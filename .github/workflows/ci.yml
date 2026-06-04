@@ -1,0 +1,146 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+
+jobs:
+  lint:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        run: go tool golangci-lint run ./...
+
+      - name: Validate GitHub Actions
+        run: go tool actionlint
+
+      - name: Validate CLI surface
+        run: go run ./cmd/diffpal --help
+
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run race tests
+        run: go test -race ./...
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Run govulncheck
+        run: go tool govulncheck ./...
+
+  azure-devops-task:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tasks/azure-devops/package-lock.json
+
+      - name: Install dependencies
+        run: npm --prefix tasks/azure-devops ci
+
+      - name: Audit runtime dependencies
+        run: npm --prefix tasks/azure-devops audit --omit=dev
+
+      - name: Build task handler
+        run: npm --prefix tasks/azure-devops run build
+
+      - name: Package production extension
+        run: npm --prefix tasks/azure-devops run package:prod
+
+      - name: Package development extension
+        run: npm --prefix tasks/azure-devops run package:dev
+
+  omnidist-package:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      OMNIDIST_VERSION: 0.1.0-dev.0
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install omnidist
+        run: npm install --global @omnidist/omnidist@latest
+
+      - name: Build artifacts
+        run: omnidist --profile default build
+
+      - name: Stage npm artifacts
+        run: omnidist --profile default npm stage
+
+      - name: Verify npm artifacts
+        run: omnidist --profile default npm verify

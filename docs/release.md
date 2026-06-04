@@ -32,10 +32,11 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-OMNIDIST_VERSION=0.1.0 npx -y @omnidist/omnidist@latest build
-npx -y @omnidist/omnidist@latest npm stage
-npx -y @omnidist/omnidist@latest npm verify
-npx -y @omnidist/omnidist@latest npm publish
+npm install --global @omnidist/omnidist@latest
+OMNIDIST_VERSION=0.1.0 omnidist --profile default build
+omnidist --profile default npm stage
+omnidist --profile default npm verify
+omnidist --profile default npm publish
 ```
 
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
@@ -90,12 +91,12 @@ present.
 
 ## CI baseline
 
-- CI provides separate `lint`, `test`, `security`, `azure-devops-task`, and `omnidist-check` jobs.
+- The `ci` workflow provides `lint`, `test`, `security`, `azure-devops-task`, and `omnidist-package` jobs in one workflow run.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
 - `azure-devops-task` runs `npm ci`, runtime dependency audit, TypeScript build, and prod/dev VSIX packaging.
-- `omnidist-check` builds, stages, and verifies the npm package without publishing.
+- `omnidist-package` builds, stages, and verifies the npm package without publishing.
 - Release automation uses omnidist and the Go version from `go.mod`.
 
 ## Change log and audits
