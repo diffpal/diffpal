@@ -107,7 +107,8 @@ jobs:
       - name: Generate checksums
         run: |
           cd release-assets
-          find . -maxdepth 1 -type f ! -name checksums.txt -print0 | sort -z | xargs -0 sha256sum -- > checksums.txt
+          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum -- > checksums.tmp
+          mv checksums.tmp checksums.txt
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
