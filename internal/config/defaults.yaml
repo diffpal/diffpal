@@ -1,0 +1,18 @@
+version: v1
+
+defaults:
+  provider: ""
+  policy: default
+
+providers:
+
+policies:
+  default:
+    block_on: high
+
+review:
+  context_lines: 20
+  max_files: 200
+  chunking:
+    max_patch_chars: 12000
+    max_files_per_chunk: 20

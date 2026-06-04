@@ -1,0 +1,32 @@
+profiles:
+    default:
+        tool:
+            name: diffpal
+            main: ./cmd/diffpal
+        version:
+            source: env
+        targets:
+            - os: darwin
+              arch: amd64
+            - os: darwin
+              arch: arm64
+            - os: linux
+              arch: amd64
+            - os: linux
+              arch: arm64
+            - os: windows
+              arch: amd64
+        build:
+            ldflags: >-
+                -s -w
+                -X github.com/diffpal/diffpal/internal/version.Version=${OMNIDIST_VERSION}
+                -X github.com/diffpal/diffpal/internal/version.GitCommit=${OMNIDIST_GIT_COMMIT}
+                -X github.com/diffpal/diffpal/internal/version.BuildDate=${OMNIDIST_BUILD_DATE}
+            tags: []
+            cgo: false
+        distributions:
+            npm:
+                package: '@diffpal/diffpal'
+                registry: https://registry.npmjs.org
+                access: public
+                include-readme: true

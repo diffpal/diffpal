@@ -1,0 +1,27 @@
+{
+  "name": "@diffpal/azure-devops-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Azure DevOps extension and pipeline task for DiffPal review",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-task-handler.js",
+    "package:prod": "npm run build && mkdir -p ../../dist && tfx extension create --manifest-globs vss-extension.json --output-path ../../dist/diffpal-review.vsix",
+    "package:dev": "npm run build && mkdir -p ../../dist && tfx extension create --manifest-globs vss-extension.dev.json --output-path ../../dist/diffpal-review-dev.vsix",
+    "publish:prod": "npm run build && tfx extension publish --manifest-globs vss-extension.json",
+    "publish:dev": "npm run build && tfx extension publish --manifest-globs vss-extension.dev.json"
+  },
+  "dependencies": {
+    "azure-pipelines-task-lib": "5.2.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "tfx-cli": "0.23.1",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

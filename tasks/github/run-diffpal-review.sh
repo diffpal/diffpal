@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+diffpal_path="${INPUT_DIFFPAL_PATH:-diffpal}"
+
+if [[ "$diffpal_path" == */* ]]; then
+  if [[ ! -x "$diffpal_path" ]]; then
+    echo "diffpal binary is not executable: $diffpal_path" >&2
+    exit 127
+  fi
+elif ! command -v "$diffpal_path" >/dev/null 2>&1; then
+  echo "diffpal binary was not found on PATH: $diffpal_path" >&2
+  exit 127
+fi
+
+require_input() {
+  local name="$1"
+  local value="$2"
+  if [[ -z "$value" ]]; then
+    echo "required input is empty: $name" >&2
+    exit 2
+  fi
+}
+
+truthy() {
+  case "${1,,}" in
+    1 | true | yes | y | on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+require_input "base" "${INPUT_BASE:-}"
+require_input "head" "${INPUT_HEAD:-}"
+
+argv=("$diffpal_path")
+
+if [[ -n "${INPUT_CONFIG_DIR:-}" ]]; then
+  argv+=(--config-dir "$INPUT_CONFIG_DIR")
+fi
+if [[ -n "${INPUT_PROFILE:-}" ]]; then
+  argv+=(--profile "$INPUT_PROFILE")
+fi
+
+argv+=(review github --base "$INPUT_BASE" --head "$INPUT_HEAD")
+
+if [[ -n "${INPUT_BLOCK_ON:-}" ]]; then
+  argv+=(--block-on "$INPUT_BLOCK_ON")
+fi
+if truthy "${INPUT_GATE:-false}"; then
+  argv+=(--gate)
+fi
+if [[ -n "${INPUT_MODE:-}" ]]; then
+  argv+=(--mode "$INPUT_MODE")
+fi
+if [[ -n "${INPUT_OUT:-}" ]]; then
+  argv+=(--out "$INPUT_OUT")
+fi
+if [[ -n "${INPUT_REPO:-}" ]]; then
+  argv+=(--repo "$INPUT_REPO")
+fi
+if [[ -n "${INPUT_REVIEW_ID:-}" ]]; then
+  argv+=(--review-id "$INPUT_REVIEW_ID")
+fi
+if [[ -n "${INPUT_MAX_FILES:-}" ]]; then
+  argv+=(--max-files "$INPUT_MAX_FILES")
+fi
+if [[ -n "${INPUT_CONTEXT_LINES:-}" ]]; then
+  argv+=(--context-lines "$INPUT_CONTEXT_LINES")
+fi
+if [[ -n "${INPUT_MAX_PATCH_CHARS:-}" ]]; then
+  argv+=(--max-patch-chars "$INPUT_MAX_PATCH_CHARS")
+fi
+if [[ -n "${INPUT_MAX_FILES_PER_CHUNK:-}" ]]; then
+  argv+=(--max-files-per-chunk "$INPUT_MAX_FILES_PER_CHUNK")
+fi
+
+exec "${argv[@]}"

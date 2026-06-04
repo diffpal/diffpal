@@ -1,0 +1,5 @@
+# DiffPal generated ignore file
+*.lock
+bin/
+dist/
+.artifacts/

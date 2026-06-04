@@ -1,0 +1,87 @@
+name: diffpal
+description: Run DiffPal review in GitHub Actions
+author: DiffPal
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  diffpal-path:
+    description: Path or command name for the diffpal binary. The binary must already be on PATH or executable at this path.
+    required: false
+    default: diffpal
+  base:
+    description: Base revision passed to diffpal review github.
+    required: true
+  head:
+    description: Head revision passed to diffpal review github.
+    required: true
+  config-dir:
+    description: Extra config root directory passed before the review command.
+    required: false
+    default: ""
+  profile:
+    description: Config profile name passed before the review command.
+    required: false
+    default: ""
+  block-on:
+    description: Severity threshold that marks findings as blocking.
+    required: false
+    default: high
+  gate:
+    description: Return non-zero when blocking findings exist.
+    required: false
+    default: "false"
+  mode:
+    description: Comma-separated GitHub publish modes.
+    required: false
+    default: ""
+  out:
+    description: Output findings bundle path.
+    required: false
+    default: ""
+  repo:
+    description: Repository id for deterministic fingerprints.
+    required: false
+    default: ""
+  review-id:
+    description: Review identifier for deterministic outputs.
+    required: false
+    default: ""
+  max-files:
+    description: Maximum files from diff.
+    required: false
+    default: ""
+  context-lines:
+    description: Context lines to enrich each changed file.
+    required: false
+    default: ""
+  max-patch-chars:
+    description: Maximum context characters per chunk.
+    required: false
+    default: ""
+  max-files-per-chunk:
+    description: Maximum files per context chunk.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Run DiffPal review
+      shell: bash
+      env:
+        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_HEAD: ${{ inputs.head }}
+        INPUT_CONFIG_DIR: ${{ inputs.config-dir }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_BLOCK_ON: ${{ inputs.block-on }}
+        INPUT_GATE: ${{ inputs.gate }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_OUT: ${{ inputs.out }}
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_REVIEW_ID: ${{ inputs.review-id }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
+        INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}
+        INPUT_MAX_FILES_PER_CHUNK: ${{ inputs.max-files-per-chunk }}
+      run: ${{ github.action_path }}/tasks/github/run-diffpal-review.sh

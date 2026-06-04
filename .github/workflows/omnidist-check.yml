@@ -1,0 +1,34 @@
+name: omnidist-check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  npm-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      OMNIDIST_VERSION: 0.1.0-dev.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build artifacts
+        run: npx -y @omnidist/omnidist@latest --profile default build
+
+      - name: Stage npm artifacts
+        run: npx -y @omnidist/omnidist@latest --profile default npm stage
+
+      - name: Verify npm artifacts
+        run: npx -y @omnidist/omnidist@latest --profile default npm verify

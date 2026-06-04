@@ -1,0 +1,45 @@
+name: diffpal-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: diffpal-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install DiffPal CLI
+        run: npm install @diffpal/diffpal@latest
+
+      - uses: ./
+        with:
+          diffpal-path: ./node_modules/.bin/diffpal
+          config-dir: .github
+          profile: ci
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          repo: ${{ github.repository }}
+          review-id: github-pr-${{ github.event.pull_request.number }}
+          mode: check-run,comments,summary
+          gate: true
+        env:
+          DIFFPAL_OPENAI_MODEL: ${{ vars.DIFFPAL_OPENAI_MODEL || 'gpt-5-mini' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

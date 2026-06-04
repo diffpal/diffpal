@@ -1,0 +1,158 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "396cd97d-4488-471f-af03-f54c0c04f6fe",
+  "name": "DiffPalReview",
+  "friendlyName": "DiffPal Review",
+  "description": "Run DiffPal review for Azure DevOps pull requests.",
+  "helpMarkDown": "Runs `diffpal review ado` using a diffpal binary that is already installed on the agent PATH.",
+  "category": "Build",
+  "author": "DiffPal",
+  "version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 0
+  },
+  "minimumAgentVersion": "3.224.0",
+  "instanceNameFormat": "DiffPal Review",
+  "inputs": [
+    {
+      "name": "diffpalPath",
+      "type": "string",
+      "label": "DiffPal path",
+      "required": false,
+      "defaultValue": "diffpal",
+      "helpMarkDown": "Path or command name for the diffpal binary."
+    },
+    {
+      "name": "base",
+      "type": "string",
+      "label": "Base revision",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Base revision. Defaults to System.PullRequest.TargetCommitId when empty."
+    },
+    {
+      "name": "head",
+      "type": "string",
+      "label": "Head revision",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Head revision. Defaults to System.PullRequest.SourceCommitId, then Build.SourceVersion, when empty."
+    },
+    {
+      "name": "configDir",
+      "type": "filePath",
+      "label": "Config directory",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Extra config root directory."
+    },
+    {
+      "name": "profile",
+      "type": "string",
+      "label": "Profile",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Config profile name."
+    },
+    {
+      "name": "blockOn",
+      "type": "pickList",
+      "label": "Block on severity",
+      "required": false,
+      "defaultValue": "high",
+      "options": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "helpMarkDown": "Severity threshold that marks findings as blocking."
+    },
+    {
+      "name": "gate",
+      "type": "boolean",
+      "label": "Gate pull request",
+      "required": false,
+      "defaultValue": "false",
+      "helpMarkDown": "Return non-zero when blocking findings exist."
+    },
+    {
+      "name": "mode",
+      "type": "string",
+      "label": "Publish modes",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Comma-separated Azure DevOps publish modes."
+    },
+    {
+      "name": "out",
+      "type": "filePath",
+      "label": "Output bundle",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Output findings bundle path."
+    },
+    {
+      "name": "repo",
+      "type": "string",
+      "label": "Repository id",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Repository id for deterministic fingerprints."
+    },
+    {
+      "name": "reviewId",
+      "type": "string",
+      "label": "Review id",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Review identifier for deterministic outputs."
+    },
+    {
+      "name": "maxFiles",
+      "type": "string",
+      "label": "Max files",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Maximum files from diff."
+    },
+    {
+      "name": "contextLines",
+      "type": "string",
+      "label": "Context lines",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Context lines to enrich each changed file."
+    },
+    {
+      "name": "maxPatchChars",
+      "type": "string",
+      "label": "Max patch chars",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Maximum context characters per chunk."
+    },
+    {
+      "name": "maxFilesPerChunk",
+      "type": "string",
+      "label": "Max files per chunk",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Maximum files per context chunk."
+    }
+  ],
+  "execution": {
+    "Node20_1": {
+      "target": "dist/index.js"
+    }
+  },
+  "restrictions": {
+    "commands": {
+      "mode": "restricted"
+    },
+    "settableVariables": {
+      "allowed": []
+    }
+  }
+}

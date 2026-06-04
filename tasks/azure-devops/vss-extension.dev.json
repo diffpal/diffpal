@@ -1,0 +1,34 @@
+{
+  "manifestVersion": 1,
+  "id": "diffpal-review-dev",
+  "name": "DiffPal Review Dev",
+  "version": "0.1.0",
+  "publisher": "diffpal",
+  "description": "Development build of the DiffPal pull request review task for Azure Pipelines.",
+  "public": false,
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "files": [
+    {
+      "path": "DiffPalReviewDevV1"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "diffpal-review-dev-task",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "DiffPalReviewDevV1"
+      }
+    }
+  ]
+}
