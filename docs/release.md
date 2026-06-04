@@ -41,6 +41,9 @@ npx -y @omnidist/omnidist@latest npm publish
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
 SemVer tag automatically. Major action aliases such as `v1` are not release
 triggers and should be pushed only after the SemVer release tag succeeds.
+NPM publishing uses token auth, not npm trusted publishing: the workflow passes
+`NPM_PUBLISH_TOKEN` and `NODE_AUTH_TOKEN`, does not request `id-token: write`,
+and sets `NPM_CONFIG_PROVENANCE=false`.
 
 4. Build Azure DevOps extension packages:
 
@@ -50,7 +53,7 @@ npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts with `NPM_PUBLISH_TOKEN`.
+5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
 6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
 7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
@@ -60,6 +63,7 @@ Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add the `NPM_PUBLISH_TOKEN` repository secret.
+- Do not configure npm trusted publishing for this first release path.
 - Add the `OPENAI_API_KEY` repository secret for `.github/workflows/diffpal-review.yml`.
 - Optionally add the `DIFFPAL_OPENAI_MODEL` repository variable. The workflow defaults to `gpt-5-mini`.
 - Push the release commit to `main`.

@@ -50,9 +50,14 @@ jobs:
       contents: read
     env:
       NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+      NPM_CONFIG_PROVENANCE: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
       - name: Download staged artifacts
         uses: actions/download-artifact@v4
         with:
