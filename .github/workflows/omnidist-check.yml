@@ -24,11 +24,14 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install omnidist
+        run: npm install --global @omnidist/omnidist@latest
+
       - name: Build artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default build
+        run: omnidist --profile default build
 
       - name: Stage npm artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default npm stage
+        run: omnidist --profile default npm stage
 
       - name: Verify npm artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default npm verify
+        run: omnidist --profile default npm verify

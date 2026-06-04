@@ -29,4 +29,5 @@ profiles:
                 package: '@diffpal/diffpal'
                 registry: https://registry.npmjs.org
                 access: public
+                publish-auth: token
                 include-readme: true

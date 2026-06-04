@@ -15,6 +15,8 @@ jobs:
         with:
           go-version-file: go.mod
       - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Set release version
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -23,12 +25,14 @@ jobs:
             exit 1
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Install omnidist
+        run: npm install --global @omnidist/omnidist@latest
       - name: Build artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default build
+        run: omnidist --profile default build
       - name: Stage artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default npm stage
+        run: omnidist --profile default npm stage
       - name: Verify artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default npm verify
+        run: omnidist --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -58,6 +62,8 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
+      - name: Install omnidist
+        run: npm install --global @omnidist/omnidist@latest
       - name: Download staged artifacts
         uses: actions/download-artifact@v4
         with:
@@ -65,7 +71,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: npx -y @omnidist/omnidist@latest --profile default npm publish
+        run: omnidist --profile default npm publish
 
   release:
     needs:
