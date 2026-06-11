@@ -2,22 +2,14 @@
 set -euo pipefail
 
 diffpal_path="${INPUT_DIFFPAL_PATH:-diffpal}"
-read -r -a diffpal_argv <<< "$diffpal_path"
 
-if [[ ${#diffpal_argv[@]} -eq 0 ]]; then
-  echo "diffpal command is empty" >&2
-  exit 127
-fi
-
-diffpal_cmd="${diffpal_argv[0]}"
-
-if [[ "$diffpal_cmd" == */* ]]; then
-  if [[ ! -x "$diffpal_cmd" ]]; then
-    echo "diffpal binary is not executable: $diffpal_cmd" >&2
+if [[ "$diffpal_path" == */* ]]; then
+  if [[ ! -x "$diffpal_path" ]]; then
+    echo "diffpal binary is not executable: $diffpal_path" >&2
     exit 127
   fi
-elif ! command -v "$diffpal_cmd" >/dev/null 2>&1; then
-  echo "diffpal binary was not found on PATH: $diffpal_cmd" >&2
+elif ! command -v "$diffpal_path" >/dev/null 2>&1; then
+  echo "diffpal binary was not found on PATH: $diffpal_path" >&2
   exit 127
 fi
 
@@ -44,7 +36,7 @@ truthy() {
 require_input "base" "${INPUT_BASE:-}"
 require_input "head" "${INPUT_HEAD:-}"
 
-argv=("${diffpal_argv[@]}")
+argv=("$diffpal_path")
 
 if [[ -n "${INPUT_CONFIG_DIR:-}" ]]; then
   argv+=(--config-dir "$INPUT_CONFIG_DIR")

@@ -6,7 +6,7 @@ branding:
   color: blue
 inputs:
   diffpal-path:
-    description: Path, command name, or command invocation for the diffpal binary.
+    description: Path or command name for the diffpal binary. The binary must already be on PATH or executable at this path.
     required: false
     default: diffpal
   base:

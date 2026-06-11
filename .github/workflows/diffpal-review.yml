@@ -25,9 +25,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install DiffPal CLI
+        run: npm install --global @diffpal/diffpal@latest
+
       - uses: ./
         with:
-          diffpal-path: npx --yes @diffpal/diffpal@latest
           config-dir: .github
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
