@@ -26,11 +26,11 @@ jobs:
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
       - name: Build artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default build
+        run: npx -y --package @omnidist/omnidist@0.1.30 omnidist --profile default build
       - name: Stage artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm stage
+        run: npx -y --package @omnidist/omnidist@0.1.30 omnidist --profile default npm stage
       - name: Verify artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm verify
+        run: npx -y --package @omnidist/omnidist@0.1.30 omnidist --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -68,7 +68,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm publish
+        run: npx -y --package @omnidist/omnidist@0.1.30 omnidist --profile default npm publish
 
   release:
     needs:

@@ -11,7 +11,9 @@ providers:
       cmd:
         - npx
         - -y
+        - --package
         - @github/copilot@1.0.61
+        - copilot
       extra_args:
         - --stdio
 
