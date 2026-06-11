@@ -165,7 +165,19 @@ func isTransientProviderError(err error) bool {
 		return true
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return strings.Contains(msg, "structured output schema validation") ||
-		strings.Contains(msg, "no json object found") ||
+	return isStructuredOutputProviderMessage(msg) ||
 		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
+}
+
+func isStructuredOutputProviderError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return isStructuredOutputProviderMessage(msg)
+}
+
+func isStructuredOutputProviderMessage(msg string) bool {
+	return strings.Contains(msg, "structured output schema validation") ||
+		strings.Contains(msg, "no json object found")
 }
