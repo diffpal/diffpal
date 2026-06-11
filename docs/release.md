@@ -44,15 +44,11 @@ node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile defa
 `OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action aliases
 such as `v1` are not release triggers and should be pushed only after the SemVer
 release tag succeeds.
-NPM publishing should use trusted publishing/OIDC with provenance enabled. If a
-bootstrap release must use `NPM_PUBLISH_TOKEN`, run it only from a protected
-GitHub Environment with required reviewers and remove that fallback after the
-trusted publishing path is verified.
+NPM publishing uses trusted publishing/OIDC with provenance enabled.
 Keep release credentials least-privilege and scoped to the one service that
 needs them. Do not echo token values, run commands with shell tracing, or copy
-secrets into artifacts/logs. Prefer OIDC/provenance-based publishing whenever
-the target registry supports it; use long-lived repository secrets only as a
-temporary fallback.
+secrets into artifacts/logs. Use GitHub Environment secrets with required
+reviewers for any non-OIDC credential that cannot be avoided.
 Concrete controls:
 
 - Run `diffpal-review` only for same-repository pull requests; do not expose
@@ -61,8 +57,8 @@ Concrete controls:
   third-party actions in jobs that can read release or review secrets.
 - Leave `ACTIONS_STEP_DEBUG` and shell tracing disabled for secret-bearing
   jobs.
-- Prefer protected GitHub Environments with required reviewers for publish jobs
-  that use long-lived tokens.
+- Use protected GitHub Environments with required reviewers for publish jobs
+  that need any marketplace credential.
 
 Required same-repository guard for any review job that reads
 `COPILOT_GITHUB_TOKEN`:
@@ -87,8 +83,7 @@ npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts through trusted publishing/OIDC. Use `NPM_PUBLISH_TOKEN`
-   only as a temporary bootstrap fallback in a protected environment.
+5. Publish npm artifacts through trusted publishing/OIDC.
 6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
 7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
@@ -97,11 +92,10 @@ npm --prefix tasks/azure-devops run package:dev
 Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
-- Add the `NPM_PUBLISH_TOKEN` repository secret.
-- Add the `COPILOT_GITHUB_TOKEN` repository secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
+- Configure npm trusted publishing for `.github/workflows/omnidist-release.yml`.
+- Add `COPILOT_GITHUB_TOKEN` as a protected Environment secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
-- Do not configure npm trusted publishing for this first release path.
 - Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.

@@ -30,7 +30,6 @@ Required:
 - token source:
   - `system_access_token`
   - `pat`
-  - `none`
 
 ## PR thread publishing
 
