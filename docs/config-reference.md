@@ -72,8 +72,11 @@ Config files support envsubst-style placeholders before YAML parsing:
 - `$VAR`
 - `${VAR}`
 
-Missing referenced variables fail config load. Quote substituted values when they
-may contain YAML-significant characters:
+Referenced variables are required at config-load time. Prefer the standard
+runtime environment fallbacks listed below for optional CI credentials, and use
+placeholders only when the command must fail before YAML parsing if a value is
+missing. Quote substituted values when they may contain YAML-significant
+characters:
 
 ```yaml
 api_key: "${OPENAI_API_KEY}"
@@ -112,8 +115,9 @@ Rules:
 - `review github` requires configured `token` or `GITHUB_TOKEN`.
 - `review gitlab` prefers API token, then falls back to job token.
 - `review ado` uses `platforms.azure` and prefers system access token, then falls back to PAT.
-- Envsubst placeholders remain supported, but missing referenced variables fail
-  config load before command-specific auth resolution can run.
+- Envsubst placeholders remain supported for required values. For optional CI
+  credentials, omit the config value and let command-specific auth resolution
+  read the standard environment variables above.
 
 ## Policy and Exit Codes
 

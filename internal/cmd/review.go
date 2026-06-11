@@ -322,18 +322,21 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			return err
 		}
 		commentPlan := github.PlanInlineComments(existingComments, bundle.Findings)
-		for _, mode := range modes {
-			switch normalizePublishMode(platform, mode) {
-			case "check_run":
-				if err := github.PublishCheckRun(ctx, auth.Token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
-					return err
-				}
-			case "github_comments":
-				if err := github.PublishInlineComments(ctx, auth.Token, reviewCtx, commentPlan, nil); err != nil {
-					return err
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				switch normalizePublishMode(platform, mode) {
+				case "check_run":
+					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
+						return err
+					}
+				case "github_comments":
+					if err := github.PublishInlineComments(ctx, token, reviewCtx, commentPlan, nil); err != nil {
+						return err
+					}
 				}
 			}
-		}
+			return nil
+		})
 	case "gitlab":
 		reviewCtx, err := gitlabpub.ResolveContext(bundle.BaseSHA, bundle.HeadSHA, "", "")
 		if err != nil {
@@ -345,14 +348,17 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		}
 		blockThresholds := []string{blockOn}
 		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
-		for _, mode := range modes {
-			if normalizePublishMode(platform, mode) != "discussions" {
-				continue
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				if normalizePublishMode(platform, mode) != "discussions" {
+					continue
+				}
+				if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+					return err
+				}
 			}
-			if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, auth.Token, reviewCtx, plan, nil); err != nil {
-				return err
-			}
-		}
+			return nil
+		})
 	case "azure":
 		reviewCtx, err := azure.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
 		if err != nil {
@@ -365,22 +371,24 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
-		for _, mode := range modes {
-			switch normalizePublishMode(platform, mode) {
-			case "threads":
-				if err := azure.PublishThreads(ctx, auth.Mode, auth.Token, reviewCtx, plan, nil); err != nil {
-					return err
-				}
-			case "status":
-				if err := azure.PublishStatus(ctx, auth.Mode, auth.Token, reviewCtx, status, nil); err != nil {
-					return err
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				switch normalizePublishMode(platform, mode) {
+				case "threads":
+					if err := azure.PublishThreads(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+						return err
+					}
+				case "status":
+					if err := azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
+						return err
+					}
 				}
 			}
-		}
+			return nil
+		})
 	default:
 		return fmt.Errorf("unsupported platform %q", platform)
 	}
-	return nil
 }
 
 func hostDisplayName(name string) string {

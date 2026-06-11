@@ -35,12 +35,10 @@ func TestResolveGitHubUsesEnvToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
-	if resolved.Token != "env-token" {
-		t.Fatal("Token did not match expected environment token")
-	}
 	if resolved.Source != "GITHUB_TOKEN" {
 		t.Fatalf("Source = %q, want GITHUB_TOKEN", resolved.Source)
 	}
+	assertResolvedToken(t, resolved, "env-token")
 }
 
 func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
@@ -62,9 +60,7 @@ func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
 	if resolved.Mode != "gitlab_token" {
 		t.Fatalf("Mode = %q, want gitlab_token", resolved.Mode)
 	}
-	if resolved.Token != "api-token" {
-		t.Fatal("Token did not match expected configured API token")
-	}
+	assertResolvedToken(t, resolved, "api-token")
 }
 
 func TestResolveGitLabUsesEnvTokens(t *testing.T) {
@@ -74,12 +70,10 @@ func TestResolveGitLabUsesEnvTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
-	if resolved.Token != "job-env-token" {
-		t.Fatal("Token did not match expected CI job token")
-	}
 	if resolved.Source != "CI_JOB_TOKEN" {
 		t.Fatalf("Source = %q, want CI_JOB_TOKEN", resolved.Source)
 	}
+	assertResolvedToken(t, resolved, "job-env-token")
 }
 
 func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
@@ -101,9 +95,7 @@ func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
 	if resolved.Mode != "system_access_token" {
 		t.Fatalf("Mode = %q, want system_access_token", resolved.Mode)
 	}
-	if resolved.Token != "system-token" {
-		t.Fatal("Token did not match expected system access token")
-	}
+	assertResolvedToken(t, resolved, "system-token")
 }
 
 func TestResolveADOUsesEnvToken(t *testing.T) {
@@ -113,12 +105,10 @@ func TestResolveADOUsesEnvToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
-	if resolved.Token != "system-env-token" {
-		t.Fatal("Token did not match expected system access token from environment")
-	}
 	if resolved.Source != "SYSTEM_ACCESSTOKEN" {
 		t.Fatalf("Source = %q, want SYSTEM_ACCESSTOKEN", resolved.Source)
 	}
+	assertResolvedToken(t, resolved, "system-env-token")
 }
 
 func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
@@ -139,5 +129,18 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func assertResolvedToken(t *testing.T, resolved Resolved, want string) {
+	t.Helper()
+	err := resolved.WithToken(func(token string) error {
+		if token != want {
+			t.Fatalf("token passed to callback = %q, want %q", token, want)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithToken() error = %v", err)
 	}
 }

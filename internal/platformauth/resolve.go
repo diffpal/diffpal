@@ -11,8 +11,12 @@ import (
 type Resolved struct {
 	Platform string
 	Mode     string
-	Token    string
 	Source   string
+	token    string
+}
+
+func (r Resolved) WithToken(use func(string) error) error {
+	return use(r.token)
 }
 
 func Resolve(cfg config.Config, platform string) (Resolved, error) {
@@ -41,8 +45,8 @@ func resolveGitHub(cfg config.Config) (Resolved, error) {
 	return Resolved{
 		Platform: "github",
 		Mode:     "github_token",
-		Token:    token,
 		Source:   source,
+		token:    token,
 	}, nil
 }
 
@@ -66,15 +70,15 @@ func resolveGitLab(cfg config.Config) (Resolved, error) {
 		return Resolved{
 			Platform: "gitlab",
 			Mode:     "gitlab_token",
-			Token:    apiToken,
 			Source:   apiSource,
+			token:    apiToken,
 		}, nil
 	}
 	return Resolved{
 		Platform: "gitlab",
 		Mode:     "ci_job_token",
-		Token:    jobToken,
 		Source:   jobSource,
+		token:    jobToken,
 	}, nil
 }
 
@@ -98,14 +102,14 @@ func resolveADO(cfg config.Config) (Resolved, error) {
 		return Resolved{
 			Platform: "ado",
 			Mode:     "system_access_token",
-			Token:    systemToken,
 			Source:   systemSource,
+			token:    systemToken,
 		}, nil
 	}
 	return Resolved{
 		Platform: "ado",
 		Mode:     "pat",
-		Token:    pat,
 		Source:   patSource,
+		token:    pat,
 	}, nil
 }
