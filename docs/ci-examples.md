@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   review:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,7 +37,6 @@ jobs:
           --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
 ## GitLab CI
@@ -85,9 +85,8 @@ steps:
     inputs:
       diffpalPath: ./node_modules/.bin/diffpal
       gate: true
-    env:
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-      OPENAI_API_KEY: $(OPENAI_API_KEY)
+	    env:
+	      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
 ## Semantics
