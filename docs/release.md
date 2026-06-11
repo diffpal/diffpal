@@ -32,10 +32,10 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" npx -y @omnidist/omnidist@0.1.30 --profile default build
-npx -y @omnidist/omnidist@0.1.30 --profile default npm stage
-npx -y @omnidist/omnidist@0.1.30 --profile default npm verify
-npx -y @omnidist/omnidist@0.1.30 --profile default npm publish
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" npx -y --package @omnidist/omnidist@0.1.30 -- node -e 'process.argv=[process.argv[0],process.argv[1],"--profile","default","build"]; import("@omnidist/omnidist/omnidist.js")'
+npx -y --package @omnidist/omnidist@0.1.30 -- node -e 'process.argv=[process.argv[0],process.argv[1],"--profile","default","npm","stage"]; import("@omnidist/omnidist/omnidist.js")'
+npx -y --package @omnidist/omnidist@0.1.30 -- node -e 'process.argv=[process.argv[0],process.argv[1],"--profile","default","npm","verify"]; import("@omnidist/omnidist/omnidist.js")'
+npx -y --package @omnidist/omnidist@0.1.30 -- node -e 'process.argv=[process.argv[0],process.argv[1],"--profile","default","npm","publish"]; import("@omnidist/omnidist/omnidist.js")'
 ```
 
 `@omnidist/omnidist` is invoked with an exact package version. The

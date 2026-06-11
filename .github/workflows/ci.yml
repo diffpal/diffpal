@@ -134,10 +134,16 @@ jobs:
           node-version: 20
 
       - name: Build artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default build
+        run: >-
+          npx -y --package @omnidist/omnidist@0.1.30 -- node -e
+          'process.argv=[process.argv[0],process.argv[1],"--profile","default","build"]; import("@omnidist/omnidist/omnidist.js")'
 
       - name: Stage npm artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm stage
+        run: >-
+          npx -y --package @omnidist/omnidist@0.1.30 -- node -e
+          'process.argv=[process.argv[0],process.argv[1],"--profile","default","npm","stage"]; import("@omnidist/omnidist/omnidist.js")'
 
       - name: Verify npm artifacts
-        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm verify
+        run: >-
+          npx -y --package @omnidist/omnidist@0.1.30 -- node -e
+          'process.argv=[process.argv[0],process.argv[1],"--profile","default","npm","verify"]; import("@omnidist/omnidist/omnidist.js")'
