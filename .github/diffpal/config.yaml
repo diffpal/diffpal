@@ -23,4 +23,6 @@ review:
     max_files_per_chunk: 20
 
 platforms:
-  github: {}
+  github:
+    auth:
+      token: "${GITHUB_TOKEN}"
