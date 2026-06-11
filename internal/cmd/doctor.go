@@ -38,8 +38,6 @@ func newDoctorCommand() *cobra.Command {
 			cfg := config.Config{}
 			if configExists {
 				cfg, err = config.LoadConfig(workingDir, rootConfigDir, rootProfile)
-			} else {
-				err = fmt.Errorf("%s not found", configPath)
 			}
 			if err != nil && configExists {
 				issues = append(issues, "error: config validation failed: "+err.Error())

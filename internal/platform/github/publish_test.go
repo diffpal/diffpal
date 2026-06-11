@@ -67,6 +67,9 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	if payload.Annotations[1].AnnotationLevel != "warning" {
 		t.Fatalf("second annotation level = %q, want warning", payload.Annotations[1].AnnotationLevel)
 	}
+	if payload.Annotations[0].Message != "message 0" {
+		t.Fatalf("first annotation message = %q, want message 0", payload.Annotations[0].Message)
+	}
 	encoded, err := json.Marshal(payload.Annotations[0])
 	if err != nil {
 		t.Fatalf("Marshal annotation error = %v", err)
@@ -76,6 +79,15 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	}
 	if strings.Contains(string(encoded), `"level"`) {
 		t.Fatalf("annotation JSON contains unsupported level field: %s", encoded)
+	}
+}
+
+func TestAnnotationMessageFallsBackToTitle(t *testing.T) {
+	t.Parallel()
+
+	got := annotationMessage(findings.Finding{Title: "title only"})
+	if got != "title only" {
+		t.Fatalf("annotationMessage() = %q, want title only", got)
 	}
 }
 

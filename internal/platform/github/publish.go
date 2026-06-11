@@ -49,7 +49,7 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 			Path:            finding.Path,
 			StartLine:       finding.StartLine,
 			EndLine:         finding.EndLine,
-			Message:         finding.Title,
+			Message:         annotationMessage(finding),
 			AnnotationLevel: level,
 		})
 	}
@@ -76,6 +76,13 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 
 func CheckRunSummary(bundle findings.FindingsBundle) string {
 	return markdown.RenderSummary(bundle)
+}
+
+func annotationMessage(finding findings.Finding) string {
+	if finding.Message != "" {
+		return finding.Message
+	}
+	return finding.Title
 }
 
 func chunkAnnotations(items []Annotation, size int) []AnnotationBatch {

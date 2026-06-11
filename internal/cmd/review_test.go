@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -252,13 +253,18 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("CI_COMMIT_SHA", "head-a")
 
 	var requests int
+	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		if r.URL.Path != "/projects/acme/diffpal/merge_requests/42/discussions" {
-			t.Fatalf("path = %q, want GitLab discussions endpoint", r.URL.Path)
+			handlerErrs <- fmt.Errorf("path = %q, want GitLab discussions endpoint", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
 		}
 		if got := r.Header.Get("PRIVATE-TOKEN"); got != "gitlab-token" {
-			t.Fatalf("PRIVATE-TOKEN = %q, want gitlab-token", got)
+			handlerErrs <- fmt.Errorf("PRIVATE-TOKEN = %q, want gitlab-token", got)
+			http.Error(w, "unexpected token", http.StatusUnauthorized)
+			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -285,6 +291,11 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	if requests != 1 {
 		t.Fatalf("requests = %d, want 1", requests)
 	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
 }
 
 func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
@@ -302,13 +313,18 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("BUILD_SOURCEVERSION", "head-a")
 
 	var requests int
+	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		if !strings.HasSuffix(r.URL.Path, "/statuses") {
-			t.Fatalf("path = %q, want ADO statuses endpoint", r.URL.Path)
+			handlerErrs <- fmt.Errorf("path = %q, want ADO statuses endpoint", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
 		}
 		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
-			t.Fatalf("Authorization = %q, want Basic auth", got)
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Basic auth", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -334,6 +350,11 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	}
 	if requests != 1 {
 		t.Fatalf("requests = %d, want 1", requests)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
 	}
 }
 

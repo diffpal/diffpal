@@ -64,7 +64,7 @@ Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add the `NPM_PUBLISH_TOKEN` repository secret.
-- Add the `COPILOT_GITHUB_TOKEN` repository secret using a user-owned fine-grained GitHub PAT with Copilot Requests account permission.
+- Add the `COPILOT_GITHUB_TOKEN` repository secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
 - Do not configure npm trusted publishing for this first release path.
 - Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
