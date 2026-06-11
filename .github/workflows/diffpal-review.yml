@@ -25,15 +25,9 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install DiffPal CLI
-        run: npm install @diffpal/diffpal@latest
-
-      - name: Ensure DiffPal CLI is executable
-        run: chmod +x ./node_modules/.bin/diffpal
-
       - uses: ./
         with:
-          diffpal-path: ./node_modules/.bin/diffpal
+          diffpal-path: npx --yes @diffpal/diffpal@latest
           config-dir: .github
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
