@@ -23,10 +23,13 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install DiffPal CLI
         run: npm install --global @diffpal/diffpal@latest
+
+      - name: Install Copilot CLI
+        run: npm install --global @github/copilot
 
       - uses: ./
         with:
@@ -39,6 +42,5 @@ jobs:
           mode: check-run,comments,summary
           gate: true
         env:
-          DIFFPAL_OPENAI_MODEL: ${{ vars.DIFFPAL_OPENAI_MODEL || 'gpt-5-mini' }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

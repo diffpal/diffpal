@@ -65,8 +65,7 @@ Before the first public release:
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add the `NPM_PUBLISH_TOKEN` repository secret.
 - Do not configure npm trusted publishing for this first release path.
-- Add the `OPENAI_API_KEY` repository secret for `.github/workflows/diffpal-review.yml`.
-- Optionally add the `DIFFPAL_OPENAI_MODEL` repository variable. The workflow defaults to `gpt-5-mini`.
+- Ensure Copilot CLI can authenticate in `.github/workflows/diffpal-review.yml` with the workflow `GITHUB_TOKEN`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
 - Move or create the major action tag, such as `v1`, after the release commit is verified.

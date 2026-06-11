@@ -1,14 +1,14 @@
 version: v1
 
 defaults:
-  provider: openai-fast
+  provider: copilot-acp
   policy: default
 
 providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5-mini
+  copilot-acp:
+    type: copilot_acp
+    copilot_acp:
+      mode: ""
 
 policies:
   default:
