@@ -36,7 +36,7 @@ Required:
 
 - Only actionable findings with canonical `start_line > 0` and high confidence produce inline thread actions.
 - Key model:
-  - `path + ":" + start_line + ":" + ruleID`
+  - `path + ":" + start_line + ":" + end_line + ":" + ruleID`
 - Re-runs are idempotent via stored key + finding ID:
   - same key + same finding ID → skip
   - same key + different finding ID → update

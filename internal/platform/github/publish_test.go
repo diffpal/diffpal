@@ -2,7 +2,6 @@ package github
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -25,16 +24,20 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 			severity = "high"
 			blocking = true
 		}
+		message := "message"
+		if i == 0 {
+			message = "message 0"
+		}
 		bundle.Findings = append(bundle.Findings, findings.Finding{
-			RuleID:    fmt.Sprintf("rule-%d", i),
+			RuleID:    "rule",
 			Category:  "correctness",
 			Severity:  severity,
 			Blocking:  blocking,
-			Path:      fmt.Sprintf("internal/file-%02d.go", i),
+			Path:      "internal/file.go",
 			StartLine: i + 1,
 			EndLine:   i + 1,
-			Title:     fmt.Sprintf("finding %d", i),
-			Message:   fmt.Sprintf("message %d", i),
+			Title:     "finding",
+			Message:   message,
 		})
 	}
 
