@@ -25,8 +25,8 @@ jobs:
             exit 1
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Install omnidist
-        run: npm install --no-save @omnidist/omnidist@0.1.30
+      - name: Install CI npm tools
+        run: npm ci --ignore-scripts
       - name: Build artifacts
         run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
@@ -63,8 +63,8 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      - name: Install omnidist
-        run: npm install --no-save @omnidist/omnidist@0.1.30
+      - name: Install CI npm tools
+        run: npm ci --ignore-scripts
       - name: Download staged artifacts
         uses: actions/download-artifact@v8
         with:

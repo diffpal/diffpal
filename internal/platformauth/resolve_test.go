@@ -134,13 +134,15 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 
 func assertResolvedToken(t *testing.T, resolved Resolved, want string) {
 	t.Helper()
+	var got string
 	err := resolved.WithToken(func(token string) error {
-		if token != want {
-			t.Fatalf("token passed to callback = %q, want %q", token, want)
-		}
+		got = token
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("WithToken() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("token passed to callback = %q, want %q", got, want)
 	}
 }

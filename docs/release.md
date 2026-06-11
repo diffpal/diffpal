@@ -32,7 +32,7 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm install --no-save @omnidist/omnidist@0.1.30
+npm ci --ignore-scripts
 OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
 node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
 node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
@@ -45,6 +45,11 @@ triggers and should be pushed only after the SemVer release tag succeeds.
 NPM publishing uses token auth for the first release path. Enable npm provenance
 once the package is ready for trusted publishing, then remove the token-only
 fallback.
+Keep release credentials least-privilege and scoped to the one service that
+needs them. Do not echo token values, run commands with shell tracing, or copy
+secrets into artifacts/logs. Prefer OIDC/provenance-based publishing whenever
+the target registry supports it; use long-lived repository secrets only as a
+temporary fallback.
 
 4. Build Azure DevOps extension packages:
 
@@ -65,6 +70,8 @@ Before the first public release:
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add the `NPM_PUBLISH_TOKEN` repository secret.
 - Add the `COPILOT_GITHUB_TOKEN` repository secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
+- Keep all release and review secrets scoped to the minimum permissions, rotate
+  them after any suspected exposure, and never print them in workflow logs.
 - Do not configure npm trusted publishing for this first release path.
 - Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.

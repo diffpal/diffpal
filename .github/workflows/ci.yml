@@ -133,8 +133,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install omnidist
-        run: npm install --no-save @omnidist/omnidist@0.1.30
+      - name: Install CI npm tools
+        run: npm ci --ignore-scripts
 
       - name: Build artifacts
         run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build

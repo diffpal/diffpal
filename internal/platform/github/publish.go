@@ -33,10 +33,10 @@ type CheckRunPayload struct {
 
 func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSummary string) CheckRunPayload {
 	levelBySeverity := map[string]string{
-		"critical": "error",
-		"high":     "error",
+		"critical": "failure",
+		"high":     "failure",
 		"medium":   "warning",
-		"low":      "note",
+		"low":      "notice",
 	}
 	annotations := make([]Annotation, 0, len(bundle.Findings))
 	blocking := 0
