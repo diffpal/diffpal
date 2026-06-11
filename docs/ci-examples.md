@@ -28,14 +28,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install @diffpal/diffpal@latest
-      - uses: diffpal/action@v1
-        with:
-          diffpal-path: ./node_modules/.bin/diffpal
-          config-dir: .github
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          gate: true
+      - run: npm install --global @diffpal/diffpal@latest
+      - run: >-
+          diffpal review github
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

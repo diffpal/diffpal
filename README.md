@@ -15,7 +15,7 @@ DiffPal is a diff-first, policy-aware review assistant.
 - CLI package: `@diffpal/diffpal`
 - GitHub Action: `diffpal/action`
 - NPM scope: `@diffpal/*`
-- Self-review: `.github/workflows/diffpal-review.yml` installs `@diffpal/diffpal@latest` and runs this repository's action on same-repository pull requests.
+- Self-review: `.github/workflows/diffpal-review.yml` installs the current branch CLI globally and runs it against `.config/diffpal/config.yaml` on same-repository pull requests.
 
 See [docs/product-contract.md](docs/product-contract.md) for full contract details.
 

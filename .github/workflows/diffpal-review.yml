@@ -35,16 +35,15 @@ jobs:
       - name: Install Copilot CLI
         run: npm install --global @github/copilot@1.0.61
 
-      - uses: ./
-        with:
-          config-dir: .github
-          profile: ci
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          repo: ${{ github.repository }}
-          review-id: github-pr-${{ github.event.pull_request.number }}
-          mode: check-run,comments,summary
-          gate: true
+      - name: Run DiffPal review
+        run: >-
+          diffpal --profile ci review github
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --repo ${{ github.repository }}
+          --review-id github-pr-${{ github.event.pull_request.number }}
+          --mode check-run,comments,summary
+          --gate
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

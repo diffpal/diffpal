@@ -63,7 +63,7 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
   - `platforms.azure.auth.pat`
 - Standard CI env fallbacks are `SYSTEM_ACCESSTOKEN` and `AZURE_DEVOPS_EXT_PAT`.
 - Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access.
-- Envsubst placeholders such as `system_access_token: "${SYSTEM_ACCESSTOKEN}"` are supported when you want config-file injection, but missing referenced variables fail config load.
+- Prefer the standard CI environment fallback for `SYSTEM_ACCESSTOKEN` rather than committed token placeholders. If you use envsubst placeholders for explicit config injection, define those variables in the pipeline before loading config.
 - Azure Pipelines must enable `Allow scripts to access the OAuth token` so `SYSTEM_ACCESSTOKEN` is present.
 - Keep token scope to PR validation service connections or project defaults.
 - Avoid broad service permissions in non-interactive PR contexts.
