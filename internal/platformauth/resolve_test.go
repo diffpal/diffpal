@@ -122,6 +122,9 @@ func TestResolveADOUsesEnvToken(t *testing.T) {
 }
 
 func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "")
+	t.Setenv("CI_JOB_TOKEN", "")
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitLab: config.GitLabPlatformConfig{

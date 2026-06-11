@@ -33,7 +33,7 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 
 ```bash
 npm install --global @omnidist/omnidist@0.1.30
-OMNIDIST_VERSION=0.1.0 omnidist --profile default build
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" omnidist --profile default build
 omnidist --profile default npm stage
 omnidist --profile default npm verify
 omnidist --profile default npm publish
