@@ -11,7 +11,7 @@ providers:
       cmd:
         - npx
         - --no-install
-        - copilot
+        - ./node_modules/.bin/copilot
       extra_args:
         - --stdio
 
