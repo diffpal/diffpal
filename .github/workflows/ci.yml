@@ -134,10 +134,10 @@ jobs:
           node-version: 20
 
       - name: Build artifacts
-        run: npx -y -p @omnidist/omnidist@0.1.30 omnidist --profile default build
+        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default build
 
       - name: Stage npm artifacts
-        run: npx -y -p @omnidist/omnidist@0.1.30 omnidist --profile default npm stage
+        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm stage
 
       - name: Verify npm artifacts
-        run: npx -y -p @omnidist/omnidist@0.1.30 omnidist --profile default npm verify
+        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm verify
