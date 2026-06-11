@@ -134,7 +134,7 @@ jobs:
           node-version: 20
 
       - name: Install CI npm tools
-        run: npm ci --ignore-scripts
+        run: npm ci --include=dev --ignore-scripts
 
       - name: Build artifacts
         run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build

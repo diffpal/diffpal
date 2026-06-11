@@ -32,16 +32,21 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm ci --ignore-scripts
+npm ci --include=dev --ignore-scripts
+npm ls @omnidist/omnidist@0.1.30
 OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
 node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
 node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
 node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 ```
 
-The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
-SemVer tag automatically. Major action aliases such as `v1` are not release
-triggers and should be pushed only after the SemVer release tag succeeds.
+`@omnidist/omnidist` is pinned in the root `package.json` and
+`package-lock.json`; release jobs install from the committed lockfile and verify
+the exact package version before running it. Do not regenerate or update the
+lockfile inside a release job. The `omnidist-release` workflow derives
+`OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action
+aliases such as `v1` are not release triggers and should be pushed only after
+the SemVer release tag succeeds.
 NPM publishing should use trusted publishing/OIDC with provenance enabled. If a
 bootstrap release must use `NPM_PUBLISH_TOKEN`, run it only from a protected
 GitHub Environment with required reviewers and remove that fallback after the

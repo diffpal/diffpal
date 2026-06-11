@@ -26,7 +26,7 @@ jobs:
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
       - name: Install CI npm tools
-        run: npm ci --ignore-scripts
+        run: npm ci --include=dev --ignore-scripts
       - name: Build artifacts
         run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
@@ -64,7 +64,7 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
       - name: Install CI npm tools
-        run: npm ci --ignore-scripts
+        run: npm ci --include=dev --ignore-scripts
       - name: Download staged artifacts
         uses: actions/download-artifact@v8
         with:
