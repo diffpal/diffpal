@@ -5,10 +5,6 @@ branding:
   icon: check-circle
   color: blue
 inputs:
-  diffpal-path:
-    description: Path or command name for the diffpal binary. The binary must already be on PATH or executable at this path.
-    required: false
-    default: diffpal
   base:
     description: Base revision passed to diffpal review github.
     required: true
@@ -69,7 +65,6 @@ runs:
     - name: Run DiffPal review
       shell: bash
       env:
-        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
         INPUT_BASE: ${{ inputs.base }}
         INPUT_HEAD: ${{ inputs.head }}
         INPUT_CONFIG_DIR: ${{ inputs.config-dir }}
