@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -70,8 +71,8 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	if err == nil {
 		t.Fatal("Execute() error = nil, want blocked gate error")
 	}
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 1 {
@@ -209,8 +210,8 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	if err == nil {
 		t.Fatal("Execute() error = nil, want host auth failure")
 	}
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 2 {
@@ -340,8 +341,8 @@ func TestReviewRequiresConfigWithExitCode2(t *testing.T) {
 		t.Fatal("Execute() error = nil, want config failure")
 	}
 
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 2 {

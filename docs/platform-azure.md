@@ -55,8 +55,8 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 ## Token and setup guidance
 
 - The `DiffPalReview@1` task expects the `diffpal` CLI to be installed before
-  the task runs. The standard install path is
-  `npm install @diffpal/diffpal@latest`, then `diffpalPath:
+  the task runs. Pin the CLI to an audited SemVer version, for example
+  `npm install @diffpal/diffpal@1.2.3`, then `diffpalPath:
   ./node_modules/.bin/diffpal`.
 - Config auth values:
   - `platforms.azure.auth.system_access_token`

@@ -50,6 +50,16 @@ needs them. Do not echo token values, run commands with shell tracing, or copy
 secrets into artifacts/logs. Prefer OIDC/provenance-based publishing whenever
 the target registry supports it; use long-lived repository secrets only as a
 temporary fallback.
+Concrete controls:
+
+- Run `diffpal-review` only for same-repository pull requests; do not expose
+  `COPILOT_GITHUB_TOKEN` to forked PRs or `pull_request_target` workflows.
+- Keep workflow `permissions` minimal for each job and avoid unpinned
+  third-party actions in jobs that can read release or review secrets.
+- Leave `ACTIONS_STEP_DEBUG` and shell tracing disabled for secret-bearing
+  jobs.
+- Prefer protected GitHub Environments with required reviewers for publish jobs
+  that use long-lived tokens.
 
 4. Build Azure DevOps extension packages:
 
