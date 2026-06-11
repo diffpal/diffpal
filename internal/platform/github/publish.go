@@ -8,11 +8,11 @@ import (
 const maxAnnotationsPerBatch = 50
 
 type Annotation struct {
-	Path      string `json:"path"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
-	Message   string `json:"message"`
-	Level     string `json:"level"`
+	Path            string `json:"path"`
+	StartLine       int    `json:"start_line"`
+	EndLine         int    `json:"end_line"`
+	Message         string `json:"message"`
+	AnnotationLevel string `json:"annotation_level"`
 }
 
 type AnnotationBatch struct {
@@ -46,11 +46,11 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 			blocking++
 		}
 		annotations = append(annotations, Annotation{
-			Path:      finding.Path,
-			StartLine: finding.StartLine,
-			EndLine:   finding.EndLine,
-			Message:   finding.Title,
-			Level:     level,
+			Path:            finding.Path,
+			StartLine:       finding.StartLine,
+			EndLine:         finding.EndLine,
+			Message:         finding.Title,
+			AnnotationLevel: level,
 		})
 	}
 	conclusion := "success"

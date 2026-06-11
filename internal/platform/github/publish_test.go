@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -59,6 +60,22 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	}
 	if len(payload.Annotations) != 50 {
 		t.Fatalf("Annotations = %d, want 50 primary annotations", len(payload.Annotations))
+	}
+	if payload.Annotations[0].AnnotationLevel != "error" {
+		t.Fatalf("first annotation level = %q, want error", payload.Annotations[0].AnnotationLevel)
+	}
+	if payload.Annotations[1].AnnotationLevel != "warning" {
+		t.Fatalf("second annotation level = %q, want warning", payload.Annotations[1].AnnotationLevel)
+	}
+	encoded, err := json.Marshal(payload.Annotations[0])
+	if err != nil {
+		t.Fatalf("Marshal annotation error = %v", err)
+	}
+	if !strings.Contains(string(encoded), `"annotation_level":"error"`) {
+		t.Fatalf("annotation JSON missing annotation_level: %s", encoded)
+	}
+	if strings.Contains(string(encoded), `"level"`) {
+		t.Fatalf("annotation JSON contains unsupported level field: %s", encoded)
 	}
 }
 
