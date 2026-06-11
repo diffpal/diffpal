@@ -132,6 +132,32 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 }
 
+func TestLoadConfigRejectsNegativeReviewEnvOverrides(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+	}{
+		{name: "max files", env: "DIFFPAL_REVIEW_MAX_FILES"},
+		{name: "context lines", env: "DIFFPAL_REVIEW_CONTEXT_LINES"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
+			t.Setenv(tc.env, "-1")
+
+			_, err := LoadConfig(dir, "", "")
+			if err == nil {
+				t.Fatal("LoadConfig() error = nil, want invalid env override error")
+			}
+			if !strings.Contains(err.Error(), "must be non-negative") {
+				t.Fatalf("LoadConfig() error = %v, want non-negative validation", err)
+			}
+		})
+	}
+}
+
 func TestLoadConfigExpandsEnvsubstValuesBeforeYAMLDecode(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `

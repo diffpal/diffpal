@@ -229,20 +229,31 @@ func (cfg *Config) ApplyEnvOverrides() error {
 		cfg.setOpenAIModel(value)
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_MAX_FILES")); value != "" {
-		parsed, err := strconv.Atoi(value)
+		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_MAX_FILES", value)
 		if err != nil {
-			return fmt.Errorf("invalid DIFFPAL_REVIEW_MAX_FILES %q: %w", value, err)
+			return err
 		}
 		cfg.Review.MaxFiles = parsed
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CONTEXT_LINES")); value != "" {
-		parsed, err := strconv.Atoi(value)
+		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_CONTEXT_LINES", value)
 		if err != nil {
-			return fmt.Errorf("invalid DIFFPAL_REVIEW_CONTEXT_LINES %q: %w", value, err)
+			return err
 		}
 		cfg.Review.ContextLines = parsed
 	}
 	return nil
+}
+
+func parseNonNegativeEnvInt(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: %w", name, value, err)
+	}
+	if parsed < 0 {
+		return 0, fmt.Errorf("invalid %s %q: must be non-negative", name, value)
+	}
+	return parsed, nil
 }
 
 func (cfg *Config) setSelectedBlockOn(value string) {

@@ -176,7 +176,11 @@ func requiresProviderAuth(mode string) bool {
 func diagnoseWorkspace(configPath string) []string {
 	issues := []string{}
 	if _, err := os.Stat(configPath); err != nil {
-		issues = append(issues, fmt.Sprintf("warn: %s not found; run `diffpal init`", configPath))
+		if errors.Is(err, os.ErrNotExist) {
+			issues = append(issues, fmt.Sprintf("warn: %s not found; run `diffpal init`", configPath))
+		} else {
+			issues = append(issues, fmt.Sprintf("warn: cannot inspect %s: %v", configPath, err))
+		}
 	}
 	if !provider.HasExecutable("git") {
 		issues = append(issues, "warn: git is not available; diff collection and SCM context will fail")

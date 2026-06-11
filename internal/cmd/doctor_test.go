@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -164,5 +166,33 @@ func TestDiagnoseSelectedProviderHostedMissingAuthRequired(t *testing.T) {
 	joined := strings.Join(issues, "\n")
 	if !strings.Contains(joined, "error: selected provider openai.api_key is required") {
 		t.Fatalf("diagnoseSelectedProvider() missing auth error:\n%s", joined)
+	}
+}
+
+func TestDiagnoseWorkspaceReportsMissingConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), ".config", "diffpal", "config.yaml")
+
+	issues := diagnoseWorkspace(configPath)
+	joined := strings.Join(issues, "\n")
+	if !strings.Contains(joined, "not found; run `diffpal init`") {
+		t.Fatalf("diagnoseWorkspace() missing not-found warning:\n%s", joined)
+	}
+}
+
+func TestDiagnoseWorkspaceReportsStatErrors(t *testing.T) {
+	dir := t.TempDir()
+	parentFile := filepath.Join(dir, ".config")
+	if err := os.WriteFile(parentFile, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	configPath := filepath.Join(parentFile, "diffpal", "config.yaml")
+
+	issues := diagnoseWorkspace(configPath)
+	joined := strings.Join(issues, "\n")
+	if !strings.Contains(joined, "cannot inspect") {
+		t.Fatalf("diagnoseWorkspace() missing stat error warning:\n%s", joined)
+	}
+	if strings.Contains(joined, "run `diffpal init`") {
+		t.Fatalf("diagnoseWorkspace() misreported stat error as missing config:\n%s", joined)
 	}
 }
