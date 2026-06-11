@@ -10,6 +10,7 @@ providers:
     copilot_acp:
       cmd:
         - npx
+        - --no-install
         - copilot
       extra_args:
         - --stdio
