@@ -56,8 +56,11 @@ Environment overrides:
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
 
-Config files expand `$VAR` and `${VAR}` before YAML parsing. Missing variables
-fail config load; quote substituted values.
+Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
+are used for required values. Missing referenced variables fail config load, so
+do not use placeholders for optional CI credentials; omit those fields and let
+runtime auth resolution read standard CI environment variables. Quote
+substituted values.
 
 Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,

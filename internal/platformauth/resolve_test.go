@@ -143,6 +143,6 @@ func assertResolvedToken(t *testing.T, resolved Resolved, want string) {
 		t.Fatalf("WithToken() error = %v", err)
 	}
 	if got != want {
-		t.Fatalf("token passed to callback = %q, want %q", got, want)
+		t.Fatal("token passed to callback did not match expected value")
 	}
 }

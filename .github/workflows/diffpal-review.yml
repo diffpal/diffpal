@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Add Go binaries to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
       - name: Install DiffPal CLI
         run: go install ./cmd/diffpal
 

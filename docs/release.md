@@ -42,9 +42,10 @@ node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
 SemVer tag automatically. Major action aliases such as `v1` are not release
 triggers and should be pushed only after the SemVer release tag succeeds.
-NPM publishing uses token auth for the first release path. Enable npm provenance
-once the package is ready for trusted publishing, then remove the token-only
-fallback.
+NPM publishing should use trusted publishing/OIDC with provenance enabled. If a
+bootstrap release must use `NPM_PUBLISH_TOKEN`, run it only from a protected
+GitHub Environment with required reviewers and remove that fallback after the
+trusted publishing path is verified.
 Keep release credentials least-privilege and scoped to the one service that
 needs them. Do not echo token values, run commands with shell tracing, or copy
 secrets into artifacts/logs. Prefer OIDC/provenance-based publishing whenever
@@ -69,7 +70,8 @@ npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
+5. Publish npm artifacts through trusted publishing/OIDC. Use `NPM_PUBLISH_TOKEN`
+   only as a temporary bootstrap fallback in a protected environment.
 6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
 7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
