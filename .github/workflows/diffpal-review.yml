@@ -35,11 +35,8 @@ jobs:
       - name: Install DiffPal CLI
         run: go install ./cmd/diffpal
 
-      - name: Install CI npm tools
-        run: npm ci --include=dev --ignore-scripts
-
-      - name: Add local npm binaries to PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install Copilot CLI
+        run: npm install --global @github/copilot@1.0.61
 
       - name: Run DiffPal review
         run: >-
