@@ -72,15 +72,14 @@ Config files support envsubst-style placeholders before YAML parsing:
 - `$VAR`
 - `${VAR}`
 
-Referenced variables are required at config-load time. Prefer the standard
-runtime environment fallbacks listed below for optional CI credentials, and use
-placeholders only when the command must fail before YAML parsing if a value is
-missing. Quote substituted values when they may contain YAML-significant
-characters:
+Referenced variables are required at config-load time. Use placeholders only
+for values that must exist before YAML parsing. Do not use placeholders for
+optional CI credentials; omit those config fields and let command-specific auth
+resolution read the standard environment variables listed below. Quote
+substituted values when they may contain YAML-significant characters:
 
 ```yaml
-api_key: "${OPENAI_API_KEY}"
-token: "${GITHUB_TOKEN}"
+workspace_id: "${REQUIRED_WORKSPACE_ID}"
 ```
 
 Environment overrides:

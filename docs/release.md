@@ -62,6 +62,25 @@ Concrete controls:
 - Prefer protected GitHub Environments with required reviewers for publish jobs
   that use long-lived tokens.
 
+Same-repository guard for review jobs that read `COPILOT_GITHUB_TOKEN`:
+
+```yaml
+on:
+  pull_request:
+
+jobs:
+  review:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - run: diffpal --profile ci review github --gate
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+```
+
 4. Build Azure DevOps extension packages:
 
 ```bash
