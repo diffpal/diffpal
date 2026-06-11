@@ -9,7 +9,8 @@ providers:
     type: copilot_acp
     copilot_acp:
       cmd:
-        - ./node_modules/.bin/copilot
+        - node
+        - ./node_modules/@github/copilot/npm-loader.js
       extra_args:
         - --stdio
 

@@ -28,11 +28,11 @@ jobs:
       - name: Install omnidist
         run: npm install --no-save @omnidist/omnidist@0.1.30
       - name: Build artifacts
-        run: ./node_modules/.bin/omnidist --profile default build
+        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
-        run: ./node_modules/.bin/omnidist --profile default npm stage
+        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
       - name: Verify artifacts
-        run: ./node_modules/.bin/omnidist --profile default npm verify
+        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -72,7 +72,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: ./node_modules/.bin/omnidist --profile default npm publish
+        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 
   release:
     needs:

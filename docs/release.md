@@ -33,10 +33,10 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 
 ```bash
 npm install --no-save @omnidist/omnidist@0.1.30
-OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" ./node_modules/.bin/omnidist --profile default build
-./node_modules/.bin/omnidist --profile default npm stage
-./node_modules/.bin/omnidist --profile default npm verify
-./node_modules/.bin/omnidist --profile default npm publish
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
+node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
+node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 ```
 
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
