@@ -36,7 +36,7 @@ func TestResolveGitHubUsesEnvToken(t *testing.T) {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 	if resolved.Token != "env-token" {
-		t.Fatalf("Token = %q, want env-token", resolved.Token)
+		t.Fatal("Token did not match expected environment token")
 	}
 	if resolved.Source != "GITHUB_TOKEN" {
 		t.Fatalf("Source = %q, want GITHUB_TOKEN", resolved.Source)
@@ -63,7 +63,7 @@ func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
 		t.Fatalf("Mode = %q, want gitlab_token", resolved.Mode)
 	}
 	if resolved.Token != "api-token" {
-		t.Fatalf("Token = %q, want api-token", resolved.Token)
+		t.Fatal("Token did not match expected configured API token")
 	}
 }
 
@@ -75,7 +75,7 @@ func TestResolveGitLabUsesEnvTokens(t *testing.T) {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 	if resolved.Token != "job-env-token" {
-		t.Fatalf("Token = %q, want job-env-token", resolved.Token)
+		t.Fatal("Token did not match expected CI job token")
 	}
 	if resolved.Source != "CI_JOB_TOKEN" {
 		t.Fatalf("Source = %q, want CI_JOB_TOKEN", resolved.Source)
@@ -102,7 +102,7 @@ func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
 		t.Fatalf("Mode = %q, want system_access_token", resolved.Mode)
 	}
 	if resolved.Token != "system-token" {
-		t.Fatalf("Token = %q, want system-token", resolved.Token)
+		t.Fatal("Token did not match expected system access token")
 	}
 }
 
@@ -114,7 +114,7 @@ func TestResolveADOUsesEnvToken(t *testing.T) {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 	if resolved.Token != "system-env-token" {
-		t.Fatalf("Token = %q, want system-env-token", resolved.Token)
+		t.Fatal("Token did not match expected system access token from environment")
 	}
 	if resolved.Source != "SYSTEM_ACCESSTOKEN" {
 		t.Fatalf("Source = %q, want SYSTEM_ACCESSTOKEN", resolved.Source)

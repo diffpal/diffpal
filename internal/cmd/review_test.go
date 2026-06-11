@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
@@ -104,14 +105,19 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_BASE_SHA", "base-a")
 	t.Setenv("GITHUB_HEAD_SHA", "head-a")
 
-	var requests int
+	var requests atomic.Int32
+	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if r.URL.Path != "/repos/acme/diffpal/check-runs" {
-			t.Fatalf("path = %q, want /repos/acme/diffpal/check-runs", r.URL.Path)
+			handlerErrs <- fmt.Errorf("path = %q, want /repos/acme/diffpal/check-runs", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer token" {
-			t.Fatalf("Authorization = %q, want Bearer token", got)
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -143,8 +149,13 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want 1", got)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
 	}
 	text := out.String()
 	for _, needle := range []string{
@@ -252,10 +263,10 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("CI_MERGE_REQUEST_DIFF_BASE_SHA", "base-a")
 	t.Setenv("CI_COMMIT_SHA", "head-a")
 
-	var requests int
+	var requests atomic.Int32
 	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if r.URL.Path != "/projects/acme/diffpal/merge_requests/42/discussions" {
 			handlerErrs <- fmt.Errorf("path = %q, want GitLab discussions endpoint", r.URL.Path)
 			http.Error(w, "unexpected path", http.StatusBadRequest)
@@ -288,8 +299,8 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want 1", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -312,10 +323,10 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("SYSTEM_PULLREQUEST_TARGETCOMMITID", "base-a")
 	t.Setenv("BUILD_SOURCEVERSION", "head-a")
 
-	var requests int
+	var requests atomic.Int32
 	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if !strings.HasSuffix(r.URL.Path, "/statuses") {
 			handlerErrs <- fmt.Errorf("path = %q, want ADO statuses endpoint", r.URL.Path)
 			http.Error(w, "unexpected path", http.StatusBadRequest)
@@ -348,8 +359,8 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want 1", got)
 	}
 	select {
 	case err := <-handlerErrs:
