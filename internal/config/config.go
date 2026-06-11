@@ -59,7 +59,12 @@ type PlatformConfigs struct {
 }
 
 type GitHubPlatformConfig struct {
-	Auth GitHubAuthConfig `json:"auth,omitempty" yaml:"auth,omitempty" mapstructure:"auth"`
+	Auth           GitHubAuthConfig           `json:"auth,omitempty"            yaml:"auth,omitempty"            mapstructure:"auth"`
+	SummaryComment GitHubSummaryCommentConfig `json:"summary_comment,omitempty" yaml:"summary_comment,omitempty" mapstructure:"summary_comment"`
+}
+
+type GitHubSummaryCommentConfig struct {
+	Enabled *bool `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
 }
 
 type GitHubAuthConfig struct {
@@ -225,21 +230,35 @@ func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_BLOCK_ON")); value != "" {
 		cfg.setSelectedBlockOn(value)
 	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_OPENAI_MODEL")); value != "" {
+		cfg.setOpenAIModel(value)
+	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_MAX_FILES")); value != "" {
-		parsed, err := strconv.Atoi(value)
+		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_MAX_FILES", value)
 		if err != nil {
-			return fmt.Errorf("invalid DIFFPAL_REVIEW_MAX_FILES %q: %w", value, err)
+			return err
 		}
 		cfg.Review.MaxFiles = parsed
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CONTEXT_LINES")); value != "" {
-		parsed, err := strconv.Atoi(value)
+		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_CONTEXT_LINES", value)
 		if err != nil {
-			return fmt.Errorf("invalid DIFFPAL_REVIEW_CONTEXT_LINES %q: %w", value, err)
+			return err
 		}
 		cfg.Review.ContextLines = parsed
 	}
 	return nil
+}
+
+func parseNonNegativeEnvInt(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: %w", name, value, err)
+	}
+	if parsed < 0 {
+		return 0, fmt.Errorf("invalid %s %q: must be non-negative", name, value)
+	}
+	return parsed, nil
 }
 
 func (cfg *Config) setSelectedBlockOn(value string) {
@@ -250,6 +269,18 @@ func (cfg *Config) setSelectedBlockOn(value string) {
 	policyCfg := cfg.Policies[name]
 	policyCfg.BlockOn = value
 	cfg.Policies[name] = policyCfg
+}
+
+func (cfg *Config) setOpenAIModel(value string) {
+	for name, providerCfg := range cfg.Providers {
+		if !strings.EqualFold(strings.TrimSpace(providerCfg.Type), "openai") || providerCfg.OpenAI == nil {
+			continue
+		}
+		block := *providerCfg.OpenAI
+		block.Model = value
+		providerCfg.OpenAI = &block
+		cfg.Providers[name] = providerCfg
+	}
 }
 
 func (cfg PlatformConfigs) Validate() error {
@@ -274,6 +305,10 @@ func (cfg PlatformConfigs) Validate() error {
 	}
 	sort.Strings(errs)
 	return fmt.Errorf("platform config validation failed: %s", strings.Join(errs, "; "))
+}
+
+func (cfg GitHubPlatformConfig) SummaryCommentEnabled() bool {
+	return cfg.SummaryComment.Enabled == nil || *cfg.SummaryComment.Enabled
 }
 
 func ConfigDir(workingDir string) string {

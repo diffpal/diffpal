@@ -34,8 +34,7 @@ providers:
   openai-fast:
     type: openai
     openai:
-      model: "${DIFFPAL_OPENAI_MODEL}"
-      api_key: "${OPENAI_API_KEY}"
+      model: gpt-5-mini
   copilot-acp:
     type: copilot_acp
     copilot_acp:
@@ -54,16 +53,10 @@ review:
 
 platforms:
   github:
-    auth:
-      token: "${GITHUB_TOKEN}"
-  gitlab:
-    auth:
-      job_token: "${CI_JOB_TOKEN}"
-      api_token: "${GITLAB_TOKEN}"
-  azure:
-    auth:
-      system_access_token: "${SYSTEM_ACCESSTOKEN}"
-      pat: "${AZURE_DEVOPS_EXT_PAT}"
+    summary_comment:
+      enabled: true
+  gitlab: {}
+  azure: {}
 
 profiles:
   copilot-acp:
@@ -81,12 +74,14 @@ Config files support envsubst-style placeholders before YAML parsing:
 - `$VAR`
 - `${VAR}`
 
-Missing referenced variables fail config load. Quote substituted values when they
-may contain YAML-significant characters:
+Referenced variables are required at config-load time. Use placeholders only
+for values that must exist before YAML parsing. Do not use placeholders for
+optional CI credentials; omit those config fields and let command-specific auth
+resolution read the standard environment variables listed below. Quote
+substituted values when they may contain YAML-significant characters:
 
 ```yaml
-api_key: "${OPENAI_API_KEY}"
-token: "${GITHUB_TOKEN}"
+workspace_id: "${REQUIRED_WORKSPACE_ID}"
 ```
 
 Environment overrides:
@@ -95,26 +90,50 @@ Environment overrides:
 - `DIFFPAL_PROVIDER`
 - `DIFFPAL_POLICY`
 - `DIFFPAL_BLOCK_ON`
+- `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
 
+## GitHub Summary Comment
+
+`review github --mode summary` posts a PR-level summary comment by default,
+including when the review has no findings. Disable that visible PR-thread
+summary with:
+
+```yaml
+platforms:
+  github:
+    summary_comment:
+      enabled: false
+```
+
+Inline finding comments remain controlled by `--mode comments`.
+
 ## Platform Auth
 
-Host review modes resolve platform API credentials from direct config values.
-Use envsubst placeholders to inject secrets at runtime:
+Host review modes resolve platform API credentials from direct config values or
+standard CI environment variables:
 
 - `platforms.github.auth.token`
+- `GITHUB_TOKEN`
 - `platforms.gitlab.auth.api_token`
+- `GITLAB_TOKEN`
 - `platforms.gitlab.auth.job_token`
+- `CI_JOB_TOKEN`
 - `platforms.azure.auth.system_access_token`
+- `SYSTEM_ACCESSTOKEN`
 - `platforms.azure.auth.pat`
+- `AZURE_DEVOPS_EXT_PAT`
 
 Rules:
 
 - `review local` ignores `platforms`.
-- `review github` requires `token`.
-- `review gitlab` prefers `api_token`, then falls back to `job_token`.
-- `review ado` uses `platforms.azure` and prefers `system_access_token`, then falls back to `pat`.
+- `review github` requires configured `token` or `GITHUB_TOKEN`.
+- `review gitlab` prefers API token, then falls back to job token.
+- `review ado` uses `platforms.azure` and prefers system access token, then falls back to PAT.
+- Envsubst placeholders remain supported for required values. For optional CI
+  credentials, omit the config value and let command-specific auth resolution
+  read the standard environment variables above.
 
 ## Policy and Exit Codes
 

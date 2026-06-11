@@ -1,6 +1,7 @@
 package platformauth
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -8,6 +9,8 @@ import (
 )
 
 func TestResolveGitHubUsesConfiguredToken(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitHub: config.GitHubPlatformConfig{
@@ -28,7 +31,22 @@ func TestResolveGitHubUsesConfiguredToken(t *testing.T) {
 	}
 }
 
+func TestResolveGitHubUsesEnvToken(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "env-token")
+
+	resolved, err := Resolve(config.Config{}, "github")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Source != "GITHUB_TOKEN" {
+		t.Fatalf("Source = %q, want GITHUB_TOKEN", resolved.Source)
+	}
+	assertResolvedToken(t, resolved, "env-token")
+}
+
 func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitLab: config.GitLabPlatformConfig{
@@ -47,12 +65,25 @@ func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
 	if resolved.Mode != "gitlab_token" {
 		t.Fatalf("Mode = %q, want gitlab_token", resolved.Mode)
 	}
-	if resolved.Token != "api-token" {
-		t.Fatalf("Token = %q, want api-token", resolved.Token)
+	assertResolvedToken(t, resolved, "api-token")
+}
+
+func TestResolveGitLabUsesEnvTokens(t *testing.T) {
+	t.Setenv("CI_JOB_TOKEN", "job-env-token")
+
+	resolved, err := Resolve(config.Config{}, "gitlab")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
 	}
+	if resolved.Source != "CI_JOB_TOKEN" {
+		t.Fatalf("Source = %q, want CI_JOB_TOKEN", resolved.Source)
+	}
+	assertResolvedToken(t, resolved, "job-env-token")
 }
 
 func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			Azure: config.AzurePlatformConfig{
@@ -71,12 +102,25 @@ func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
 	if resolved.Mode != "system_access_token" {
 		t.Fatalf("Mode = %q, want system_access_token", resolved.Mode)
 	}
-	if resolved.Token != "system-token" {
-		t.Fatalf("Token = %q, want system-token", resolved.Token)
+	assertResolvedToken(t, resolved, "system-token")
+}
+
+func TestResolveADOUsesEnvToken(t *testing.T) {
+	t.Setenv("SYSTEM_ACCESSTOKEN", "system-env-token")
+
+	resolved, err := Resolve(config.Config{}, "ado")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
 	}
+	if resolved.Source != "SYSTEM_ACCESSTOKEN" {
+		t.Fatalf("Source = %q, want SYSTEM_ACCESSTOKEN", resolved.Source)
+	}
+	assertResolvedToken(t, resolved, "system-env-token")
 }
 
 func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitLab: config.GitLabPlatformConfig{
@@ -89,7 +133,45 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want missing token error")
 	}
-	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token or platforms.gitlab.auth.job_token") {
+	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func clearPlatformTokenEnv(t *testing.T) {
+	t.Helper()
+	clearEnvVar(t, "GITHUB_TOKEN")
+	clearEnvVar(t, "GITLAB_TOKEN")
+	clearEnvVar(t, "CI_JOB_TOKEN")
+	clearEnvVar(t, "SYSTEM_ACCESSTOKEN")
+}
+
+func clearEnvVar(t *testing.T, key string) {
+	t.Helper()
+	previous, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("os.Unsetenv(%q): %v", key, err)
+	}
+	t.Cleanup(func() {
+		if ok {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
+func assertResolvedToken(t *testing.T, resolved Resolved, want string) {
+	t.Helper()
+	var got string
+	err := resolved.WithToken(func(token string) error {
+		got = token
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithToken() error = %v", err)
+	}
+	if got != want {
+		t.Fatal("token passed to callback did not match expected value")
 	}
 }

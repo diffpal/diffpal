@@ -5,10 +5,6 @@ branding:
   icon: check-circle
   color: blue
 inputs:
-  diffpal-path:
-    description: Path or command name for the diffpal binary. The binary must already be on PATH or executable at this path.
-    required: false
-    default: diffpal
   base:
     description: Base revision passed to diffpal review github.
     required: true
@@ -35,18 +31,6 @@ inputs:
     description: Comma-separated GitHub publish modes.
     required: false
     default: ""
-  out:
-    description: Output findings bundle path.
-    required: false
-    default: ""
-  repo:
-    description: Repository id for deterministic fingerprints.
-    required: false
-    default: ""
-  review-id:
-    description: Review identifier for deterministic outputs.
-    required: false
-    default: ""
   max-files:
     description: Maximum files from diff.
     required: false
@@ -69,7 +53,6 @@ runs:
     - name: Run DiffPal review
       shell: bash
       env:
-        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
         INPUT_BASE: ${{ inputs.base }}
         INPUT_HEAD: ${{ inputs.head }}
         INPUT_CONFIG_DIR: ${{ inputs.config-dir }}
@@ -77,9 +60,6 @@ runs:
         INPUT_BLOCK_ON: ${{ inputs.block-on }}
         INPUT_GATE: ${{ inputs.gate }}
         INPUT_MODE: ${{ inputs.mode }}
-        INPUT_OUT: ${{ inputs.out }}
-        INPUT_REPO: ${{ inputs.repo }}
-        INPUT_REVIEW_ID: ${{ inputs.review-id }}
         INPUT_MAX_FILES: ${{ inputs.max-files }}
         INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
         INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}

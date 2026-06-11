@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var reviewRun = reviewer.Run
+type reviewRunner func(context.Context, config.Config, reviewer.Options) (reviewer.Result, error)
 
 type reviewExecution struct {
 	Config  config.Config
@@ -26,6 +26,10 @@ type reviewExecution struct {
 }
 
 func newReviewCommand() *cobra.Command {
+	return newReviewCommandWithRunner(reviewer.Run)
+}
+
+func newReviewCommandWithRunner(run reviewRunner) *cobra.Command {
 	review := &cobra.Command{
 		Use:   "review",
 		Short: "Run review locally or for a CI host",
@@ -33,21 +37,21 @@ func newReviewCommand() *cobra.Command {
 	}
 
 	review.AddCommand(
-		newLocalReviewSubcommand(),
-		newHostReviewSubcommand("github", "github", nil),
-		newHostReviewSubcommand("gitlab", "gitlab", nil),
-		newHostReviewSubcommand("ado", "azure", []string{"azure"}),
+		newLocalReviewSubcommand(run),
+		newHostReviewSubcommand(run, "github", "github", nil),
+		newHostReviewSubcommand(run, "gitlab", "gitlab", nil),
+		newHostReviewSubcommand(run, "ado", "azure", []string{"azure"}),
 	)
 
 	return review
 }
 
-func newLocalReviewSubcommand() *cobra.Command {
+func newLocalReviewSubcommand(run reviewRunner) *cobra.Command {
 	local := &cobra.Command{
 		Use:   "local",
 		Short: "Review a local diff and write findings.json",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runReviewOnly(cmd, "local")
+			return runReviewOnly(cmd, "local", run)
 		},
 	}
 	addReviewAnalysisFlags(local, "local")
@@ -55,13 +59,13 @@ func newLocalReviewSubcommand() *cobra.Command {
 	return local
 }
 
-func newHostReviewSubcommand(name, platform string, aliases []string) *cobra.Command {
+func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []string) *cobra.Command {
 	host := &cobra.Command{
 		Use:     name,
 		Aliases: aliases,
 		Short:   fmt.Sprintf("Review and emit %s artifacts", hostDisplayName(name)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runHostReview(cmd, platform, name)
+			return runHostReview(cmd, platform, name, run)
 		},
 	}
 	addReviewAnalysisFlags(host, name)
@@ -91,8 +95,8 @@ func addReviewPolicyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("gate", false, "Return non-zero when blocking findings exist")
 }
 
-func runReviewOnly(cmd *cobra.Command, defaultReviewID string) error {
-	execution, err := executeReview(cmd, defaultReviewID)
+func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner) error {
+	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
@@ -101,14 +105,16 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string) error {
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-		return withExitCode(5, err)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+			return withExitCode(5, err)
+		}
+		return nil
 	}
 	return nil
 }
 
-func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
-	execution, err := executeReview(cmd, defaultReviewID)
+func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
+	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
@@ -125,8 +131,10 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
 			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 		}
 		if blocking > 0 {
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-			return withExitCode(5, err)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+				return withExitCode(5, err)
+			}
+			return nil
 		}
 		return nil
 	}
@@ -139,7 +147,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -152,13 +160,15 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-		return withExitCode(5, err)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+			return withExitCode(5, err)
+		}
+		return nil
 	}
 	return nil
 }
 
-func executeReview(cmd *cobra.Command, defaultReviewID string) (reviewExecution, error) {
+func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	maxFiles, _ := cmd.Flags().GetInt("max-files")
@@ -204,7 +214,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string) (reviewExecution,
 	if runCtx == nil {
 		runCtx = context.Background()
 	}
-	result, err := reviewRun(runCtx, cfg, reviewer.Options{
+	result, err := run(runCtx, cfg, reviewer.Options{
 		Repo:             repo,
 		ReviewID:         reviewID,
 		BaseSHA:          base,
@@ -293,7 +303,7 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, bundle findings.FindingsBundle, blockOn string, modes []string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -312,18 +322,29 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			return err
 		}
 		commentPlan := github.PlanInlineComments(existingComments, bundle.Findings)
-		for _, mode := range modes {
-			switch normalizePublishMode(platform, mode) {
-			case "check_run":
-				if err := github.PublishCheckRun(ctx, auth.Token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
-					return err
-				}
-			case "github_comments":
-				if err := github.PublishInlineComments(ctx, auth.Token, reviewCtx, commentPlan, nil); err != nil {
-					return err
+		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				switch normalizePublishMode(platform, mode) {
+				case "check_run":
+					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
+						return err
+					}
+				case "github_comments":
+					if err := github.PublishInlineComments(ctx, token, reviewCtx, commentPlan, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if !summaryCommentEnabled {
+						continue
+					}
+					if err := github.PublishSummaryComment(ctx, token, reviewCtx, github.CheckRunSummary(bundle), nil); err != nil {
+						return err
+					}
 				}
 			}
-		}
+			return nil
+		})
 	case "gitlab":
 		reviewCtx, err := gitlabpub.ResolveContext(bundle.BaseSHA, bundle.HeadSHA, "", "")
 		if err != nil {
@@ -335,14 +356,17 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		}
 		blockThresholds := []string{blockOn}
 		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
-		for _, mode := range modes {
-			if normalizePublishMode(platform, mode) != "discussions" {
-				continue
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				if normalizePublishMode(platform, mode) != "discussions" {
+					continue
+				}
+				if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+					return err
+				}
 			}
-			if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, auth.Token, reviewCtx, plan, nil); err != nil {
-				return err
-			}
-		}
+			return nil
+		})
 	case "azure":
 		reviewCtx, err := azure.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
 		if err != nil {
@@ -355,22 +379,24 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
-		for _, mode := range modes {
-			switch normalizePublishMode(platform, mode) {
-			case "threads":
-				if err := azure.PublishThreads(ctx, auth.Mode, auth.Token, reviewCtx, plan, nil); err != nil {
-					return err
-				}
-			case "status":
-				if err := azure.PublishStatus(ctx, auth.Mode, auth.Token, reviewCtx, status, nil); err != nil {
-					return err
+		return auth.WithToken(func(token string) error {
+			for _, mode := range modes {
+				switch normalizePublishMode(platform, mode) {
+				case "threads":
+					if err := azure.PublishThreads(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+						return err
+					}
+				case "status":
+					if err := azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
+						return err
+					}
 				}
 			}
-		}
+			return nil
+		})
 	default:
 		return fmt.Errorf("unsupported platform %q", platform)
 	}
-	return nil
 }
 
 func hostDisplayName(name string) string {

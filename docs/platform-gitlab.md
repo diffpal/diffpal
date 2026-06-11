@@ -27,7 +27,7 @@ Severity to discussion policy:
 
 Each finding maps to a stable thread key:
 
-- `path + ":" + startLine + ":" + ruleID`
+- `path + ":" + start_line + ":" + end_line + ":" + ruleID`
 
 Re-publishing uses key + finding ID for idempotent update/skip.
 
@@ -50,5 +50,6 @@ Both artifacts are generated from one deterministic source so dedupe keys remain
 - Config auth values:
   - `platforms.gitlab.auth.api_token`
   - `platforms.gitlab.auth.job_token`
-- Use envsubst placeholders such as `api_token: "${GITLAB_TOKEN}"`; API token is preferred over `CI_JOB_TOKEN`.
+- Standard CI env fallbacks are `GITLAB_TOKEN` and `CI_JOB_TOKEN`; API token is preferred over job token.
+- Envsubst placeholders such as `api_token: "${GITLAB_TOKEN}"` are supported when you want config-file injection, but missing referenced variables fail config load.
 - Retry policy: platform retries are batched and use exponential backoff with idempotent thread keys.

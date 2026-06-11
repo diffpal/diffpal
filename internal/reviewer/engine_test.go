@@ -225,6 +225,46 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 	}
 }
 
+func TestStructuredOutputErrorsAreTransient(t *testing.T) {
+	err := errors.New("structured output schema validation error: extract output JSON: no JSON object found at byte start")
+	if !isTransientProviderError(err) {
+		t.Fatal("isTransientProviderError() = false, want true")
+	}
+}
+
+func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	malformed := wrapError(KindTransient, errors.New("structured output schema validation error: no JSON object found at byte start"))
+	runtime := &fakeRuntime{
+		errs: []error{malformed, malformed, malformed},
+	}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-d",
+		ReviewID:         "review-d",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if runtime.calls != 3 {
+		t.Fatalf("runtime calls = %d, want 3", runtime.calls)
+	}
+	if len(result.Bundle.Findings) != 0 {
+		t.Fatalf("len(Findings) = %d, want 0", len(result.Bundle.Findings))
+	}
+}
+
 type fakeRuntime struct {
 	outputs []ChunkOutput
 	errs    []error

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -113,7 +115,7 @@ func TestDiagnoseSelectedProviderHostedSuccess(t *testing.T) {
 	}
 
 	t.Setenv("OPENAI_API_KEY", "test-key")
-	issues, fatal := diagnoseSelectedProvider(cfg, t.TempDir())
+	issues, fatal := diagnoseSelectedProvider(cfg, t.TempDir(), true)
 	if fatal != "" {
 		t.Fatalf("fatal = %q, want empty", fatal)
 	}
@@ -135,12 +137,62 @@ func TestDiagnoseSelectedProviderHostedMissingAuth(t *testing.T) {
 	}
 
 	t.Setenv("OPENAI_API_KEY", "")
-	issues, fatal := diagnoseSelectedProvider(cfg, t.TempDir())
+	issues, fatal := diagnoseSelectedProvider(cfg, t.TempDir(), false)
+	if fatal != "" {
+		t.Fatalf("fatal = %q, want empty for local-mode auth warning", fatal)
+	}
+	joined := strings.Join(issues, "\n")
+	if !strings.Contains(joined, "warn: selected provider openai.api_key is required") {
+		t.Fatalf("diagnoseSelectedProvider() missing auth warning:\n%s", joined)
+	}
+}
+
+func TestDiagnoseSelectedProviderHostedMissingAuthRequired(t *testing.T) {
+	cfg := config.Config{
+		Defaults: config.DefaultsConfig{Provider: "openai-fast"},
+		Providers: map[string]config.ProviderConfig{
+			"openai-fast": {
+				Type:   "openai",
+				OpenAI: &agentconfig.LocalAPIConfig{Model: "gpt-5"},
+			},
+		},
+	}
+
+	t.Setenv("OPENAI_API_KEY", "")
+	issues, fatal := diagnoseSelectedProvider(cfg, t.TempDir(), true)
 	if fatal == "" {
 		t.Fatal("fatal = empty, want missing auth error")
 	}
 	joined := strings.Join(issues, "\n")
-	if !strings.Contains(joined, "openai.api_key is required") {
+	if !strings.Contains(joined, "error: selected provider openai.api_key is required") {
 		t.Fatalf("diagnoseSelectedProvider() missing auth error:\n%s", joined)
+	}
+}
+
+func TestDiagnoseWorkspaceReportsMissingConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), ".config", "diffpal", "config.yaml")
+
+	issues := diagnoseWorkspace(configPath)
+	joined := strings.Join(issues, "\n")
+	if !strings.Contains(joined, "not found; run `diffpal init`") {
+		t.Fatalf("diagnoseWorkspace() missing not-found warning:\n%s", joined)
+	}
+}
+
+func TestDiagnoseWorkspaceReportsStatErrors(t *testing.T) {
+	dir := t.TempDir()
+	parentFile := filepath.Join(dir, ".config")
+	if err := os.WriteFile(parentFile, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	configPath := filepath.Join(parentFile, "diffpal", "config.yaml")
+
+	issues := diagnoseWorkspace(configPath)
+	joined := strings.Join(issues, "\n")
+	if !strings.Contains(joined, "cannot inspect") {
+		t.Fatalf("diagnoseWorkspace() missing stat error warning:\n%s", joined)
+	}
+	if strings.Contains(joined, "run `diffpal init`") {
+		t.Fatalf("diagnoseWorkspace() misreported stat error as missing config:\n%s", joined)
 	}
 }

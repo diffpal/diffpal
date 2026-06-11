@@ -1,6 +1,6 @@
 # DiffPal Config Schema
 
-`config` is loaded from:
+`config` is resolved in this order, from base file to highest-priority override:
 
 1. `--config-dir/diffpal/config.yaml`
 2. `--config-dir/config.yaml`
@@ -9,7 +9,7 @@
 5. environment overrides
 6. CLI flags
 
-Higher position in the list has higher precedence.
+Later entries override earlier entries; CLI flags have the highest precedence.
 
 ```yaml
 version: v1
@@ -22,8 +22,7 @@ providers:
   openai-fast:
     type: openai
     openai:
-      model: "${DIFFPAL_OPENAI_MODEL}"
-      api_key: "${OPENAI_API_KEY}"
+      model: gpt-5-mini
 
 policies:
   default:
@@ -38,16 +37,10 @@ review:
 
 platforms:
   github:
-    auth:
-      token: "${GITHUB_TOKEN}"
-  gitlab:
-    auth:
-      job_token: "${CI_JOB_TOKEN}"
-      api_token: "${GITLAB_TOKEN}"
-  azure:
-    auth:
-      system_access_token: "${SYSTEM_ACCESSTOKEN}"
-      pat: "${AZURE_DEVOPS_EXT_PAT}"
+    summary_comment:
+      enabled: true
+  gitlab: {}
+  azure: {}
 
 profiles:
   ci:
@@ -61,11 +54,23 @@ Environment overrides:
 - `DIFFPAL_PROFILE`
 - `DIFFPAL_POLICY`
 - `DIFFPAL_BLOCK_ON`
+- `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
 
-Config files expand `$VAR` and `${VAR}` before YAML parsing. Missing variables
-fail config load; quote substituted values.
+Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
+are used for required values. Missing referenced variables fail config load, so
+do not use placeholders for optional CI credentials; omit those fields and let
+runtime auth resolution read standard CI environment variables. Quote
+substituted values.
+
+Platform auth can be supplied either by config fields or standard CI
+environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
+`SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
+
+`platforms.github.summary_comment.enabled` defaults to `true`. When `summary`
+mode is selected, DiffPal posts or updates a PR-level GitHub summary comment
+even if there are no findings.
 
 Validation requires `version: v1`, a `defaults.provider` key present in
 `providers`, a `defaults.policy` key present in `policies`, and a valid

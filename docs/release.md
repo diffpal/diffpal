@@ -5,7 +5,7 @@
 - CLI and Go module use SemVer (`vMAJOR.MINOR.PATCH`).
 - GitHub Action tag is kept at a stable major (`v1`), with matching GitHub repository tags.
 - The CLI is distributed through omnidist, including the npm package `@diffpal/diffpal`.
-- Consumers install the CLI with `npm install @diffpal/diffpal@latest` or a pinned SemVer version.
+- Consumers install the CLI with a pinned SemVer version such as `npm install @diffpal/diffpal@1.2.3`.
 
 ## Artifact list
 
@@ -32,19 +32,48 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm install --global @omnidist/omnidist@latest
-OMNIDIST_VERSION=0.1.0 omnidist --profile default build
-omnidist --profile default npm stage
-omnidist --profile default npm verify
-omnidist --profile default npm publish
+npm ci --prefix tools/omnidist --ignore-scripts
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 ```
 
-The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
-SemVer tag automatically. Major action aliases such as `v1` are not release
-triggers and should be pushed only after the SemVer release tag succeeds.
-NPM publishing uses token auth, not npm trusted publishing: the workflow passes
-`NPM_PUBLISH_TOKEN` and `NODE_AUTH_TOKEN`, does not request `id-token: write`,
-and sets `NPM_CONFIG_PROVENANCE=false`.
+`@omnidist/omnidist` is installed from the committed lockfile in
+`tools/omnidist/package-lock.json`. The `omnidist-release` workflow derives
+`OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action aliases
+such as `v1` are not release triggers and should be pushed only after the SemVer
+release tag succeeds.
+NPM publishing uses trusted publishing/OIDC with provenance enabled.
+Keep release credentials least-privilege and scoped to the one service that
+needs them. Do not echo token values, run commands with shell tracing, or copy
+secrets into artifacts/logs. Use GitHub Environment secrets with required
+reviewers for any non-OIDC credential that cannot be avoided.
+Concrete controls:
+
+- Run `diffpal-review` only for same-repository pull requests; do not expose
+  `COPILOT_GITHUB_TOKEN` to forked PRs or `pull_request_target` workflows.
+- Keep workflow `permissions` minimal for each job and avoid unpinned
+  third-party actions in jobs that can read release or review secrets.
+- Leave `ACTIONS_STEP_DEBUG` and shell tracing disabled for secret-bearing
+  jobs.
+- Use protected GitHub Environments with required reviewers for publish jobs
+  that need any marketplace credential.
+
+Required same-repository guard for any review job that reads
+`COPILOT_GITHUB_TOKEN`:
+
+```yaml
+jobs:
+  review:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+```
+
+Inject `COPILOT_GITHUB_TOKEN` only inside a job with that guard.
 
 4. Build Azure DevOps extension packages:
 
@@ -54,7 +83,7 @@ npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
+5. Publish npm artifacts through trusted publishing/OIDC.
 6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
 7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
@@ -63,10 +92,11 @@ npm --prefix tasks/azure-devops run package:dev
 Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
-- Add the `NPM_PUBLISH_TOKEN` repository secret.
-- Do not configure npm trusted publishing for this first release path.
-- Add the `OPENAI_API_KEY` repository secret for `.github/workflows/diffpal-review.yml`.
-- Optionally add the `DIFFPAL_OPENAI_MODEL` repository variable. The workflow defaults to `gpt-5-mini`.
+- Configure npm trusted publishing for `.github/workflows/omnidist-release.yml`.
+- Add `COPILOT_GITHUB_TOKEN` as a protected Environment secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
+- Keep all release and review secrets scoped to the minimum permissions, rotate
+  them after any suspected exposure, and never print them in workflow logs.
+- Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
 - Move or create the major action tag, such as `v1`, after the release commit is verified.
@@ -75,12 +105,13 @@ After release, verify:
 
 ```bash
 npm view @diffpal/diffpal version
-npm install @diffpal/diffpal@latest
+npm install @diffpal/diffpal@1.2.3
 ./node_modules/.bin/diffpal version
 ```
 
 Open a same-repository pull request and confirm the `diffpal-review` workflow
-publishes the `diffpal-checks` check run and review comments when findings are
+publishes the `diffpal-checks` check run, posts a PR-level summary comment even
+when no findings are present, and posts inline review comments when findings are
 present.
 
 ## Branch policy expectations
@@ -98,6 +129,14 @@ present.
 - `azure-devops-task` runs `npm ci`, runtime dependency audit, TypeScript build, and prod/dev VSIX packaging.
 - `omnidist-package` builds, stages, and verifies the npm package without publishing.
 - Release automation uses omnidist and the Go version from `go.mod`.
+
+## Self-review gate
+
+DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
+`omnidist-release`. Before promoting a release beyond the initial npm package,
+open a maintainer-controlled same-repository pull request and verify that
+`diffpal-review` publishes the `diffpal-checks` check run, posts the PR-level
+summary comment, and leaves the PR in the expected pass/fail state.
 
 ## Change log and audits
 

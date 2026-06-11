@@ -1,7 +1,7 @@
 package github
 
 import (
-	"fmt"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -24,16 +24,20 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 			severity = "high"
 			blocking = true
 		}
+		message := "message"
+		if i == 0 {
+			message = "message 0"
+		}
 		bundle.Findings = append(bundle.Findings, findings.Finding{
-			RuleID:    fmt.Sprintf("rule-%d", i),
+			RuleID:    "rule",
 			Category:  "correctness",
 			Severity:  severity,
 			Blocking:  blocking,
-			Path:      fmt.Sprintf("internal/file-%02d.go", i),
+			Path:      "internal/file.go",
 			StartLine: i + 1,
 			EndLine:   i + 1,
-			Title:     fmt.Sprintf("finding %d", i),
-			Message:   fmt.Sprintf("message %d", i),
+			Title:     "finding",
+			Message:   message,
 		})
 	}
 
@@ -60,6 +64,89 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	if len(payload.Annotations) != 50 {
 		t.Fatalf("Annotations = %d, want 50 primary annotations", len(payload.Annotations))
 	}
+	if payload.Annotations[0].AnnotationLevel != "failure" {
+		t.Fatalf("first annotation level = %q, want failure", payload.Annotations[0].AnnotationLevel)
+	}
+	if payload.Annotations[1].AnnotationLevel != "warning" {
+		t.Fatalf("second annotation level = %q, want warning", payload.Annotations[1].AnnotationLevel)
+	}
+	if payload.Annotations[0].Message != "message 0" {
+		t.Fatalf("first annotation message = %q, want message 0", payload.Annotations[0].Message)
+	}
+	encoded, err := json.Marshal(payload.Annotations[0])
+	if err != nil {
+		t.Fatalf("Marshal annotation error = %v", err)
+	}
+	if !strings.Contains(string(encoded), `"annotation_level":"failure"`) {
+		t.Fatalf("annotation JSON missing annotation_level: %s", encoded)
+	}
+	if strings.Contains(string(encoded), `"level"`) {
+		t.Fatalf("annotation JSON contains unsupported level field: %s", encoded)
+	}
+}
+
+func TestAnnotationMessageFallsBackToTitle(t *testing.T) {
+	t.Parallel()
+
+	got := annotationMessage(findings.Finding{Title: "title only"})
+	if got != "title only" {
+		t.Fatalf("annotationMessage() = %q, want title only", got)
+	}
+}
+
+func TestBuildCheckRunPayloadDefaultsUnknownSeverityToWarning(t *testing.T) {
+	t.Parallel()
+
+	bundle := findings.FindingsBundle{
+		ReviewID: "review-github",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				RuleID:    "custom",
+				Category:  "correctness",
+				Severity:  "unexpected",
+				Path:      "internal/file.go",
+				StartLine: 1,
+				EndLine:   1,
+				Title:     "custom finding",
+				Message:   "custom message",
+			},
+		},
+	}
+
+	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
+	if payload.Annotations[0].AnnotationLevel != "warning" {
+		t.Fatalf("annotation level = %q, want warning", payload.Annotations[0].AnnotationLevel)
+	}
+}
+
+func TestBuildCheckRunPayloadFailsOnFailureLevelAnnotation(t *testing.T) {
+	t.Parallel()
+
+	bundle := findings.FindingsBundle{
+		ReviewID: "review-github",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				RuleID:    "high",
+				Category:  "correctness",
+				Severity:  "high",
+				Blocking:  false,
+				Path:      "internal/file.go",
+				StartLine: 1,
+				EndLine:   1,
+				Title:     "high finding",
+				Message:   "high message",
+			},
+		},
+	}
+
+	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
+	if payload.Conclusion != "failure" {
+		t.Fatalf("Conclusion = %q, want failure", payload.Conclusion)
+	}
 }
 
 func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
@@ -82,13 +169,14 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	}
 
 	summary := CheckRunSummary(bundle)
-	if !strings.Contains(summary, "# DiffPal Findings Summary") {
-		t.Fatalf("summary missing title:\n%s", summary)
-	}
-	if !strings.Contains(summary, "## CRITICAL (1)") {
-		t.Fatalf("summary missing severity section:\n%s", summary)
-	}
-	if !strings.Contains(summary, "### internal/db/query.go") {
-		t.Fatalf("summary missing file section:\n%s", summary)
+	assertStringContains(t, summary, "# DiffPal Findings Summary", "title")
+	assertStringContains(t, summary, "## CRITICAL (1)", "severity section")
+	assertStringContains(t, summary, "### internal/db/query.go", "file section")
+}
+
+func assertStringContains(t *testing.T, got, want, label string) {
+	t.Helper()
+	if !strings.Contains(got, want) {
+		t.Fatalf("summary missing %s:\n%s", label, got)
 	}
 }

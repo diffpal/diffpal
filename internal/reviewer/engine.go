@@ -202,6 +202,9 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			return nil
 		})
 		if err != nil {
+			if isStructuredOutputProviderError(err) {
+				continue
+			}
 			return Result{}, err
 		}
 		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID())...)

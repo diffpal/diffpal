@@ -5,7 +5,7 @@
 ### Local
 
 ```bash
-npm install @diffpal/diffpal@latest
+npm install @diffpal/diffpal@1.2.3
 npx diffpal version
 npx diffpal doctor
 ```
@@ -13,7 +13,7 @@ npx diffpal doctor
 Go source installs remain available for development:
 
 ```bash
-go install github.com/diffpal/diffpal/cmd/diffpal@latest
+go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
 diffpal version
 diffpal doctor
 ```
@@ -21,16 +21,15 @@ diffpal doctor
 ### GitHub Action
 
 ```yaml
-- uses: actions/setup-node@v4
+- uses: actions/setup-go@v6
   with:
-    node-version: 20
-- run: npm install @diffpal/diffpal@latest
-- uses: diffpal/action@v1
-  with:
-    diffpal-path: ./node_modules/.bin/diffpal
-    base: ${{ github.event.pull_request.base.sha }}
-    head: ${{ github.event.pull_request.head.sha }}
-    gate: true
+    go-version-file: go.mod
+- run: go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
+- run: diffpal review github --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
+  env:
+    BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## First run
@@ -74,9 +73,10 @@ diffpal review github \
   --gate
 ```
 
-Host review modes require platform auth values in `.config/diffpal/config.yaml`.
-Use envsubst placeholders such as `token: "${GITHUB_TOKEN}"` so raw secrets are
-provided by the runtime environment and are not committed.
+Host review modes require platform auth through config values or standard CI
+environment variables such as `GITHUB_TOKEN`. Envsubst placeholders such as
+`token: "${GITHUB_TOKEN}"` remain supported, but missing referenced variables
+fail config load before the command can run.
 
 Equivalent host modes exist for GitLab and Azure DevOps:
 

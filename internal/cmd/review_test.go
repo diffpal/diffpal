@@ -3,11 +3,14 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
@@ -21,12 +24,7 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.ReviewID != "local" {
 			t.Fatalf("ReviewID = %q, want local default", opts.ReviewID)
 		}
@@ -37,9 +35,8 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 			t.Fatalf("ContextLines = %d, want 20 from config", opts.ContextLines)
 		}
 		return testReviewResult("local"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -61,16 +58,10 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("local"), nil
 	})
 
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
-		return testReviewResult("local"), nil
-	}
-
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -80,8 +71,8 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	if err == nil {
 		t.Fatal("Execute() error = nil, want blocked gate error")
 	}
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 1 {
@@ -95,41 +86,46 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "token")
+	t.Setenv("GITHUB_TOKEN", "token")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_BASE_SHA", "base-a")
 	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
-	var requests int
+	var requests atomic.Int32
+	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		if r.URL.Path != "/repos/acme/diffpal/check-runs" {
-			t.Fatalf("path = %q, want /repos/acme/diffpal/check-runs", r.URL.Path)
-		}
+		requests.Add(1)
 		if got := r.Header.Get("Authorization"); got != "Bearer token" {
-			t.Fatalf("Authorization = %q, want Bearer token", got)
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
 		}
-		w.WriteHeader(http.StatusCreated)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.BlockOn != "high" {
 			t.Fatalf("BlockOn = %q, want high", opts.BlockOn)
 		}
 		return testReviewResult("github"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -142,8 +138,13 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("requests = %d, want 3", got)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
 	}
 	text := out.String()
 	for _, needle := range []string{
@@ -175,19 +176,13 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
 		return result, nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -201,6 +196,48 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	}
 }
 
+func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	writeHostTestConfigWithGitHubSummary(t, dir, false)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.Error(w, "unexpected request", http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("requests = %d, want 0", got)
+	}
+	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
+		t.Fatalf("output missing summary artifact:\n%s", out.String())
+	}
+}
+
 func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -208,16 +245,10 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
 	})
 
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
-		return testReviewResult("github"), nil
-	}
-
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -227,14 +258,14 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	if err == nil {
 		t.Fatal("Execute() error = nil, want host auth failure")
 	}
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 2 {
 		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
 	}
-	if !strings.Contains(err.Error(), "missing environment variable(s): DIFFPAL_GITHUB_TOKEN_TEST") {
+	if !strings.Contains(err.Error(), "platforms.github.auth.token or GITHUB_TOKEN is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -242,7 +273,7 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "gitlab-token")
+	t.Setenv("GITLAB_TOKEN", "gitlab-token")
 	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
@@ -251,29 +282,29 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("CI_MERGE_REQUEST_DIFF_BASE_SHA", "base-a")
 	t.Setenv("CI_COMMIT_SHA", "head-a")
 
-	var requests int
+	var requests atomic.Int32
+	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if r.URL.Path != "/projects/acme/diffpal/merge_requests/42/discussions" {
-			t.Fatalf("path = %q, want GitLab discussions endpoint", r.URL.Path)
+			handlerErrs <- fmt.Errorf("path = %q, want GitLab discussions endpoint", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
 		}
 		if got := r.Header.Get("PRIVATE-TOKEN"); got != "gitlab-token" {
-			t.Fatalf("PRIVATE-TOKEN = %q, want gitlab-token", got)
+			handlerErrs <- fmt.Errorf("PRIVATE-TOKEN = %q, want gitlab-token", got)
+			http.Error(w, "unexpected token", http.StatusUnauthorized)
+			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITLAB_API_URL", server.URL)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("gitlab"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -282,15 +313,20 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want 1", got)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
 	}
 }
 
 func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_ADO_PAT_TEST", "ado-token")
+	t.Setenv("AZURE_DEVOPS_EXT_PAT", "ado-token")
 	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	writeHostTestConfig(t, dir)
@@ -301,29 +337,29 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("SYSTEM_PULLREQUEST_TARGETCOMMITID", "base-a")
 	t.Setenv("BUILD_SOURCEVERSION", "head-a")
 
-	var requests int
+	var requests atomic.Int32
+	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		if !strings.HasSuffix(r.URL.Path, "/statuses") {
-			t.Fatalf("path = %q, want ADO statuses endpoint", r.URL.Path)
+			handlerErrs <- fmt.Errorf("path = %q, want ADO statuses endpoint", r.URL.Path)
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
 		}
 		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
-			t.Fatalf("Authorization = %q, want Basic auth", got)
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Basic auth", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_ADO_API_URL", server.URL+"/_apis/git/repositories/repo-1/pullRequests/55")
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("ado"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -332,8 +368,13 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if requests != 1 {
-		t.Fatalf("requests = %d, want 1", requests)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want 1", got)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
 	}
 }
 
@@ -348,8 +389,8 @@ func TestReviewRequiresConfigWithExitCode2(t *testing.T) {
 		t.Fatal("Execute() error = nil, want config failure")
 	}
 
-	coder, ok := err.(interface{ ExitCode() int })
-	if !ok {
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
 	if coder.ExitCode() != 2 {
@@ -423,12 +464,16 @@ review:
 }
 
 func writeHostTestConfig(t *testing.T, dir string) {
+	writeHostTestConfigWithGitHubSummary(t, dir, true)
+}
+
+func writeHostTestConfigWithGitHubSummary(t *testing.T, dir string, enabled bool) {
 	t.Helper()
 	configDir := filepath.Join(dir, ".config", "diffpal")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
-	const payload = `version: v1
+	payload := fmt.Sprintf(`version: v1
 defaults:
   provider: openai-fast
   policy: default
@@ -449,15 +494,11 @@ review:
     max_files_per_chunk: 20
 platforms:
   github:
-    auth:
-      token: "${DIFFPAL_GITHUB_TOKEN_TEST}"
-  gitlab:
-    auth:
-      api_token: "${DIFFPAL_GITLAB_TOKEN_TEST}"
-  azure:
-    auth:
-      pat: "${DIFFPAL_ADO_PAT_TEST}"
-`
+    summary_comment:
+      enabled: %t
+  gitlab: {}
+  azure: {}
+`, enabled)
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)
 	}

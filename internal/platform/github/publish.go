@@ -1,6 +1,8 @@
 package github
 
 import (
+	"strings"
+
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/markdown"
 )
@@ -8,11 +10,11 @@ import (
 const maxAnnotationsPerBatch = 50
 
 type Annotation struct {
-	Path      string `json:"path"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
-	Message   string `json:"message"`
-	Level     string `json:"level"`
+	Path            string `json:"path"`
+	StartLine       int    `json:"start_line"`
+	EndLine         int    `json:"end_line"`
+	Message         string `json:"message"`
+	AnnotationLevel string `json:"annotation_level"`
 }
 
 type AnnotationBatch struct {
@@ -33,28 +35,36 @@ type CheckRunPayload struct {
 
 func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSummary string) CheckRunPayload {
 	levelBySeverity := map[string]string{
-		"critical": "error",
-		"high":     "error",
+		"critical": "failure",
+		"high":     "failure",
 		"medium":   "warning",
-		"low":      "note",
+		"low":      "notice",
 	}
 	annotations := make([]Annotation, 0, len(bundle.Findings))
 	blocking := 0
+	failureAnnotations := 0
 	for _, finding := range bundle.Findings {
-		level := levelBySeverity[finding.Severity]
+		normalizedSeverity := strings.ToLower(strings.TrimSpace(finding.Severity))
+		level, ok := levelBySeverity[normalizedSeverity]
+		if !ok {
+			level = "warning"
+		}
+		if level == "failure" {
+			failureAnnotations++
+		}
 		if finding.Blocking {
 			blocking++
 		}
 		annotations = append(annotations, Annotation{
-			Path:      finding.Path,
-			StartLine: finding.StartLine,
-			EndLine:   finding.EndLine,
-			Message:   finding.Title,
-			Level:     level,
+			Path:            finding.Path,
+			StartLine:       finding.StartLine,
+			EndLine:         finding.EndLine,
+			Message:         annotationMessage(finding),
+			AnnotationLevel: level,
 		})
 	}
 	conclusion := "success"
-	if blocking > 0 {
+	if blocking > 0 || failureAnnotations > 0 {
 		conclusion = "failure"
 	}
 	batches := chunkAnnotations(annotations, maxAnnotationsPerBatch)
@@ -76,6 +86,13 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 
 func CheckRunSummary(bundle findings.FindingsBundle) string {
 	return markdown.RenderSummary(bundle)
+}
+
+func annotationMessage(finding findings.Finding) string {
+	if finding.Message != "" {
+		return finding.Message
+	}
+	return finding.Title
 }
 
 func chunkAnnotations(items []Annotation, size int) []AnnotationBatch {

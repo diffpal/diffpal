@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-diffpal_path="${INPUT_DIFFPAL_PATH:-diffpal}"
-
-if [[ "$diffpal_path" == */* ]]; then
-  if [[ ! -x "$diffpal_path" ]]; then
-    echo "diffpal binary is not executable: $diffpal_path" >&2
-    exit 127
-  fi
-elif ! command -v "$diffpal_path" >/dev/null 2>&1; then
-  echo "diffpal binary was not found on PATH: $diffpal_path" >&2
+if ! command -v diffpal >/dev/null 2>&1; then
+  echo "diffpal binary was not found on PATH" >&2
   exit 127
 fi
 
@@ -36,7 +29,7 @@ truthy() {
 require_input "base" "${INPUT_BASE:-}"
 require_input "head" "${INPUT_HEAD:-}"
 
-argv=("$diffpal_path")
+argv=(diffpal)
 
 if [[ -n "${INPUT_CONFIG_DIR:-}" ]]; then
   argv+=(--config-dir "$INPUT_CONFIG_DIR")

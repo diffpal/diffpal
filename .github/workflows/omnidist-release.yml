@@ -26,13 +26,13 @@ jobs:
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
       - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@latest
+        run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Build artifacts
-        run: omnidist --profile default build
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
-        run: omnidist --profile default npm stage
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
       - name: Verify artifacts
-        run: omnidist --profile default npm verify
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -52,10 +52,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     env:
-      NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-      NPM_CONFIG_PROVENANCE: "false"
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -63,7 +62,7 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
       - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@latest
+        run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Download staged artifacts
         uses: actions/download-artifact@v8
         with:
@@ -71,7 +70,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: omnidist --profile default npm publish
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 
   release:
     needs:

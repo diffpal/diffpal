@@ -134,13 +134,13 @@ jobs:
           node-version: 20
 
       - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@latest
+        run: npm ci --prefix tools/omnidist --ignore-scripts
 
       - name: Build artifacts
-        run: omnidist --profile default build
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
 
       - name: Stage npm artifacts
-        run: omnidist --profile default npm stage
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
 
       - name: Verify npm artifacts
-        run: omnidist --profile default npm verify
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify

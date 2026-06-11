@@ -30,13 +30,12 @@ Required:
 - token source:
   - `system_access_token`
   - `pat`
-  - `none`
 
 ## PR thread publishing
 
-- Only actionable findings with `start_line > 0` and high confidence produce inline thread actions.
+- Only actionable findings with canonical `start_line > 0` and high confidence produce inline thread actions.
 - Key model:
-  - `path + ":" + line + ":" + ruleID`
+  - `path + ":" + start_line + ":" + end_line + ":" + ruleID`
 - Re-runs are idempotent via stored key + finding ID:
   - same key + same finding ID → skip
   - same key + different finding ID → update
@@ -55,14 +54,15 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 ## Token and setup guidance
 
 - The `DiffPalReview@1` task expects the `diffpal` CLI to be installed before
-  the task runs. The standard install path is
-  `npm install @diffpal/diffpal@latest`, then `diffpalPath:
+  the task runs. Pin the CLI to an audited SemVer version, for example
+  `npm install @diffpal/diffpal@1.2.3`, then `diffpalPath:
   ./node_modules/.bin/diffpal`.
 - Config auth values:
   - `platforms.azure.auth.system_access_token`
   - `platforms.azure.auth.pat`
-- Use envsubst placeholders such as `system_access_token: "${SYSTEM_ACCESSTOKEN}"`.
+- Standard CI env fallbacks are `SYSTEM_ACCESSTOKEN` and `AZURE_DEVOPS_EXT_PAT`.
 - Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access.
+- Prefer the standard CI environment fallback for `SYSTEM_ACCESSTOKEN` rather than committed token placeholders. If you use envsubst placeholders for explicit config injection, define those variables in the pipeline before loading config.
 - Azure Pipelines must enable `Allow scripts to access the OAuth token` so `SYSTEM_ACCESSTOKEN` is present.
 - Keep token scope to PR validation service connections or project defaults.
 - Avoid broad service permissions in non-interactive PR contexts.

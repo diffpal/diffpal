@@ -1,15 +1,15 @@
 version: v1
 
 defaults:
-  provider: openai-fast
+  provider: copilot-acp
   policy: default
 
 providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: "${DIFFPAL_OPENAI_MODEL}"
-      api_key: "${OPENAI_API_KEY}"
+  copilot-acp:
+    type: copilot_acp
+    copilot_acp:
+      extra_args:
+        - --stdio
 
 policies:
   default:
@@ -23,6 +23,4 @@ review:
     max_files_per_chunk: 20
 
 platforms:
-  github:
-    auth:
-      token: "${GITHUB_TOKEN}"
+  github: {}

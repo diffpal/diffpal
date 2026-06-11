@@ -23,9 +23,11 @@ func newDoctorCommand() *cobra.Command {
 		Short: "Validate local runtime and environment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var issues []string
-			var hasError bool
 			errorIssues := []string{}
-			mode, _ := cmd.Flags().GetString("mode")
+			mode, err := cmd.Flags().GetString("mode")
+			if err != nil {
+				return err
+			}
 			workingDir, err := currentWorkingDir()
 			if err != nil {
 				return err
@@ -38,13 +40,11 @@ func newDoctorCommand() *cobra.Command {
 			cfg := config.Config{}
 			if configExists {
 				cfg, err = config.LoadConfig(workingDir, rootConfigDir, rootProfile)
-			} else {
-				err = fmt.Errorf("%s not found", configPath)
 			}
 			if err != nil && configExists {
 				issues = append(issues, "error: config validation failed: "+err.Error())
 				errorIssues = append(errorIssues, err.Error())
-				hasError = true
+				return printDoctorResult(cmd, issues, errorIssues)
 			}
 
 			issues = append(issues, provider.Diagnostics()...)
@@ -52,39 +52,38 @@ func newDoctorCommand() *cobra.Command {
 				issues = append(issues, "warn: no default provider definitions available")
 			}
 			issues = append(issues, diagnoseProviderConfig(cfg)...)
-			selectedProviderIssues, selectedProviderError := diagnoseSelectedProvider(cfg, workingDir)
+			selectedProviderIssues, selectedProviderError := diagnoseSelectedProvider(cfg, workingDir, requiresProviderAuth(mode))
 			issues = append(issues, selectedProviderIssues...)
 			if selectedProviderError != "" {
 				errorIssues = append(errorIssues, selectedProviderError)
-				hasError = true
 			}
 			platformIssues, platformError := diagnosePlatformAuth(cfg, mode)
 			issues = append(issues, platformIssues...)
 			if platformError != "" {
 				errorIssues = append(errorIssues, platformError)
-				hasError = true
 			}
 			issues = append(issues, diagnoseWorkspace(configPath)...)
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "doctor runtime: goos=%s\n", runtime.GOOS)
-			if err != nil {
-				return err
-			}
-			for _, issue := range issues {
-				_, err = fmt.Fprintln(cmd.OutOrStdout(), issue)
-				if err != nil {
-					return err
-				}
-			}
-
-			if hasError {
-				return withExitCode(2, errors.New("doctor failures: "+strings.Join(errorIssues, "; ")))
-			}
-			return nil
+			return printDoctorResult(cmd, issues, errorIssues)
 		},
 	}
 	doctor.Flags().String("mode", "local", "Validate mode-specific platform authorization for local, github, gitlab, or ado")
 	return doctor
+}
+
+func printDoctorResult(cmd *cobra.Command, issues []string, errorIssues []string) error {
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "doctor runtime: goos=%s\n", runtime.GOOS); err != nil {
+		return err
+	}
+	for _, issue := range issues {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), issue); err != nil {
+			return err
+		}
+	}
+	if len(errorIssues) > 0 {
+		return withExitCode(2, errors.New("doctor failures: "+strings.Join(errorIssues, "; ")))
+	}
+	return nil
 }
 
 func diagnoseProviderConfig(cfg config.Config) []string {
@@ -131,7 +130,7 @@ func diagnoseProviderConfig(cfg config.Config) []string {
 	return issues
 }
 
-func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, string) {
+func diagnoseSelectedProvider(cfg config.Config, workingDir string, requireAuth bool) ([]string, string) {
 	providerID := strings.TrimSpace(cfg.ProviderID())
 	if providerID == "" {
 		return nil, ""
@@ -147,17 +146,21 @@ func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, s
 	providers := providerConfigsWithEnv(cfg.Providers)
 	selected := providers[providerID]
 	if missing := hostedProviderMissing(selected); missing != "" {
+		if !requireAuth && strings.Contains(missing, "api_key") {
+			issues = append(issues, "warn: "+missing)
+			return issues, ""
+		}
 		issues = append(issues, "error: "+missing)
 		return issues, missing
 	}
 
 	factory := agentfactory.New(providers, mcpregistry.New(cfg.MCPServers))
 	if err := factory.ValidateAgent(providerID); err != nil {
-		msg := fmt.Sprintf("selected provider %s failed validation: %v", providerID, err)
+		msg := fmt.Sprintf("selected provider %s failed validation", providerID)
 		return append(issues, "error: "+msg), msg
 	}
 	if _, err := factory.BuildSessionState(providerID, workingDir); err != nil {
-		msg := fmt.Sprintf("selected provider %s session state invalid: %v", providerID, err)
+		msg := fmt.Sprintf("selected provider %s session state invalid", providerID)
 		return append(issues, "error: "+msg), msg
 	}
 
@@ -165,10 +168,19 @@ func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, s
 	return issues, ""
 }
 
+func requiresProviderAuth(mode string) bool {
+	selected := strings.ToLower(strings.TrimSpace(mode))
+	return selected != "" && selected != "local"
+}
+
 func diagnoseWorkspace(configPath string) []string {
 	issues := []string{}
 	if _, err := os.Stat(configPath); err != nil {
-		issues = append(issues, fmt.Sprintf("warn: %s not found; run `diffpal init`", configPath))
+		if errors.Is(err, os.ErrNotExist) {
+			issues = append(issues, fmt.Sprintf("warn: %s not found; run `diffpal init`", configPath))
+		} else {
+			issues = append(issues, fmt.Sprintf("warn: cannot inspect %s: %v", configPath, err))
+		}
 	}
 	if !provider.HasExecutable("git") {
 		issues = append(issues, "warn: git is not available; diff collection and SCM context will fail")

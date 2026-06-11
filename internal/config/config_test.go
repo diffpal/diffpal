@@ -113,6 +113,7 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	t.Setenv("DIFFPAL_REVIEW_CONTEXT_LINES", "33")
 	t.Setenv("DIFFPAL_REVIEW_MAX_FILES", "55")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
+	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
 	cfg, err := LoadConfig(dir, "", "")
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
@@ -125,6 +126,48 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
+	}
+	if cfg.Providers["openai-fast"].OpenAI.Model != "gpt-env" {
+		t.Fatalf("OpenAI.Model = %q, want gpt-env", cfg.Providers["openai-fast"].OpenAI.Model)
+	}
+}
+
+func TestLoadConfigRejectsNegativeReviewEnvOverrides(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+	}{
+		{name: "max files", env: "DIFFPAL_REVIEW_MAX_FILES"},
+		{name: "context lines", env: "DIFFPAL_REVIEW_CONTEXT_LINES"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
+			t.Setenv(tc.env, "-1")
+
+			_, err := LoadConfig(dir, "", "")
+			if err == nil {
+				t.Fatal("LoadConfig() error = nil, want invalid env override error")
+			}
+			if !strings.Contains(err.Error(), "must be non-negative") {
+				t.Fatalf("LoadConfig() error = %v, want non-negative validation", err)
+			}
+		})
+	}
+}
+
+func TestGitHubSummaryCommentDefaultsEnabled(t *testing.T) {
+	var cfg GitHubPlatformConfig
+	if !cfg.SummaryCommentEnabled() {
+		t.Fatal("SummaryCommentEnabled() = false, want default true")
+	}
+
+	enabled := false
+	cfg.SummaryComment.Enabled = &enabled
+	if cfg.SummaryCommentEnabled() {
+		t.Fatal("SummaryCommentEnabled() = true, want configured false")
 	}
 }
 

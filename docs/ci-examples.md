@@ -15,12 +15,12 @@ concurrency:
 
 jobs:
   review:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       checks: write
-      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,17 +28,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install @diffpal/diffpal@latest
-      - uses: diffpal/action@v1
-        with:
-          diffpal-path: ./node_modules/.bin/diffpal
-          config-dir: .github
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          gate: true
+      - run: npm install --global @diffpal/diffpal@1.2.3
+      - run: >-
+          diffpal review github
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
 ## GitLab CI
@@ -54,8 +51,8 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   script:
-    - npm install @diffpal/diffpal@latest
-    - ./node_modules/.bin/diffpal review gitlab \
+    - npm install --global @diffpal/diffpal@1.2.3
+    - diffpal review gitlab \
         --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" \
         --head "$CI_COMMIT_SHA" \
         --gate
@@ -81,21 +78,19 @@ steps:
   - task: NodeTool@0
     inputs:
       versionSpec: "20.x"
-  - script: npm install @diffpal/diffpal@latest
+  - script: npm install --global @diffpal/diffpal@1.2.3
     displayName: Install DiffPal CLI
   - task: DiffPalReview@1
     inputs:
-      diffpalPath: ./node_modules/.bin/diffpal
       gate: true
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-      OPENAI_API_KEY: $(OPENAI_API_KEY)
 ```
 
 ## Semantics
 
-- GitHub pipeline publishes check-run summaries and inline reviews.
+- GitHub pipeline publishes check runs, a PR-level summary comment, and inline reviews for actionable findings.
 - GitLab pipeline writes both `discussions` and artifact reports.
 - Azure pipeline posts PR threads and PR status with merge-policy-compatible names.
-- The GitHub and Azure task wrappers expect a `diffpal` binary that was installed by an earlier step, typically from `@diffpal/diffpal`.
+- The GitHub and Azure task wrappers expect a `diffpal` binary on `PATH`, typically installed from a pinned `@diffpal/diffpal` SemVer.
 - Azure publish requires `Allow scripts to access the OAuth token` so `SYSTEM_ACCESSTOKEN` is populated.
