@@ -5,7 +5,7 @@
 ### Local
 
 ```bash
-npm install @diffpal/diffpal@latest
+npm install @diffpal/diffpal@1.2.3
 npx diffpal version
 npx diffpal doctor
 ```
@@ -13,7 +13,7 @@ npx diffpal doctor
 Go source installs remain available for development:
 
 ```bash
-go install github.com/diffpal/diffpal/cmd/diffpal@latest
+go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
 diffpal version
 diffpal doctor
 ```
@@ -24,7 +24,7 @@ diffpal doctor
 - uses: actions/setup-go@v6
   with:
     go-version-file: go.mod
-- run: go install github.com/diffpal/diffpal/cmd/diffpal@latest
+- run: go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
 - run: diffpal review github --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
   env:
     BASE_SHA: ${{ github.event.pull_request.base.sha }}

@@ -5,7 +5,7 @@
 - CLI and Go module use SemVer (`vMAJOR.MINOR.PATCH`).
 - GitHub Action tag is kept at a stable major (`v1`), with matching GitHub repository tags.
 - The CLI is distributed through omnidist, including the npm package `@diffpal/diffpal`.
-- Consumers install the CLI with `npm install @diffpal/diffpal@latest` or a pinned SemVer version.
+- Consumers install the CLI with a pinned SemVer version such as `npm install @diffpal/diffpal@1.2.3`.
 
 ## Artifact list
 
@@ -32,20 +32,18 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm_integrity="$(npm view @omnidist/omnidist@0.1.30 dist.integrity)"
-test "$npm_integrity" = "sha512-2if3z9cfT5n2NsurfFkCrJu+M83qMUNq5jNInFDb13iIEbKvrFYFDwAizCo6JCjpvv3TmOrGihU4YUBhd89MUg=="
-npm install --no-save --ignore-scripts @omnidist/omnidist@0.1.30
-OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
-node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
-node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
-node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
+npm ci --prefix tools/omnidist --ignore-scripts
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 ```
 
-`@omnidist/omnidist` is invoked with an exact package version after checking
-the npm-published package integrity. The `omnidist-release` workflow derives
-`OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action
-aliases such as `v1` are not release triggers and should be pushed only after
-the SemVer release tag succeeds.
+`@omnidist/omnidist` is installed from the committed lockfile in
+`tools/omnidist/package-lock.json`. The `omnidist-release` workflow derives
+`OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action aliases
+such as `v1` are not release triggers and should be pushed only after the SemVer
+release tag succeeds.
 NPM publishing should use trusted publishing/OIDC with provenance enabled. If a
 bootstrap release must use `NPM_PUBLISH_TOKEN`, run it only from a protected
 GitHub Environment with required reviewers and remove that fallback after the
@@ -113,7 +111,7 @@ After release, verify:
 
 ```bash
 npm view @diffpal/diffpal version
-npm install @diffpal/diffpal@latest
+npm install @diffpal/diffpal@1.2.3
 ./node_modules/.bin/diffpal version
 ```
 

@@ -32,11 +32,14 @@ jobs:
       - name: Add Go binaries to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
+      - name: Add Copilot CLI to PATH
+        run: echo "$GITHUB_WORKSPACE/tools/copilot/node_modules/.bin" >> "$GITHUB_PATH"
+
       - name: Install DiffPal CLI
         run: go install ./cmd/diffpal
 
       - name: Install Copilot CLI
-        run: npm install --global @github/copilot@1.0.61
+        run: npm ci --prefix tools/copilot --ignore-scripts
 
       - name: Run DiffPal review
         run: >-

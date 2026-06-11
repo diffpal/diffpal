@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "dependencies": {
+    "@omnidist/omnidist": "0.1.30"
+  }
+}

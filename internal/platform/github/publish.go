@@ -1,6 +1,8 @@
 package github
 
 import (
+	"strings"
+
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/markdown"
 )
@@ -42,7 +44,8 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 	blocking := 0
 	failureAnnotations := 0
 	for _, finding := range bundle.Findings {
-		level, ok := levelBySeverity[finding.Severity]
+		normalizedSeverity := strings.ToLower(strings.TrimSpace(finding.Severity))
+		level, ok := levelBySeverity[normalizedSeverity]
 		if !ok {
 			level = "warning"
 		}

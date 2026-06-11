@@ -25,16 +25,14 @@ jobs:
             exit 1
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Verify omnidist package integrity
-        run: test "$(npm view @omnidist/omnidist@0.1.30 dist.integrity)" = "sha512-2if3z9cfT5n2NsurfFkCrJu+M83qMUNq5jNInFDb13iIEbKvrFYFDwAizCo6JCjpvv3TmOrGihU4YUBhd89MUg=="
       - name: Install omnidist
-        run: npm install --no-save --ignore-scripts @omnidist/omnidist@0.1.30
+        run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Build artifacts
-        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
-        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
       - name: Verify artifacts
-        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -65,10 +63,8 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      - name: Verify omnidist package integrity
-        run: test "$(npm view @omnidist/omnidist@0.1.30 dist.integrity)" = "sha512-2if3z9cfT5n2NsurfFkCrJu+M83qMUNq5jNInFDb13iIEbKvrFYFDwAizCo6JCjpvv3TmOrGihU4YUBhd89MUg=="
       - name: Install omnidist
-        run: npm install --no-save --ignore-scripts @omnidist/omnidist@0.1.30
+        run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Download staged artifacts
         uses: actions/download-artifact@v8
         with:
@@ -76,7 +72,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
+        run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm publish
 
   release:
     needs:

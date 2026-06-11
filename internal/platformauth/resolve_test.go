@@ -1,6 +1,7 @@
 package platformauth
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -139,10 +140,25 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 
 func clearPlatformTokenEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("GITHUB_TOKEN", "")
-	t.Setenv("GITLAB_TOKEN", "")
-	t.Setenv("CI_JOB_TOKEN", "")
-	t.Setenv("SYSTEM_ACCESSTOKEN", "")
+	clearEnvVar(t, "GITHUB_TOKEN")
+	clearEnvVar(t, "GITLAB_TOKEN")
+	clearEnvVar(t, "CI_JOB_TOKEN")
+	clearEnvVar(t, "SYSTEM_ACCESSTOKEN")
+}
+
+func clearEnvVar(t *testing.T, key string) {
+	t.Helper()
+	previous, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("os.Unsetenv(%q): %v", key, err)
+	}
+	t.Cleanup(func() {
+		if ok {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
 }
 
 func assertResolvedToken(t *testing.T, resolved Resolved, want string) {
