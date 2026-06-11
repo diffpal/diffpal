@@ -41,7 +41,10 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 	annotations := make([]Annotation, 0, len(bundle.Findings))
 	blocking := 0
 	for _, finding := range bundle.Findings {
-		level := levelBySeverity[finding.Severity]
+		level, ok := levelBySeverity[finding.Severity]
+		if !ok {
+			level = "warning"
+		}
 		if finding.Blocking {
 			blocking++
 		}

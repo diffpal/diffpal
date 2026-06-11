@@ -33,7 +33,7 @@ jobs:
         run: go install ./cmd/diffpal
 
       - name: Install Copilot CLI
-        run: npm install --global @github/copilot
+        run: npm install --global @github/copilot@1.0.61
 
       - uses: ./
         with:

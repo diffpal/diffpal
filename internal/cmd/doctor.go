@@ -23,9 +23,11 @@ func newDoctorCommand() *cobra.Command {
 		Short: "Validate local runtime and environment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var issues []string
-			var hasError bool
 			errorIssues := []string{}
-			mode, _ := cmd.Flags().GetString("mode")
+			mode, err := cmd.Flags().GetString("mode")
+			if err != nil {
+				return err
+			}
 			workingDir, err := currentWorkingDir()
 			if err != nil {
 				return err
@@ -42,7 +44,6 @@ func newDoctorCommand() *cobra.Command {
 			if err != nil && configExists {
 				issues = append(issues, "error: config validation failed: "+err.Error())
 				errorIssues = append(errorIssues, err.Error())
-				hasError = true
 			}
 
 			issues = append(issues, provider.Diagnostics()...)
@@ -54,13 +55,11 @@ func newDoctorCommand() *cobra.Command {
 			issues = append(issues, selectedProviderIssues...)
 			if selectedProviderError != "" {
 				errorIssues = append(errorIssues, selectedProviderError)
-				hasError = true
 			}
 			platformIssues, platformError := diagnosePlatformAuth(cfg, mode)
 			issues = append(issues, platformIssues...)
 			if platformError != "" {
 				errorIssues = append(errorIssues, platformError)
-				hasError = true
 			}
 			issues = append(issues, diagnoseWorkspace(configPath)...)
 
@@ -75,7 +74,7 @@ func newDoctorCommand() *cobra.Command {
 				}
 			}
 
-			if hasError {
+			if len(errorIssues) > 0 {
 				return withExitCode(2, errors.New("doctor failures: "+strings.Join(errorIssues, "; ")))
 			}
 			return nil

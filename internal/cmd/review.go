@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var reviewRun = reviewer.Run
+type reviewRunner func(context.Context, config.Config, reviewer.Options) (reviewer.Result, error)
 
 type reviewExecution struct {
 	Config  config.Config
@@ -26,6 +26,10 @@ type reviewExecution struct {
 }
 
 func newReviewCommand() *cobra.Command {
+	return newReviewCommandWithRunner(reviewer.Run)
+}
+
+func newReviewCommandWithRunner(run reviewRunner) *cobra.Command {
 	review := &cobra.Command{
 		Use:   "review",
 		Short: "Run review locally or for a CI host",
@@ -33,21 +37,21 @@ func newReviewCommand() *cobra.Command {
 	}
 
 	review.AddCommand(
-		newLocalReviewSubcommand(),
-		newHostReviewSubcommand("github", "github", nil),
-		newHostReviewSubcommand("gitlab", "gitlab", nil),
-		newHostReviewSubcommand("ado", "azure", []string{"azure"}),
+		newLocalReviewSubcommand(run),
+		newHostReviewSubcommand(run, "github", "github", nil),
+		newHostReviewSubcommand(run, "gitlab", "gitlab", nil),
+		newHostReviewSubcommand(run, "ado", "azure", []string{"azure"}),
 	)
 
 	return review
 }
 
-func newLocalReviewSubcommand() *cobra.Command {
+func newLocalReviewSubcommand(run reviewRunner) *cobra.Command {
 	local := &cobra.Command{
 		Use:   "local",
 		Short: "Review a local diff and write findings.json",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runReviewOnly(cmd, "local")
+			return runReviewOnly(cmd, "local", run)
 		},
 	}
 	addReviewAnalysisFlags(local, "local")
@@ -55,13 +59,13 @@ func newLocalReviewSubcommand() *cobra.Command {
 	return local
 }
 
-func newHostReviewSubcommand(name, platform string, aliases []string) *cobra.Command {
+func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []string) *cobra.Command {
 	host := &cobra.Command{
 		Use:     name,
 		Aliases: aliases,
 		Short:   fmt.Sprintf("Review and emit %s artifacts", hostDisplayName(name)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runHostReview(cmd, platform, name)
+			return runHostReview(cmd, platform, name, run)
 		},
 	}
 	addReviewAnalysisFlags(host, name)
@@ -91,8 +95,8 @@ func addReviewPolicyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("gate", false, "Return non-zero when blocking findings exist")
 }
 
-func runReviewOnly(cmd *cobra.Command, defaultReviewID string) error {
-	execution, err := executeReview(cmd, defaultReviewID)
+func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner) error {
+	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
@@ -107,8 +111,8 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string) error {
 	return nil
 }
 
-func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
-	execution, err := executeReview(cmd, defaultReviewID)
+func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
+	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
@@ -158,7 +162,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string) error {
 	return nil
 }
 
-func executeReview(cmd *cobra.Command, defaultReviewID string) (reviewExecution, error) {
+func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	maxFiles, _ := cmd.Flags().GetInt("max-files")
@@ -204,7 +208,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string) (reviewExecution,
 	if runCtx == nil {
 		runCtx = context.Background()
 	}
-	result, err := reviewRun(runCtx, cfg, reviewer.Options{
+	result, err := run(runCtx, cfg, reviewer.Options{
 		Repo:             repo,
 		ReviewID:         reviewID,
 		BaseSHA:          base,

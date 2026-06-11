@@ -42,9 +42,9 @@ omnidist --profile default npm publish
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
 SemVer tag automatically. Major action aliases such as `v1` are not release
 triggers and should be pushed only after the SemVer release tag succeeds.
-NPM publishing uses token auth, not npm trusted publishing: the workflow passes
-`NPM_PUBLISH_TOKEN` and `NODE_AUTH_TOKEN`, does not request `id-token: write`,
-and sets `NPM_CONFIG_PROVENANCE=false`.
+NPM publishing uses token auth for the first release path. Enable npm provenance
+once the package is ready for trusted publishing, then remove the token-only
+fallback.
 
 4. Build Azure DevOps extension packages:
 

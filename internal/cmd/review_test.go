@@ -23,12 +23,7 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.ReviewID != "local" {
 			t.Fatalf("ReviewID = %q, want local default", opts.ReviewID)
 		}
@@ -39,9 +34,8 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 			t.Fatalf("ContextLines = %d, want 20 from config", opts.ContextLines)
 		}
 		return testReviewResult("local"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -63,16 +57,10 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("local"), nil
 	})
 
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
-		return testReviewResult("local"), nil
-	}
-
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -124,19 +112,13 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.BlockOn != "high" {
 			t.Fatalf("BlockOn = %q, want high", opts.BlockOn)
 		}
 		return testReviewResult("github"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -187,19 +169,13 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
 		return result, nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -220,16 +196,10 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
 	})
 
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
-		return testReviewResult("github"), nil
-	}
-
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -282,15 +252,10 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITLAB_API_URL", server.URL)
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("gitlab"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -342,15 +307,10 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_ADO_API_URL", server.URL+"/_apis/git/repositories/repo-1/pullRequests/55")
 
-	previous := reviewRun
-	t.Cleanup(func() {
-		reviewRun = previous
-	})
-	reviewRun = func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("ado"), nil
-	}
+	})
 
-	cmd := newReviewCommand()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)

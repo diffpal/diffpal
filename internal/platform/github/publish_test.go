@@ -91,6 +91,33 @@ func TestAnnotationMessageFallsBackToTitle(t *testing.T) {
 	}
 }
 
+func TestBuildCheckRunPayloadDefaultsUnknownSeverityToWarning(t *testing.T) {
+	t.Parallel()
+
+	bundle := findings.FindingsBundle{
+		ReviewID: "review-github",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				RuleID:    "custom",
+				Category:  "correctness",
+				Severity:  "unexpected",
+				Path:      "internal/file.go",
+				StartLine: 1,
+				EndLine:   1,
+				Title:     "custom finding",
+				Message:   "custom message",
+			},
+		},
+	}
+
+	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
+	if payload.Annotations[0].AnnotationLevel != "warning" {
+		t.Fatalf("annotation level = %q, want warning", payload.Annotations[0].AnnotationLevel)
+	}
+}
+
 func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	t.Parallel()
 
