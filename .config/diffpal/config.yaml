@@ -9,8 +9,6 @@ providers:
     type: copilot_acp
     copilot_acp:
       cmd:
-        - npx
-        - --no-install
         - ./node_modules/.bin/copilot
       extra_args:
         - --stdio
