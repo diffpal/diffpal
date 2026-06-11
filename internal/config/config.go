@@ -59,7 +59,12 @@ type PlatformConfigs struct {
 }
 
 type GitHubPlatformConfig struct {
-	Auth GitHubAuthConfig `json:"auth,omitempty" yaml:"auth,omitempty" mapstructure:"auth"`
+	Auth           GitHubAuthConfig           `json:"auth,omitempty"            yaml:"auth,omitempty"            mapstructure:"auth"`
+	SummaryComment GitHubSummaryCommentConfig `json:"summary_comment,omitempty" yaml:"summary_comment,omitempty" mapstructure:"summary_comment"`
+}
+
+type GitHubSummaryCommentConfig struct {
+	Enabled *bool `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
 }
 
 type GitHubAuthConfig struct {
@@ -300,6 +305,10 @@ func (cfg PlatformConfigs) Validate() error {
 	}
 	sort.Strings(errs)
 	return fmt.Errorf("platform config validation failed: %s", strings.Join(errs, "; "))
+}
+
+func (cfg GitHubPlatformConfig) SummaryCommentEnabled() bool {
+	return cfg.SummaryComment.Enabled == nil || *cfg.SummaryComment.Enabled
 }
 
 func ConfigDir(workingDir string) string {

@@ -93,22 +93,28 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_BASE_SHA", "base-a")
 	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
-	handlerErrs := make(chan error, 2)
+	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		if r.URL.Path != "/repos/acme/diffpal/check-runs" {
-			handlerErrs <- fmt.Errorf("path = %q, want /repos/acme/diffpal/check-runs", r.URL.Path)
-			http.Error(w, "unexpected path", http.StatusBadRequest)
-			return
-		}
 		if got := r.Header.Get("Authorization"); got != "Bearer token" {
 			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
 			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
@@ -132,8 +138,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 1 {
-		t.Fatalf("requests = %d, want 1", got)
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("requests = %d, want 3", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -187,6 +193,48 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "publish=skipped-fork") {
 		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+}
+
+func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	writeHostTestConfigWithGitHubSummary(t, dir, false)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.Error(w, "unexpected request", http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("requests = %d, want 0", got)
+	}
+	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
+		t.Fatalf("output missing summary artifact:\n%s", out.String())
 	}
 }
 
@@ -416,12 +464,16 @@ review:
 }
 
 func writeHostTestConfig(t *testing.T, dir string) {
+	writeHostTestConfigWithGitHubSummary(t, dir, true)
+}
+
+func writeHostTestConfigWithGitHubSummary(t *testing.T, dir string, enabled bool) {
 	t.Helper()
 	configDir := filepath.Join(dir, ".config", "diffpal")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
-	const payload = `version: v1
+	payload := fmt.Sprintf(`version: v1
 defaults:
   provider: openai-fast
   policy: default
@@ -441,10 +493,12 @@ review:
     max_patch_chars: 12000
     max_files_per_chunk: 20
 platforms:
-  github: {}
+  github:
+    summary_comment:
+      enabled: %t
   gitlab: {}
   azure: {}
-`
+`, enabled)
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)
 	}

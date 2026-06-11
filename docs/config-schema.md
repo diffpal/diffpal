@@ -36,7 +36,9 @@ review:
     max_files_per_chunk: 20
 
 platforms:
-  github: {}
+  github:
+    summary_comment:
+      enabled: true
   gitlab: {}
   azure: {}
 
@@ -65,6 +67,10 @@ substituted values.
 Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
+
+`platforms.github.summary_comment.enabled` defaults to `true`. When `summary`
+mode is selected, DiffPal posts or updates a PR-level GitHub summary comment
+even if there are no findings.
 
 Validation requires `version: v1`, a `defaults.provider` key present in
 `providers`, a `defaults.policy` key present in `policies`, and a valid

@@ -158,6 +158,19 @@ func TestLoadConfigRejectsNegativeReviewEnvOverrides(t *testing.T) {
 	}
 }
 
+func TestGitHubSummaryCommentDefaultsEnabled(t *testing.T) {
+	var cfg GitHubPlatformConfig
+	if !cfg.SummaryCommentEnabled() {
+		t.Fatal("SummaryCommentEnabled() = false, want default true")
+	}
+
+	enabled := false
+	cfg.SummaryComment.Enabled = &enabled
+	if cfg.SummaryCommentEnabled() {
+		t.Fatal("SummaryCommentEnabled() = true, want configured false")
+	}
+}
+
 func TestLoadConfigExpandsEnvsubstValuesBeforeYAMLDecode(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `

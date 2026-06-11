@@ -147,7 +147,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -303,7 +303,7 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, bundle findings.FindingsBundle, blockOn string, modes []string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -322,6 +322,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			return err
 		}
 		commentPlan := github.PlanInlineComments(existingComments, bundle.Findings)
+		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
@@ -331,6 +332,13 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					}
 				case "github_comments":
 					if err := github.PublishInlineComments(ctx, token, reviewCtx, commentPlan, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if !summaryCommentEnabled {
+						continue
+					}
+					if err := github.PublishSummaryComment(ctx, token, reviewCtx, github.CheckRunSummary(bundle), nil); err != nil {
 						return err
 					}
 				}

@@ -89,7 +89,7 @@ steps:
 
 ## Semantics
 
-- GitHub pipeline publishes check-run summaries and inline reviews.
+- GitHub pipeline publishes check runs, a PR-level summary comment, and inline reviews for actionable findings.
 - GitLab pipeline writes both `discussions` and artifact reports.
 - Azure pipeline posts PR threads and PR status with merge-policy-compatible names.
 - The GitHub and Azure task wrappers expect a `diffpal` binary on `PATH`, typically installed from a pinned `@diffpal/diffpal` SemVer.

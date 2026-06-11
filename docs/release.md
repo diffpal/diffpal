@@ -110,7 +110,8 @@ npm install @diffpal/diffpal@1.2.3
 ```
 
 Open a same-repository pull request and confirm the `diffpal-review` workflow
-publishes the `diffpal-checks` check run and review comments when findings are
+publishes the `diffpal-checks` check run, posts a PR-level summary comment even
+when no findings are present, and posts inline review comments when findings are
 present.
 
 ## Branch policy expectations
@@ -134,8 +135,8 @@ present.
 DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
 open a maintainer-controlled same-repository pull request and verify that
-`diffpal-review` publishes the `diffpal-checks` check run and leaves the PR in
-the expected pass/fail state.
+`diffpal-review` publishes the `diffpal-checks` check run, posts the PR-level
+summary comment, and leaves the PR in the expected pass/fail state.
 
 ## Change log and audits
 

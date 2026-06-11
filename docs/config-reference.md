@@ -52,7 +52,9 @@ review:
     max_files_per_chunk: 20
 
 platforms:
-  github: {}
+  github:
+    summary_comment:
+      enabled: true
   gitlab: {}
   azure: {}
 
@@ -91,6 +93,21 @@ Environment overrides:
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
+
+## GitHub Summary Comment
+
+`review github --mode summary` posts a PR-level summary comment by default,
+including when the review has no findings. Disable that visible PR-thread
+summary with:
+
+```yaml
+platforms:
+  github:
+    summary_comment:
+      enabled: false
+```
+
+Inline finding comments remain controlled by `--mode comments`.
 
 ## Platform Auth
 
