@@ -40,10 +40,14 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 	}
 	annotations := make([]Annotation, 0, len(bundle.Findings))
 	blocking := 0
+	failureAnnotations := 0
 	for _, finding := range bundle.Findings {
 		level, ok := levelBySeverity[finding.Severity]
 		if !ok {
 			level = "warning"
+		}
+		if level == "failure" {
+			failureAnnotations++
 		}
 		if finding.Blocking {
 			blocking++
@@ -57,7 +61,7 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 		})
 	}
 	conclusion := "success"
-	if blocking > 0 {
+	if blocking > 0 || failureAnnotations > 0 {
 		conclusion = "failure"
 	}
 	batches := chunkAnnotations(annotations, maxAnnotationsPerBatch)

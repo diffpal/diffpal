@@ -118,6 +118,34 @@ func TestBuildCheckRunPayloadDefaultsUnknownSeverityToWarning(t *testing.T) {
 	}
 }
 
+func TestBuildCheckRunPayloadFailsOnFailureLevelAnnotation(t *testing.T) {
+	t.Parallel()
+
+	bundle := findings.FindingsBundle{
+		ReviewID: "review-github",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				RuleID:    "high",
+				Category:  "correctness",
+				Severity:  "high",
+				Blocking:  false,
+				Path:      "internal/file.go",
+				StartLine: 1,
+				EndLine:   1,
+				Title:     "high finding",
+				Message:   "high message",
+			},
+		},
+	}
+
+	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
+	if payload.Conclusion != "failure" {
+		t.Fatalf("Conclusion = %q, want failure", payload.Conclusion)
+	}
+}
+
 func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	t.Parallel()
 
