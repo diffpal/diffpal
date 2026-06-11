@@ -28,18 +28,12 @@ jobs:
       - name: Install DiffPal CLI
         run: npm install @diffpal/diffpal@latest
 
-      - name: Prepare DiffPal CLI shim
-        run: |
-          mkdir -p .artifacts/bin
-          cat > .artifacts/bin/diffpal <<'SH'
-          #!/usr/bin/env sh
-          exec npm exec -- diffpal "$@"
-          SH
-          chmod +x .artifacts/bin/diffpal
+      - name: Ensure DiffPal CLI is executable
+        run: chmod +x ./node_modules/.bin/diffpal
 
       - uses: ./
         with:
-          diffpal-path: ./.artifacts/bin/diffpal
+          diffpal-path: ./node_modules/.bin/diffpal
           config-dir: .github
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
