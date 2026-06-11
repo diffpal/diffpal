@@ -113,6 +113,7 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	t.Setenv("DIFFPAL_REVIEW_CONTEXT_LINES", "33")
 	t.Setenv("DIFFPAL_REVIEW_MAX_FILES", "55")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
+	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
 	cfg, err := LoadConfig(dir, "", "")
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
@@ -125,6 +126,9 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
+	}
+	if cfg.Providers["openai-fast"].OpenAI.Model != "gpt-env" {
+		t.Fatalf("OpenAI.Model = %q, want gpt-env", cfg.Providers["openai-fast"].OpenAI.Model)
 	}
 }
 

@@ -95,7 +95,7 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "token")
+	t.Setenv("GITHUB_TOKEN", "token")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
@@ -234,7 +234,7 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	if coder.ExitCode() != 2 {
 		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
 	}
-	if !strings.Contains(err.Error(), "missing environment variable(s): DIFFPAL_GITHUB_TOKEN_TEST") {
+	if !strings.Contains(err.Error(), "platforms.github.auth.token or GITHUB_TOKEN is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -242,7 +242,7 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "gitlab-token")
+	t.Setenv("GITLAB_TOKEN", "gitlab-token")
 	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
@@ -290,7 +290,7 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	t.Setenv("DIFFPAL_ADO_PAT_TEST", "ado-token")
+	t.Setenv("AZURE_DEVOPS_EXT_PAT", "ado-token")
 	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	writeHostTestConfig(t, dir)
@@ -448,15 +448,9 @@ review:
     max_patch_chars: 12000
     max_files_per_chunk: 20
 platforms:
-  github:
-    auth:
-      token: "${DIFFPAL_GITHUB_TOKEN_TEST}"
-  gitlab:
-    auth:
-      api_token: "${DIFFPAL_GITLAB_TOKEN_TEST}"
-  azure:
-    auth:
-      pat: "${DIFFPAL_ADO_PAT_TEST}"
+  github: {}
+  gitlab: {}
+  azure: {}
 `
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)

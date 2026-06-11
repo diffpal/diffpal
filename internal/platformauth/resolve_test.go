@@ -28,6 +28,21 @@ func TestResolveGitHubUsesConfiguredToken(t *testing.T) {
 	}
 }
 
+func TestResolveGitHubUsesEnvToken(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "env-token")
+
+	resolved, err := Resolve(config.Config{}, "github")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Token != "env-token" {
+		t.Fatalf("Token = %q, want env-token", resolved.Token)
+	}
+	if resolved.Source != "GITHUB_TOKEN" {
+		t.Fatalf("Source = %q, want GITHUB_TOKEN", resolved.Source)
+	}
+}
+
 func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
@@ -49,6 +64,21 @@ func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
 	}
 	if resolved.Token != "api-token" {
 		t.Fatalf("Token = %q, want api-token", resolved.Token)
+	}
+}
+
+func TestResolveGitLabUsesEnvTokens(t *testing.T) {
+	t.Setenv("CI_JOB_TOKEN", "job-env-token")
+
+	resolved, err := Resolve(config.Config{}, "gitlab")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Token != "job-env-token" {
+		t.Fatalf("Token = %q, want job-env-token", resolved.Token)
+	}
+	if resolved.Source != "CI_JOB_TOKEN" {
+		t.Fatalf("Source = %q, want CI_JOB_TOKEN", resolved.Source)
 	}
 }
 
@@ -76,6 +106,21 @@ func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
 	}
 }
 
+func TestResolveADOUsesEnvToken(t *testing.T) {
+	t.Setenv("SYSTEM_ACCESSTOKEN", "system-env-token")
+
+	resolved, err := Resolve(config.Config{}, "ado")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Token != "system-env-token" {
+		t.Fatalf("Token = %q, want system-env-token", resolved.Token)
+	}
+	if resolved.Source != "SYSTEM_ACCESSTOKEN" {
+		t.Fatalf("Source = %q, want SYSTEM_ACCESSTOKEN", resolved.Source)
+	}
+}
+
 func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
@@ -89,7 +134,7 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want missing token error")
 	}
-	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token or platforms.gitlab.auth.job_token") {
+	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

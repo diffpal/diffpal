@@ -74,9 +74,10 @@ diffpal review github \
   --gate
 ```
 
-Host review modes require platform auth values in `.config/diffpal/config.yaml`.
-Use envsubst placeholders such as `token: "${GITHUB_TOKEN}"` so raw secrets are
-provided by the runtime environment and are not committed.
+Host review modes require platform auth through config values or standard CI
+environment variables such as `GITHUB_TOKEN`. Envsubst placeholders such as
+`token: "${GITHUB_TOKEN}"` remain supported, but missing referenced variables
+fail config load before the command can run.
 
 Equivalent host modes exist for GitLab and Azure DevOps:
 

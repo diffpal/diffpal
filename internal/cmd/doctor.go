@@ -52,7 +52,7 @@ func newDoctorCommand() *cobra.Command {
 				issues = append(issues, "warn: no default provider definitions available")
 			}
 			issues = append(issues, diagnoseProviderConfig(cfg)...)
-			selectedProviderIssues, selectedProviderError := diagnoseSelectedProvider(cfg, workingDir)
+			selectedProviderIssues, selectedProviderError := diagnoseSelectedProvider(cfg, workingDir, requiresProviderAuth(mode))
 			issues = append(issues, selectedProviderIssues...)
 			if selectedProviderError != "" {
 				errorIssues = append(errorIssues, selectedProviderError)
@@ -131,7 +131,7 @@ func diagnoseProviderConfig(cfg config.Config) []string {
 	return issues
 }
 
-func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, string) {
+func diagnoseSelectedProvider(cfg config.Config, workingDir string, requireAuth bool) ([]string, string) {
 	providerID := strings.TrimSpace(cfg.ProviderID())
 	if providerID == "" {
 		return nil, ""
@@ -147,6 +147,10 @@ func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, s
 	providers := providerConfigsWithEnv(cfg.Providers)
 	selected := providers[providerID]
 	if missing := hostedProviderMissing(selected); missing != "" {
+		if !requireAuth && strings.Contains(missing, "api_key") {
+			issues = append(issues, "warn: "+missing)
+			return issues, ""
+		}
 		issues = append(issues, "error: "+missing)
 		return issues, missing
 	}
@@ -163,6 +167,11 @@ func diagnoseSelectedProvider(cfg config.Config, workingDir string) ([]string, s
 
 	issues = append(issues, fmt.Sprintf("ok: selected provider %s validated (%s)", providerID, providerCfg.Type))
 	return issues, ""
+}
+
+func requiresProviderAuth(mode string) bool {
+	selected := strings.ToLower(strings.TrimSpace(mode))
+	return selected != "" && selected != "local"
 }
 
 func diagnoseWorkspace(configPath string) []string {

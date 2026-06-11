@@ -8,8 +8,7 @@ providers:
   openai-fast:
     type: openai
     openai:
-      model: "${DIFFPAL_OPENAI_MODEL}"
-      api_key: "${OPENAI_API_KEY}"
+      model: gpt-5-mini
 
 policies:
   default:
@@ -23,6 +22,4 @@ review:
     max_files_per_chunk: 20
 
 platforms:
-  github:
-    auth:
-      token: "${GITHUB_TOKEN}"
+  github: {}

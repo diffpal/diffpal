@@ -225,6 +225,9 @@ func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_BLOCK_ON")); value != "" {
 		cfg.setSelectedBlockOn(value)
 	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_OPENAI_MODEL")); value != "" {
+		cfg.setOpenAIModel(value)
+	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_MAX_FILES")); value != "" {
 		parsed, err := strconv.Atoi(value)
 		if err != nil {
@@ -250,6 +253,18 @@ func (cfg *Config) setSelectedBlockOn(value string) {
 	policyCfg := cfg.Policies[name]
 	policyCfg.BlockOn = value
 	cfg.Policies[name] = policyCfg
+}
+
+func (cfg *Config) setOpenAIModel(value string) {
+	for name, providerCfg := range cfg.Providers {
+		if !strings.EqualFold(strings.TrimSpace(providerCfg.Type), "openai") || providerCfg.OpenAI == nil {
+			continue
+		}
+		block := *providerCfg.OpenAI
+		block.Model = value
+		providerCfg.OpenAI = &block
+		cfg.Providers[name] = providerCfg
+	}
 }
 
 func (cfg PlatformConfigs) Validate() error {
