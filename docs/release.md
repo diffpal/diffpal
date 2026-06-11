@@ -32,7 +32,7 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm install --global @omnidist/omnidist@latest
+npm install --global @omnidist/omnidist@0.1.30
 OMNIDIST_VERSION=0.1.0 omnidist --profile default build
 omnidist --profile default npm stage
 omnidist --profile default npm verify

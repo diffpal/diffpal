@@ -44,6 +44,7 @@ func newDoctorCommand() *cobra.Command {
 			if err != nil && configExists {
 				issues = append(issues, "error: config validation failed: "+err.Error())
 				errorIssues = append(errorIssues, err.Error())
+				return printDoctorResult(cmd, issues, errorIssues)
 			}
 
 			issues = append(issues, provider.Diagnostics()...)
@@ -63,25 +64,26 @@ func newDoctorCommand() *cobra.Command {
 			}
 			issues = append(issues, diagnoseWorkspace(configPath)...)
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "doctor runtime: goos=%s\n", runtime.GOOS)
-			if err != nil {
-				return err
-			}
-			for _, issue := range issues {
-				_, err = fmt.Fprintln(cmd.OutOrStdout(), issue)
-				if err != nil {
-					return err
-				}
-			}
-
-			if len(errorIssues) > 0 {
-				return withExitCode(2, errors.New("doctor failures: "+strings.Join(errorIssues, "; ")))
-			}
-			return nil
+			return printDoctorResult(cmd, issues, errorIssues)
 		},
 	}
 	doctor.Flags().String("mode", "local", "Validate mode-specific platform authorization for local, github, gitlab, or ado")
 	return doctor
+}
+
+func printDoctorResult(cmd *cobra.Command, issues []string, errorIssues []string) error {
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "doctor runtime: goos=%s\n", runtime.GOOS); err != nil {
+		return err
+	}
+	for _, issue := range issues {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), issue); err != nil {
+			return err
+		}
+	}
+	if len(errorIssues) > 0 {
+		return withExitCode(2, errors.New("doctor failures: "+strings.Join(errorIssues, "; ")))
+	}
+	return nil
 }
 
 func diagnoseProviderConfig(cfg config.Config) []string {

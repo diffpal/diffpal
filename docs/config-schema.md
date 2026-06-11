@@ -1,6 +1,6 @@
 # DiffPal Config Schema
 
-`config` is loaded from:
+`config` is resolved in this order, from base file to highest-priority override:
 
 1. `--config-dir/diffpal/config.yaml`
 2. `--config-dir/config.yaml`
@@ -9,7 +9,7 @@
 5. environment overrides
 6. CLI flags
 
-Higher position in the list has higher precedence.
+Later entries override earlier entries; CLI flags have the highest precedence.
 
 ```yaml
 version: v1

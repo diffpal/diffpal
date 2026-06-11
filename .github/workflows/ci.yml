@@ -134,7 +134,7 @@ jobs:
           node-version: 20
 
       - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@latest
+        run: npm install --global @omnidist/omnidist@0.1.30
 
       - name: Build artifacts
         run: omnidist --profile default build
