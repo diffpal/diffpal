@@ -165,5 +165,7 @@ func isTransientProviderError(err error) bool {
 		return true
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return strings.Contains(msg, "generate content") && strings.Contains(msg, "request")
+	return strings.Contains(msg, "structured output schema validation") ||
+		strings.Contains(msg, "no json object found") ||
+		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
 }

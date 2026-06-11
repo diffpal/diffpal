@@ -225,6 +225,13 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 	}
 }
 
+func TestStructuredOutputErrorsAreTransient(t *testing.T) {
+	err := errors.New("structured output schema validation error: extract output JSON: no JSON object found at byte start")
+	if !isTransientProviderError(err) {
+		t.Fatal("isTransientProviderError() = false, want true")
+	}
+}
+
 type fakeRuntime struct {
 	outputs []ChunkOutput
 	errs    []error
