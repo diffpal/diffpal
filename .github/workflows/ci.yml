@@ -133,8 +133,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Verify omnidist package integrity
+        run: test "$(npm view @omnidist/omnidist@0.1.30 dist.integrity)" = "sha512-2if3z9cfT5n2NsurfFkCrJu+M83qMUNq5jNInFDb13iIEbKvrFYFDwAizCo6JCjpvv3TmOrGihU4YUBhd89MUg=="
+
       - name: Install omnidist
-        run: npm install --no-save @omnidist/omnidist@0.1.30
+        run: npm install --no-save --ignore-scripts @omnidist/omnidist@0.1.30
 
       - name: Build artifacts
         run: node ./node_modules/@omnidist/omnidist/omnidist.js --profile default build

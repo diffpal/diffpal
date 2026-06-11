@@ -8,6 +8,8 @@ import (
 )
 
 func TestResolveGitHubUsesConfiguredToken(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitHub: config.GitHubPlatformConfig{
@@ -42,6 +44,8 @@ func TestResolveGitHubUsesEnvToken(t *testing.T) {
 }
 
 func TestResolveGitLabPrefersAPITokenOverJobToken(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			GitLab: config.GitLabPlatformConfig{
@@ -77,6 +81,8 @@ func TestResolveGitLabUsesEnvTokens(t *testing.T) {
 }
 
 func TestResolveADOPrefersSystemAccessTokenOverPAT(t *testing.T) {
+	clearPlatformTokenEnv(t)
+
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
 			Azure: config.AzurePlatformConfig{
@@ -112,8 +118,7 @@ func TestResolveADOUsesEnvToken(t *testing.T) {
 }
 
 func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
-	t.Setenv("GITLAB_TOKEN", "")
-	t.Setenv("CI_JOB_TOKEN", "")
+	clearPlatformTokenEnv(t)
 
 	cfg := config.Config{
 		Platforms: config.PlatformConfigs{
@@ -130,6 +135,14 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func clearPlatformTokenEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GITLAB_TOKEN", "")
+	t.Setenv("CI_JOB_TOKEN", "")
+	t.Setenv("SYSTEM_ACCESSTOKEN", "")
 }
 
 func assertResolvedToken(t *testing.T, resolved Resolved, want string) {

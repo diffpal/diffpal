@@ -156,11 +156,11 @@ func diagnoseSelectedProvider(cfg config.Config, workingDir string, requireAuth 
 
 	factory := agentfactory.New(providers, mcpregistry.New(cfg.MCPServers))
 	if err := factory.ValidateAgent(providerID); err != nil {
-		msg := fmt.Sprintf("selected provider %s failed validation: %v", providerID, err)
+		msg := fmt.Sprintf("selected provider %s failed validation", providerID)
 		return append(issues, "error: "+msg), msg
 	}
 	if _, err := factory.BuildSessionState(providerID, workingDir); err != nil {
-		msg := fmt.Sprintf("selected provider %s session state invalid: %v", providerID, err)
+		msg := fmt.Sprintf("selected provider %s session state invalid", providerID)
 		return append(issues, "error: "+msg), msg
 	}
 

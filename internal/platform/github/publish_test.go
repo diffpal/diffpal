@@ -169,13 +169,14 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	}
 
 	summary := CheckRunSummary(bundle)
-	if !strings.Contains(summary, "# DiffPal Findings Summary") {
-		t.Fatalf("summary missing title:\n%s", summary)
-	}
-	if !strings.Contains(summary, "## CRITICAL (1)") {
-		t.Fatalf("summary missing severity section:\n%s", summary)
-	}
-	if !strings.Contains(summary, "### internal/db/query.go") {
-		t.Fatalf("summary missing file section:\n%s", summary)
+	assertStringContains(t, summary, "# DiffPal Findings Summary", "title")
+	assertStringContains(t, summary, "## CRITICAL (1)", "severity section")
+	assertStringContains(t, summary, "### internal/db/query.go", "file section")
+}
+
+func assertStringContains(t *testing.T, got, want, label string) {
+	t.Helper()
+	if !strings.Contains(got, want) {
+		t.Fatalf("summary missing %s:\n%s", label, got)
 	}
 }
