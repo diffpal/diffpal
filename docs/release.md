@@ -104,8 +104,8 @@ present.
 DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
 open a same-repository pull request and verify that `diffpal-review` installs
-`@diffpal/diffpal@latest`, publishes the `diffpal-checks` check run, and leaves
-the PR in the expected pass/fail state.
+the branch `diffpal` CLI globally, publishes the `diffpal-checks` check run, and
+leaves the PR in the expected pass/fail state.
 
 ## Change log and audits
 

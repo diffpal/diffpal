@@ -21,12 +21,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Install DiffPal CLI
-        run: npm install --global @diffpal/diffpal@latest
+        run: go install ./cmd/diffpal
 
       - name: Install Copilot CLI
         run: npm install --global @github/copilot
