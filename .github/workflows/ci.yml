@@ -133,11 +133,14 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install omnidist
+        run: npm install --no-save @omnidist/omnidist@0.1.30
+
       - name: Build artifacts
-        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default build
+        run: npx omnidist --profile default build
 
       - name: Stage npm artifacts
-        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm stage
+        run: npx omnidist --profile default npm stage
 
       - name: Verify npm artifacts
-        run: npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm verify
+        run: npx omnidist --profile default npm verify

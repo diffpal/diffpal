@@ -32,10 +32,11 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default build
-npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm stage
-npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm verify
-npx -y --package=@omnidist/omnidist@0.1.30 omnidist --profile default npm publish
+npm install --no-save @omnidist/omnidist@0.1.30
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" npx omnidist --profile default build
+npx omnidist --profile default npm stage
+npx omnidist --profile default npm verify
+npx omnidist --profile default npm publish
 ```
 
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
