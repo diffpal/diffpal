@@ -32,11 +32,10 @@ Release pipeline is triggered on SemVer `v*.*.*` tags:
 3. Run omnidist release packaging for the DiffPal CLI:
 
 ```bash
-npm install --global @omnidist/omnidist@0.1.30
-OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" omnidist --profile default build
-omnidist --profile default npm stage
-omnidist --profile default npm verify
-omnidist --profile default npm publish
+OMNIDIST_VERSION="${GITHUB_REF_NAME#v}" npx -y @omnidist/omnidist@0.1.30 --profile default build
+npx -y @omnidist/omnidist@0.1.30 --profile default npm stage
+npx -y @omnidist/omnidist@0.1.30 --profile default npm verify
+npx -y @omnidist/omnidist@0.1.30 --profile default npm publish
 ```
 
 The `omnidist-release` workflow derives `OMNIDIST_VERSION` from the pushed
@@ -103,9 +102,9 @@ present.
 
 DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
-open a same-repository pull request and verify that `diffpal-review` installs
-the branch `diffpal` CLI globally, publishes the `diffpal-checks` check run, and
-leaves the PR in the expected pass/fail state.
+open a maintainer-controlled same-repository pull request and verify that
+`diffpal-review` publishes the `diffpal-checks` check run and leaves the PR in
+the expected pass/fail state.
 
 ## Change log and audits
 

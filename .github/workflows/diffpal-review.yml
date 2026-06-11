@@ -32,9 +32,6 @@ jobs:
       - name: Install DiffPal CLI
         run: go install ./cmd/diffpal
 
-      - name: Install Copilot CLI
-        run: npm install --global @github/copilot@1.0.61
-
       - name: Run DiffPal review
         run: >-
           diffpal --profile ci review github

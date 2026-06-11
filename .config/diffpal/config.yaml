@@ -8,6 +8,10 @@ providers:
   copilot-acp:
     type: copilot_acp
     copilot_acp:
+      cmd:
+        - npx
+        - -y
+        - @github/copilot@1.0.61
       extra_args:
         - --stdio
 

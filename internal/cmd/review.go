@@ -105,8 +105,10 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-		return withExitCode(5, err)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+			return withExitCode(5, err)
+		}
+		return nil
 	}
 	return nil
 }
@@ -129,8 +131,10 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 		}
 		if blocking > 0 {
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-			return withExitCode(5, err)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+				return withExitCode(5, err)
+			}
+			return nil
 		}
 		return nil
 	}
@@ -156,8 +160,10 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking)
-		return withExitCode(5, err)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+			return withExitCode(5, err)
+		}
+		return nil
 	}
 	return nil
 }

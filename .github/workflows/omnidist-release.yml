@@ -25,14 +25,12 @@ jobs:
             exit 1
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@0.1.30
       - name: Build artifacts
-        run: omnidist --profile default build
+        run: npx -y @omnidist/omnidist@0.1.30 --profile default build
       - name: Stage artifacts
-        run: omnidist --profile default npm stage
+        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm stage
       - name: Verify artifacts
-        run: omnidist --profile default npm verify
+        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm verify
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -63,8 +61,6 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      - name: Install omnidist
-        run: npm install --global @omnidist/omnidist@0.1.30
       - name: Download staged artifacts
         uses: actions/download-artifact@v8
         with:
@@ -72,7 +68,7 @@ jobs:
       - name: Restore staged artifacts
         run: tar -xzf omnidist-staged.tgz
       - name: Publish npm artifacts
-        run: omnidist --profile default npm publish
+        run: npx -y @omnidist/omnidist@0.1.30 --profile default npm publish
 
   release:
     needs:
