@@ -8,7 +8,8 @@ providers:
   copilot-acp:
     type: copilot_acp
     copilot_acp:
-      mode: ""
+      extra_args:
+        - --stdio
 
 policies:
   default:
