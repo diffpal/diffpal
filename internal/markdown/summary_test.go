@@ -108,6 +108,28 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	}
 }
 
+func TestRenderSummaryWithOptionsShowsFeedbackProvenance(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-feedback",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/app/service.go"},
+		},
+	}, SummaryOptions{
+		FeedbackProfile: "balanced",
+		PublishSurfaces: []string{
+			"check-run",
+			"comments",
+			"sarif",
+			"summary",
+		},
+	})
+
+	assertContains(t, got, "- Feedback profile: balanced")
+	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
+}
+
 func assertContains(t *testing.T, got string, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {

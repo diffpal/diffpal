@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/diffpal/diffpal/internal/findings"
 )
 
 func TestDefaultModesMatchProductContract(t *testing.T) {
@@ -77,5 +80,25 @@ func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 
 	if _, _, err := resolvePublishModes("github", nil, "verbose"); err == nil {
 		t.Fatal("resolvePublishModes() error = nil, want invalid feedback error")
+	}
+}
+
+func TestRenderPublishSummaryShowsFeedbackAndSurfaces(t *testing.T) {
+	t.Parallel()
+
+	got := renderPublishSummary(findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+		Files: []findings.ReviewedFile{
+			{Path: "README.md"},
+		},
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"})
+
+	for _, want := range []string{
+		"- Feedback profile: balanced",
+		"- Publish surfaces: check-run, comments, sarif, summary",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("summary missing %q:\n%s", want, got)
+		}
 	}
 }

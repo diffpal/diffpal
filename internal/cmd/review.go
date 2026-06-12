@@ -6,7 +6,6 @@ import (
 
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/findings"
-	"github.com/diffpal/diffpal/internal/markdown"
 	"github.com/diffpal/diffpal/internal/platform/azure"
 	"github.com/diffpal/diffpal/internal/platform/github"
 	gitlabpub "github.com/diffpal/diffpal/internal/platform/gitlab"
@@ -340,6 +339,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
+	summary := renderPublishSummary(bundle, profile, modes)
 
 	switch platform {
 	case "github":
@@ -357,7 +357,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
 				case "check_run":
-					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
+					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, summary), nil); err != nil {
 						return err
 					}
 				case "github_comments":
@@ -368,7 +368,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					if !summaryCommentEnabled {
 						continue
 					}
-					if err := github.PublishSummaryComment(ctx, token, reviewCtx, github.CheckRunSummary(bundle), nil); err != nil {
+					if err := github.PublishSummaryComment(ctx, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
 				}
@@ -394,7 +394,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 						return err
 					}
 				case "summary":
-					if err := gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, markdown.RenderSummary(bundle), nil); err != nil {
+					if err := gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
 				}
@@ -425,7 +425,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 						return err
 					}
 				case "summary":
-					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, markdown.RenderSummary(bundle), nil); err != nil {
+					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
 				}

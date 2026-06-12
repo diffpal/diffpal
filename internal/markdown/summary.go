@@ -16,7 +16,16 @@ var severityOrder = map[string]int{
 	"low":      3,
 }
 
+type SummaryOptions struct {
+	FeedbackProfile string
+	PublishSurfaces []string
+}
+
 func RenderSummary(bundle findings.FindingsBundle) string {
+	return RenderSummaryWithOptions(bundle, SummaryOptions{})
+}
+
+func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOptions) string {
 	sortedFindings := sortFindings(bundle.Findings)
 	rows := feedbackRows(bundle, sortedFindings)
 	blocking := countBlocking(sortedFindings)
@@ -29,6 +38,12 @@ func RenderSummary(bundle findings.FindingsBundle) string {
 	fmt.Fprintf(&out, "- Reviewed files: %d\n", len(rows))
 	fmt.Fprintf(&out, "- Findings: %d\n", len(sortedFindings))
 	fmt.Fprintf(&out, "- Blocking findings: %d\n", blocking)
+	if strings.TrimSpace(opts.FeedbackProfile) != "" {
+		fmt.Fprintf(&out, "- Feedback profile: %s\n", strings.TrimSpace(opts.FeedbackProfile))
+	}
+	if len(opts.PublishSurfaces) > 0 {
+		fmt.Fprintf(&out, "- Publish surfaces: %s\n", strings.Join(opts.PublishSurfaces, ", "))
+	}
 	if bundle.Language != "" {
 		fmt.Fprintf(&out, "- Language: %s\n", bundle.Language)
 	}

@@ -43,6 +43,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if err != nil {
 		return nil, 0, err
 	}
+	summary := renderPublishSummary(bundle, profile, modes)
 
 	for _, mode := range modes {
 		normalized := normalizePublishMode(platform, mode)
@@ -52,8 +53,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 		}
 		switch normalized {
 		case "summary":
-			report := markdown.RenderSummary(bundle)
-			if err := findings.WriteStringBundle(targetOut, report); err != nil {
+			if err := findings.WriteStringBundle(targetOut, summary); err != nil {
 				return nil, 0, err
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
@@ -63,7 +63,6 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				ctx = github.Context{}
 				ctx.HeadSHA = bundle.HeadSHA
 			}
-			summary := github.CheckRunSummary(bundle)
 			payload := github.BuildCheckRunPayload(ctx, bundle, summary)
 			raw, err := json.MarshalIndent(payload, "", "  ")
 			if err != nil {
@@ -187,6 +186,55 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 		return nil, "", err
 	}
 	return modesForFeedback(platform, profile), profile, nil
+}
+
+func renderPublishSummary(bundle findings.FindingsBundle, profile FeedbackProfile, modes []string) string {
+	opts := markdown.SummaryOptions{
+		FeedbackProfile: string(profile),
+		PublishSurfaces: publishSurfaceLabels(modes),
+	}
+	return markdown.RenderSummaryWithOptions(bundle, opts)
+}
+
+func publishSurfaceLabels(modes []string) []string {
+	labels := make([]string, 0, len(modes))
+	seen := map[string]struct{}{}
+	for _, mode := range modes {
+		label := publishSurfaceLabel(mode)
+		if label == "" {
+			continue
+		}
+		if _, ok := seen[label]; ok {
+			continue
+		}
+		seen[label] = struct{}{}
+		labels = append(labels, label)
+	}
+	sort.Strings(labels)
+	return labels
+}
+
+func publishSurfaceLabel(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "check_run", "check-run", "checks":
+		return "check-run"
+	case "github_comments", "comments", "review-comments":
+		return "comments"
+	case "code_quality", "code-quality":
+		return "code-quality"
+	case "discussions":
+		return "discussions"
+	case "threads":
+		return "threads"
+	case "status":
+		return "status"
+	case "sarif":
+		return "sarif"
+	case "summary":
+		return "summary"
+	default:
+		return strings.TrimSpace(mode)
+	}
 }
 
 func normalizeFeedback(value string) (FeedbackProfile, error) {
