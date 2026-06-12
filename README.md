@@ -42,7 +42,7 @@ diffpal:
     checks:
       - bugs
       - performance
-      - best-practices
+      # - best-practices
 ```
 
 Add `COPILOT_GITHUB_TOKEN` as a CI secret so the Copilot CLI can act as the
