@@ -48,7 +48,7 @@ jobs:
           --head ${{ github.event.pull_request.head.sha }}
           --repo ${{ github.repository }}
           --review-id github-pr-${{ github.event.pull_request.number }}
-          --mode check-run,comments,summary
+          --feedback balanced
           --gate
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
