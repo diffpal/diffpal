@@ -62,7 +62,7 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 		t.Fatalf("composeConfig() should keep profiles/platform auth in templates only:\n%s", rendered)
 	}
 	for _, needle := range []string{
-		"      model: gpt-5.4-mini",
+		"      model: gpt-5-mini",
 		"  language: en",
 		"    - bugs",
 		"    - performance",

@@ -22,7 +22,7 @@ providers:
   copilot-acp:
     type: copilot_acp
     copilot_acp:
-      model: gpt-5.4-mini
+      model: gpt-5-mini
 
 policies:
   default:
