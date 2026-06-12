@@ -458,6 +458,19 @@ func TestStructuredOutputErrorsAreTransient(t *testing.T) {
 	}
 }
 
+func TestProviderAuthAndQuotaErrorsAreTransient(t *testing.T) {
+	for _, msg := range []string{
+		`{"code":-32000,"message":"Authentication required"}`,
+		"402 You have exceeded your monthly quota",
+		"payment required",
+		"rate limit exceeded",
+	} {
+		if !isTransientProviderError(errors.New(msg)) {
+			t.Fatalf("isTransientProviderError(%q) = false, want true", msg)
+		}
+	}
+}
+
 func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) {
 	repo := newGitRepo(t)
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")

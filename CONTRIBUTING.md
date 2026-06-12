@@ -24,6 +24,20 @@ npm --prefix tasks/azure-devops ci
 npm --prefix tasks/azure-devops run build
 ```
 
+Provider-backed reviewer checks are tagged integration tests. They are not part
+of default PR verification because they need local provider auth, network access,
+and available provider quota.
+
+```bash
+# Codex ACP review path; uses npx -y @normahq/codex-acp-bridge@latest.
+go test -tags='integration,codex' -count=1 ./internal/reviewer \
+  -run TestADKRuntimeCodexACPReviewFindsUnsafeHandler -v
+
+# Copilot ACP provider error path; uses copilot --acp --stdio.
+go test -tags='integration,copilot' -count=1 ./internal/reviewer \
+  -run TestADKRuntimeCopilotACPProviderErrorPath -v
+```
+
 ## Project conventions
 
 - `cmd/` contains executable entrypoints.

@@ -167,6 +167,10 @@ func isTransientProviderError(err error) bool {
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	return isStructuredOutputProviderMessage(msg) ||
+		strings.Contains(msg, "authentication required") ||
+		strings.Contains(msg, "exceeded your monthly quota") ||
+		strings.Contains(msg, "payment required") ||
+		strings.Contains(msg, "rate limit") ||
 		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
 }
 
