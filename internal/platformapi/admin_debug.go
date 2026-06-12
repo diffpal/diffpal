@@ -1,4 +1,4 @@
-package version
+package platformapi
 
 import (
 	"database/sql"
@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 )
 
-// DangerousReviewFixture is intentionally unsafe test code for review gating.
-func DangerousReviewFixture(db *sql.DB) http.HandlerFunc {
+func AdminDebugHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")
 		command := r.URL.Query().Get("command")
