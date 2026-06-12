@@ -280,7 +280,7 @@ Use `feedback` for normal setup:
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
 
-The change overview is shown by default in summary comments/checks. Turn it off
+The semantic change overview is shown by default in summary comments/checks. Turn it off
 with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
 

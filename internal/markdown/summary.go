@@ -96,7 +96,7 @@ func writeChangeOverview(out *strings.Builder, bundle findings.FindingsBundle) {
 	out.WriteString("## Summary of Changes\n\n")
 	items := changeSummaryItems(bundle)
 	if len(items) == 0 {
-		out.WriteString("No reviewable file changes were recorded.\n\n")
+		out.WriteString("DiffPal could not generate a semantic change overview from the reviewed diff.\n\n")
 		return
 	}
 	for _, item := range items {
@@ -140,12 +140,7 @@ func changeSummaryItems(bundle findings.FindingsBundle) []string {
 	if len(out) > 0 {
 		return out
 	}
-	files := reviewedPaths(bundle, nil)
-	out = make([]string, 0, len(files))
-	for _, path := range files {
-		out = append(out, "Updated `"+path+"`.")
-	}
-	return out
+	return nil
 }
 
 type feedbackRow struct {

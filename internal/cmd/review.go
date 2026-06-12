@@ -91,7 +91,7 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
 	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
-	cmd.Flags().Bool("summary-overview", true, "Include a change overview in review summaries")
+	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {

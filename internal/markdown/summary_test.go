@@ -17,7 +17,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 		Language:     "en",
 		ReviewChecks: []string{"bugs", "performance", "best-practices"},
 		ChangeSummary: []string{
-			"Updated service behavior and database query handling.",
+			"Changed service request handling and database query behavior.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
@@ -75,7 +75,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 
 	assertContains(t, got, "# DiffPal Review Summary")
 	assertContains(t, got, "## Summary of Changes")
-	assertContains(t, got, "- Updated service behavior and database query handling.")
+	assertContains(t, got, "- Changed service request handling and database query behavior.")
 	assertContains(t, got, "## Review Result")
 	assertContains(t, got, "DiffPal found 4 actionable finding(s), including 3 blocking finding(s).")
 	assertNotContains(t, got, "review_id: review-123")
@@ -101,7 +101,7 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	got := RenderSummary(findings.FindingsBundle{
 		ReviewID: "review-empty",
 		ChangeSummary: []string{
-			"Updated application service code.",
+			"Refined application service behavior without actionable review findings.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
@@ -109,7 +109,7 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	})
 
 	assertContains(t, got, "# DiffPal Review Summary")
-	assertContains(t, got, "- Updated application service code.")
+	assertContains(t, got, "- Refined application service behavior without actionable review findings.")
 	assertNotContains(t, got, "review_id: review-empty")
 	assertContains(t, got, "DiffPal found no actionable issues in the reviewed diff.")
 	assertContains(t, got, "| `internal/app/service.go` | Passed | No actionable findings. |")
@@ -124,7 +124,7 @@ func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
 	got := RenderSummaryWithOptions(findings.FindingsBundle{
 		ReviewID: "review-feedback",
 		ChangeSummary: []string{
-			"Updated application service code.",
+			"Refined application service behavior.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
@@ -134,7 +134,7 @@ func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
 	})
 
 	assertNotContains(t, got, "## Summary of Changes")
-	assertNotContains(t, got, "Updated application service code.")
+	assertNotContains(t, got, "Refined application service behavior.")
 	assertContains(t, got, "## Review Result")
 }
 
@@ -152,7 +152,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 			"best-practices",
 		},
 		ChangeSummary: []string{
-			"Updated application service code.",
+			"Refined application service behavior.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
@@ -173,6 +173,23 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	assertContains(t, got, "- Reviewed files: 1")
 	assertContains(t, got, "- Feedback profile: balanced")
 	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
+}
+
+func TestRenderSummaryDoesNotUseFilesAsChangeOverview(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummary(findings.FindingsBundle{
+		ReviewID: "review-empty-overview",
+		Files: []findings.ReviewedFile{
+			{Path: "README.md"},
+			{Path: "internal/app/service.go"},
+		},
+	})
+
+	assertContains(t, got, "## Summary of Changes")
+	assertContains(t, got, "DiffPal could not generate a semantic change overview from the reviewed diff.")
+	assertNotContains(t, got, "Updated `README.md`.")
+	assertNotContains(t, got, "Updated `internal/app/service.go`.")
 }
 
 func assertContains(t *testing.T, got string, want string) {

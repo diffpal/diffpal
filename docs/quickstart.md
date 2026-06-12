@@ -109,7 +109,7 @@ These flags work with `review local`, `review github`, `review gitlab`, and
 - `--language`: language for generated review text.
 - `--review-checks`: checks to run.
 - `--feedback`: review output shape, either `summary`, `balanced`, or `inline`.
-- `--summary-overview`: include or hide the change overview in summary reports.
+- `--summary-overview`: include or hide the semantic change overview in summary reports.
 - `--block-on`: severity threshold that marks findings as blocking.
 - `--gate`: exits non-zero when blocking findings exist.
 

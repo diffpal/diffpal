@@ -89,7 +89,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 	got := renderPublishSummary(findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
-			"Updated README documentation.",
+			"Documented the GitHub setup flow for DiffPal users.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
@@ -104,7 +104,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 			t.Fatalf("summary contains hidden metadata %q:\n%s", unwanted, got)
 		}
 	}
-	if !strings.Contains(got, "- Updated README documentation.") {
+	if !strings.Contains(got, "- Documented the GitHub setup flow for DiffPal users.") {
 		t.Fatalf("summary missing change overview:\n%s", got)
 	}
 }
@@ -115,7 +115,7 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 	got := renderPublishSummary(findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
-			"Updated README documentation.",
+			"Documented the GitHub setup flow for DiffPal users.",
 		},
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},

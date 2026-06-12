@@ -25,7 +25,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	runtime := &fakeRuntime{
 		outputs: []ChunkOutput{{
 			ChangeSummary: []string{
-				"Updated `main.go` to print a different value.",
+				"Changed the command output behavior used by the sample entrypoint.",
 			},
 			Findings: []ChunkFinding{{
 				RuleID:     "correctness.behavior-change",
@@ -76,7 +76,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if len(result.Bundle.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
 	}
-	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Updated `main.go` to print a different value." {
+	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Changed the command output behavior used by the sample entrypoint." {
 		t.Fatalf("ChangeSummary = %v", result.Bundle.ChangeSummary)
 	}
 	got := result.Bundle.Findings[0]
@@ -100,7 +100,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 }
 
-func TestRunWithRuntimeFallsBackToFileChangeSummary(t *testing.T) {
+func TestRunWithRuntimeDoesNotInventFileListChangeSummary(t *testing.T) {
 	repo := newGitRepo(t)
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
 	runGitCmd(t, repo, "add", "main.go")
@@ -122,8 +122,8 @@ func TestRunWithRuntimeFallsBackToFileChangeSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
 	}
-	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Updated `main.go`." {
-		t.Fatalf("ChangeSummary = %v, want fallback file summary", result.Bundle.ChangeSummary)
+	if len(result.Bundle.ChangeSummary) != 0 {
+		t.Fatalf("ChangeSummary = %v, want no invented file-list summary", result.Bundle.ChangeSummary)
 	}
 }
 

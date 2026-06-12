@@ -48,7 +48,7 @@ inputs:
     required: false
     default: balanced
   summary-overview:
-    description: Include a change overview in review summaries.
+    description: Include a semantic change overview in review summaries.
     required: false
     default: "true"
   out:
