@@ -1,21 +1,70 @@
 # DiffPal
 
-DiffPal reviews pull requests from the diff first, then publishes clear,
-policy-aware feedback back to your CI system.
+DiffPal reviews pull request diffs and publishes policy-aware feedback back to
+your CI system.
 
 It is built for teams that want AI review output that is easy to scan:
 
-- a PR summary with reviewed files and pass/fail status
+- PR summaries that explain what changed
 - inline comments only for actionable findings
-- merge gating through checks/statuses, not bot approvals
+- merge gates through checks/statuses, not bot approvals
 - one config file that works across GitHub, GitLab, and Azure DevOps
 
 ## Quick Start
 
-Add DiffPal to a GitHub pull request workflow. The action installs the DiffPal
-CLI; the only provider command you install explicitly here is Copilot.
+Add a DiffPal config, add a provider secret, then choose the CI example for your
+platform.
 
-Create `.github/workflows/diffpal-review.yml`:
+The examples use npm `@latest` for quick onboarding. For production, pin
+`@diffpal/diffpal`, `diffpal-version`, and `@github/copilot` to versions you
+have tested.
+
+## Config
+
+Commit `.config/diffpal/config.yaml`:
+
+```yaml
+version: v1
+
+defaults:
+  provider: copilot-acp
+  policy: default
+
+providers:
+  copilot-acp:
+    type: copilot_acp
+    copilot_acp:
+      model: gpt-5-mini
+
+policies:
+  default:
+    block_on: high
+
+review:
+  context_lines: 20
+  max_files: 200
+  language: en
+  checks:
+    - bugs
+    - performance
+    - best-practices
+```
+
+Add `COPILOT_GITHUB_TOKEN` as a CI secret so the Copilot CLI can act as the
+review provider. Platform publish tokens are CI-specific:
+
+| Platform | Publish token |
+| --- | --- |
+| GitHub Actions | built-in `GITHUB_TOKEN` |
+| GitLab CI | built-in `CI_JOB_TOKEN` or `GITLAB_TOKEN` |
+| Azure Pipelines | built-in `SYSTEM_ACCESSTOKEN` |
+
+## GitHub Actions
+
+Create `.github/workflows/diffpal-review.yml`.
+
+The action installs the DiffPal CLI. The workflow installs only the Copilot
+provider command.
 
 ```yaml
 name: diffpal-review
@@ -63,90 +112,114 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Then add `COPILOT_GITHUB_TOKEN` as a repository secret. GitHub provides
-`GITHUB_TOKEN` automatically.
+The same-repository PR guard keeps provider secrets out of untrusted fork
+workflows. Remove or change that guard only after designing a fork-safe release
+flow.
 
-For production, pin `diffpal-version` and `@github/copilot` to versions you
-have tested.
+## GitLab CI
 
-For other CI systems:
+Add this job to `.gitlab-ci.yml`.
 
-- [GitHub Actions setup](docs/ci-examples.md#github-actions)
-- [GitLab CI setup](docs/ci-examples.md#gitlab-ci)
-- [Azure Pipelines setup](docs/ci-examples.md#azure-pipelines)
+```yaml
+stages:
+  - review
+
+diffpal-review:
+  stage: review
+  image: node:22
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
+  before_script:
+    - npm install --global @diffpal/diffpal@latest @github/copilot@latest
+  script:
+    - >-
+      diffpal review gitlab
+      --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+      --head "$CI_COMMIT_SHA"
+      --repo "$CI_PROJECT_PATH"
+      --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
+      --language en
+      --review-checks bugs,performance,best-practices
+      --feedback balanced
+      --gate
+  variables:
+    GIT_DEPTH: "0"
+  artifacts:
+    when: always
+    paths:
+      - .artifacts/diffpal/
+    reports:
+      codequality: .artifacts/diffpal/codequality.json
+      sarif: .artifacts/diffpal/diffpal.sarif
+```
+
+Set `COPILOT_GITHUB_TOKEN` as a protected/masked CI variable. Use the built-in
+`CI_JOB_TOKEN` when your GitLab instance allows it, or set `GITLAB_TOKEN` for a
+dedicated API token.
+
+## Azure Pipelines
+
+Enable **Allow scripts to access the OAuth token**, then add this to
+`azure-pipelines.yml`.
+
+```yaml
+trigger: none
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "22.x"
+
+  - script: npm install --global @diffpal/diffpal@latest @github/copilot@latest
+    displayName: Install DiffPal and Copilot
+
+  - task: DiffPalReview@1
+    displayName: DiffPal review
+    inputs:
+      language: en
+      reviewChecks: bugs,performance,best-practices
+      feedback: balanced
+      gate: true
+    env:
+      COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+```
+
+The Azure task expects `diffpal` to already be on `PATH`; the install step above
+does that with npm.
 
 ## What You Should See
 
-On the pull request, DiffPal publishes:
-
-- a `diffpal-checks` check run
-- a `DiffPal Review Summary` comment with a semantic summary of the change
-- inline comments only when there are actionable findings
-- a failed job only when `gate: true` and blocking findings exist, or when
-  setup fails
-
-## What DiffPal Publishes
-
 On pull requests, DiffPal can publish:
 
-- a review summary comment
-- a required check/status for merge gating
+- a review summary with a semantic overview of the change
+- a check/status for merge gating
 - inline comments or threads for actionable findings
 - JSON, SARIF, and CI artifacts for later inspection
 
-The default review checks are:
-
-- `bugs`
-- `performance`
-- `best-practices`
-
-The default review language is English. Both are configurable in
+The default review checks are `bugs`, `performance`, and `best-practices`. The
+default review language is English. Both are configurable in
 `.config/diffpal/config.yaml` or by CLI flags.
 
-## Minimal Config
+## Local Debugging
 
-Commit `.config/diffpal/config.yaml` to choose the provider and review policy.
-The default public onboarding provider is Copilot ACP:
-
-```yaml
-version: v1
-
-defaults:
-  provider: copilot-acp
-  policy: default
-
-providers:
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      model: gpt-5-mini
-
-policies:
-  default:
-    block_on: high
-
-review:
-  context_lines: 20
-  max_files: 200
-  language: en
-  checks:
-    - bugs
-    - performance
-    - best-practices
-```
-
-You can generate a starting config locally with `diffpal init`, then commit the
-file after reviewing it.
-
-## Common Commands
+Local commands are useful for setup checks and debugging, but they are not the
+main CI setup path.
 
 ```bash
+npm install --global @diffpal/diffpal@latest @github/copilot@latest
 diffpal init
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD
-diffpal review github --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
-diffpal review gitlab --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
-diffpal review ado --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
 ```
 
 ## Documentation
@@ -158,16 +231,4 @@ diffpal review ado --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --g
 - [GitLab adapter reference](docs/platform-gitlab.md)
 - [Azure adapter reference](docs/platform-azure.md)
 - [Release process](docs/release.md)
-
-## Development
-
-Source development in this repository uses the Go toolchain directly:
-
-```bash
-go mod download
-go test ./...
-go run ./cmd/diffpal --help
-```
-
-Maintainers track project work in Beads (`bd`). External contributors do not
-need Beads to open issues or pull requests.
+- [Contributing](CONTRIBUTING.md)
