@@ -3,8 +3,9 @@
 This is the main setup guide for running DiffPal in pull request pipelines.
 The default provider path is Copilot ACP.
 
-For quick onboarding, examples use `@latest`. For production, pin
-`@diffpal/diffpal` and `@github/copilot` to versions you have tested.
+The examples use npm `@latest` for quick onboarding. For production, pin
+`@diffpal/diffpal`, `diffpal-version`, and `@github/copilot` to versions you
+have tested.
 
 ## Common Setup
 
@@ -16,17 +17,11 @@ Every CI system needs:
 4. `COPILOT_GITHUB_TOKEN` as a secret for the Copilot provider.
 5. A platform token so DiffPal can publish PR feedback.
 
-Run this locally first:
-
-```bash
-npm install --global @diffpal/diffpal@latest @github/copilot@latest
-diffpal init
-diffpal doctor
-```
-
-The generated config defaults to:
+Commit `.config/diffpal/config.yaml` with the provider and review policy:
 
 ```yaml
+version: v1
+
 defaults:
   provider: copilot-acp
   policy: default
@@ -37,13 +32,23 @@ providers:
     copilot_acp:
       model: gpt-5-mini
 
+policies:
+  default:
+    block_on: high
+
 review:
+  context_lines: 20
+  max_files: 200
   language: en
   checks:
     - bugs
     - performance
     - best-practices
 ```
+
+You can generate a starting config locally with `diffpal init`, then commit the
+reviewed file. `diffpal doctor --mode <host>` is useful as a preflight or
+troubleshooting command, but it is not required in the normal PR workflow.
 
 ## GitHub Actions
 
@@ -101,8 +106,9 @@ jobs:
         run: npm install --global @github/copilot@latest
 
       - name: Review pull request
-        uses: diffpal/action@v1
+        uses: diffpal/diffpal@v0.1.2
         with:
+          diffpal-version: latest
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           repo: ${{ github.repository }}
@@ -129,7 +135,7 @@ jobs:
 - `GITHUB_TOKEN is required`: keep the `env` block on the review step.
 - No summary comment: confirm `pull-requests: write`.
 - No check run: confirm `checks: write`.
-- To pin the CLI, set `diffpal-version: 0.1.x` on `diffpal/action@v1`.
+- To change the CLI version, set `diffpal-version` on the action step.
 - To hide the change overview section, set `summary-overview: false`.
 - Fork PRs do not run: this is intentional when using secrets.
 
@@ -163,7 +169,6 @@ diffpal-review:
   before_script:
     - npm install --global @diffpal/diffpal@latest @github/copilot@latest
   script:
-    - diffpal doctor --mode gitlab
     - >-
       diffpal review gitlab
       --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
@@ -234,12 +239,6 @@ steps:
 
   - script: npm install --global @diffpal/diffpal@latest @github/copilot@latest
     displayName: Install DiffPal and Copilot
-
-  - script: diffpal doctor --mode ado
-    displayName: Check DiffPal setup
-    env:
-      COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - task: DiffPalReview@1
     displayName: DiffPal review

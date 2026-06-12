@@ -12,22 +12,78 @@ It is built for teams that want AI review output that is easy to scan:
 
 ## Quick Start
 
-Install the CLI and Copilot provider:
+Add DiffPal to a GitHub pull request workflow. The action installs the DiffPal
+CLI; the only provider command you install explicitly here is Copilot.
 
-```bash
-npm install --global @diffpal/diffpal@latest @github/copilot@latest
-diffpal init
-diffpal doctor
+Create `.github/workflows/diffpal-review.yml`:
+
+```yaml
+name: diffpal-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: diffpal-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Copilot provider
+        run: npm install --global @github/copilot@latest
+
+      - name: Review pull request
+        uses: diffpal/diffpal@v0.1.2
+        with:
+          diffpal-version: latest
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          repo: ${{ github.repository }}
+          review-id: github-pr-${{ github.event.pull_request.number }}
+          feedback: balanced
+          gate: true
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Then add DiffPal to your CI:
+Then add `COPILOT_GITHUB_TOKEN` as a repository secret. GitHub provides
+`GITHUB_TOKEN` automatically.
+
+For production, pin `diffpal-version` and `@github/copilot` to versions you
+have tested.
+
+For other CI systems:
 
 - [GitHub Actions setup](docs/ci-examples.md#github-actions)
 - [GitLab CI setup](docs/ci-examples.md#gitlab-ci)
 - [Azure Pipelines setup](docs/ci-examples.md#azure-pipelines)
 
-For production, pin `@diffpal/diffpal` and `@github/copilot` to tested SemVer
-versions instead of using `@latest`.
+## What You Should See
+
+On the pull request, DiffPal publishes:
+
+- a `diffpal-checks` check run
+- a `DiffPal Review Summary` comment with a semantic summary of the change
+- inline comments only when there are actionable findings
+- a failed job only when `gate: true` and blocking findings exist, or when
+  setup fails
 
 ## What DiffPal Publishes
 
@@ -49,8 +105,8 @@ The default review language is English. Both are configurable in
 
 ## Minimal Config
 
-`diffpal init` writes `.config/diffpal/config.yaml`. The default public
-onboarding provider is Copilot ACP:
+Commit `.config/diffpal/config.yaml` to choose the provider and review policy.
+The default public onboarding provider is Copilot ACP:
 
 ```yaml
 version: v1
@@ -63,8 +119,7 @@ providers:
   copilot-acp:
     type: copilot_acp
     copilot_acp:
-      extra_args:
-        - --stdio
+      model: gpt-5-mini
 
 policies:
   default:
@@ -80,9 +135,13 @@ review:
     - best-practices
 ```
 
+You can generate a starting config locally with `diffpal init`, then commit the
+file after reviewing it.
+
 ## Common Commands
 
 ```bash
+diffpal init
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD
 diffpal review github --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate

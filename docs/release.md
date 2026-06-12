@@ -100,8 +100,8 @@ Before the first public release:
 - Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
-- Move or create the major action tag, such as `v1`, only after the npm
-  package exists and a same-repository PR verifies that `diffpal/action@v1`
+- Move or create a major action tag, such as `v1`, only after the npm package
+  exists and a same-repository PR verifies that the released root action
   installs DiffPal automatically.
 
 After release, verify:
@@ -115,8 +115,8 @@ npm install @diffpal/diffpal@1.2.3
 Open a same-repository pull request and confirm the `diffpal-review` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
-present. The GitHub Action smoke path should use `diffpal/action@v1` with
-default `install: true`; provider setup such as `@github/copilot` remains a
+present. The GitHub Action smoke path should use the released root action tag
+with default `install: true`; provider setup such as `@github/copilot` remains a
 separate explicit step.
 
 ## Branch policy expectations
