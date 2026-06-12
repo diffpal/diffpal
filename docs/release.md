@@ -100,8 +100,8 @@ Before the first public release:
 - Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
-- Move or create the major action tag, such as `v1`, only after the npm
-  package exists and a same-repository PR verifies that `diffpal/action@v1`
+- Move or create a major action tag, such as `v1`, only after the npm package
+  exists and a same-repository PR verifies that the released root action
   installs DiffPal automatically.
 
 After release, verify:
@@ -115,8 +115,8 @@ npm install @diffpal/diffpal@1.2.3
 Open a same-repository pull request and confirm the `diffpal-review` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
-present. The GitHub Action smoke path should use `diffpal/action@v1` with
-default `install: true`; provider setup such as `@github/copilot` remains a
+present. The GitHub Action smoke path should use the released root action tag
+with default `install: true`; provider setup such as `@github/copilot` remains a
 separate explicit step.
 
 ## Branch policy expectations
@@ -127,13 +127,13 @@ separate explicit step.
 
 ## CI baseline
 
-- The `ci` workflow provides `lint`, `test`, `security`, `azure-devops-task`, and `omnidist-package` jobs in one workflow run.
+- The `ci` workflow provides `lint`, `test`, `security`, and `azure-devops-task` jobs in one workflow run.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
-- `azure-devops-task` runs `npm ci`, runtime dependency audit, TypeScript build, and prod/dev VSIX packaging.
-- `omnidist-package` builds, stages, and verifies the npm package without publishing.
-- Release automation uses omnidist and the Go version from `go.mod`.
+- `azure-devops-task` runs `npm ci`, runtime dependency audit, and TypeScript build.
+- Azure DevOps VSIX packaging is a release/manual packaging step via `npm --prefix tasks/azure-devops run package:prod` and `package:dev`.
+- `omnidist-release` runs only on SemVer tags and handles build, npm publish, and GitHub release assets.
 
 ## Self-review gate
 
