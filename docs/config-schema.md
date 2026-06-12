@@ -15,14 +15,15 @@ Later entries override earlier entries; CLI flags have the highest precedence.
 version: v1
 
 defaults:
-  provider: openai-fast
+  provider: copilot-acp
   policy: default
 
 providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5-mini
+  copilot-acp:
+    type: copilot_acp
+    copilot_acp:
+      extra_args:
+        - --stdio
 
 policies:
   default:
@@ -74,6 +75,10 @@ substituted values.
 Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
+
+The default public onboarding provider is `copilot-acp`. Install it with
+`npm install --global @github/copilot@latest` and provide
+`COPILOT_GITHUB_TOKEN` in CI.
 
 `platforms.github.summary_comment.enabled` defaults to `true`. When `summary`
 mode is selected, DiffPal posts or updates a PR-level GitHub summary comment

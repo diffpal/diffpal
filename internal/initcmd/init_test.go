@@ -31,8 +31,8 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generated config failed to load: %v", err)
 	}
-	if cfg.ProviderID() != "openai-fast" {
-		t.Fatalf("ProviderID() = %q, want openai-fast", cfg.ProviderID())
+	if cfg.ProviderID() != "copilot-acp" {
+		t.Fatalf("ProviderID() = %q, want copilot-acp", cfg.ProviderID())
 	}
 	if _, ok := cfg.Providers["openai-fast"]; !ok {
 		t.Fatalf("generated config missing openai-fast provider: %+v", cfg.Providers)
@@ -40,20 +40,37 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	if _, ok := cfg.Providers["copilot-acp"]; !ok {
 		t.Fatalf("generated config missing copilot-acp provider: %+v", cfg.Providers)
 	}
+	if cfg.Review.Language != "en" {
+		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
+	}
+	if strings.Join(cfg.Review.Checks, ",") != "bugs,performance,best-practices" {
+		t.Fatalf("Review.Checks = %v, want default review checks", cfg.Review.Checks)
+	}
 }
 
 func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	t.Parallel()
 
 	rendered := composeConfig([]string{"openai-fast", "copilot-acp"})
-	if !strings.Contains(rendered, "defaults:\n  provider: openai-fast") {
-		t.Fatalf("composeConfig() missing root provider:\n%s", rendered)
+	if !strings.Contains(rendered, "defaults:\n  provider: copilot-acp") {
+		t.Fatalf("composeConfig() missing copilot root provider:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "policies:\n  default:\n    block_on: high") {
 		t.Fatalf("composeConfig() missing policy.block_on:\n%s", rendered)
 	}
 	if strings.Contains(rendered, "profiles:") || strings.Contains(rendered, "platforms:") {
 		t.Fatalf("composeConfig() should keep profiles/platform auth in templates only:\n%s", rendered)
+	}
+	for _, needle := range []string{
+		"      extra_args:\n        - --stdio",
+		"  language: en",
+		"    - bugs",
+		"    - performance",
+		"    - best-practices",
+	} {
+		if !strings.Contains(rendered, needle) {
+			t.Fatalf("composeConfig() missing %q:\n%s", needle, rendered)
+		}
 	}
 }
 
@@ -117,5 +134,13 @@ func TestProviderTypeForKey(t *testing.T) {
 		if got := providerTypeForKey(key); got != want {
 			t.Fatalf("providerTypeForKey(%q) = %q, want %q", key, got, want)
 		}
+	}
+}
+
+func TestSelectedDefaultProviderFallsBackToFirstDetected(t *testing.T) {
+	t.Parallel()
+
+	if got := selectedDefaultProvider([]string{"openai-fast"}); got != "openai-fast" {
+		t.Fatalf("selectedDefaultProvider() = %q, want openai-fast", got)
 	}
 }

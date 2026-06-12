@@ -1,5 +1,9 @@
 # GitLab Adapter Contract (v1)
 
+For a copy-paste GitLab CI setup, start with the
+[CI setup guide](ci-examples.md#gitlab-ci). This page documents adapter
+behavior and publishing semantics.
+
 ## Context resolution
 
 `Review` and `publish` for GitLab resolve target PR context in this precedence:

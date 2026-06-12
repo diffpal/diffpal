@@ -1,44 +1,32 @@
-# DiffPal Configuration Reference
+# DiffPal Config Reference
 
-## File Layout and Precedence
+DiffPal reads one config file from the repository:
 
-Configuration is loaded from one selected file:
+`.config/diffpal/config.yaml`
 
-1. `--config-dir/diffpal/config.yaml`
-2. `--config-dir/config.yaml`
-3. `.config/diffpal/config.yaml` in the repository
+Generate it with:
 
-Then DiffPal applies profile overlay, environment overrides, and command flags.
-Profile selection follows `--profile`, then `DIFFPAL_PROFILE`, then implicit
-`default`.
+```bash
+diffpal init
+```
 
-Required top-level fields:
+## Default Copilot Config
 
-- `version`: must be `v1`
-- `defaults.provider`: active provider key
-- `defaults.policy`: active policy key, defaults to `default`
-- `providers`: Norma runtime provider registry
-- `policies.<name>.block_on`: blocking threshold (`low|medium|high|critical`)
-- `review`: review defaults
-
-## Full Example
+The public onboarding path uses Copilot ACP:
 
 ```yaml
 version: v1
 
 defaults:
-  provider: openai-fast
+  provider: copilot-acp
   policy: default
 
 providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5-mini
   copilot-acp:
     type: copilot_acp
     copilot_acp:
-      mode: ""
+      extra_args:
+        - --stdio
 
 policies:
   default:
@@ -62,34 +50,110 @@ platforms:
       enabled: true
   gitlab: {}
   azure: {}
-
-profiles:
-  copilot-acp:
-    defaults:
-      provider: copilot-acp
-    policies:
-      default:
-        block_on: critical
 ```
 
-## Envsubst and Overrides
+Install the matching provider command in CI:
 
-Config files support envsubst-style placeholders before YAML parsing:
+```bash
+npm install --global @github/copilot@latest
+```
 
-- `$VAR`
-- `${VAR}`
+Set `COPILOT_GITHUB_TOKEN` as a CI secret. Do not commit token values into the
+config file.
 
-Referenced variables are required at config-load time. Use placeholders only
-for values that must exist before YAML parsing. Do not use placeholders for
-optional CI credentials; omit those config fields and let command-specific auth
-resolution read the standard environment variables listed below. Quote
-substituted values when they may contain YAML-significant characters:
+## Review Settings
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `review.language` | `en` | Language for finding text and summaries. |
+| `review.checks` | `bugs`, `performance`, `best-practices` | Review scopes to run. |
+| `review.context_lines` | `20` | Neighboring source lines included with each diff hunk. |
+| `review.max_files` | `200` | Maximum changed files to review. |
+| `review.chunking.max_patch_chars` | `12000` | Maximum context size per model chunk. |
+| `review.chunking.max_files_per_chunk` | `20` | Maximum files per model chunk. |
+
+Review checks map to finding categories:
+
+| Check | Categories |
+| --- | --- |
+| `bugs` | security, correctness, reliability |
+| `performance` | performance |
+| `best-practices` | maintainability, testing, style |
+
+Override review settings per run:
+
+```bash
+diffpal review github \
+  --base "$BASE_SHA" \
+  --head "$HEAD_SHA" \
+  --language en \
+  --review-checks bugs,performance,best-practices
+```
+
+## Policy and Gating
+
+`policies.default.block_on` controls which findings are blocking:
 
 ```yaml
-workspace_id: "${REQUIRED_WORKSPACE_ID}"
+policies:
+  default:
+    block_on: high
 ```
 
-Environment overrides:
+Allowed values:
+
+- `low`
+- `medium`
+- `high`
+- `critical`
+
+Use `--gate` in CI to fail the job when blocking findings exist.
+
+## Platform Auth
+
+DiffPal can read platform tokens from config values, but CI environment
+variables are preferred.
+
+| Platform | Preferred env | Config field |
+| --- | --- | --- |
+| GitHub | `GITHUB_TOKEN` | `platforms.github.auth.token` |
+| GitLab | `CI_JOB_TOKEN` or `GITLAB_TOKEN` | `platforms.gitlab.auth.job_token`, `platforms.gitlab.auth.api_token` |
+| Azure | `SYSTEM_ACCESSTOKEN` | `platforms.azure.auth.system_access_token` |
+
+Only use envsubst placeholders for values that are guaranteed to exist:
+
+```yaml
+platforms:
+  github:
+    auth:
+      token: "${GITHUB_TOKEN}"
+```
+
+Missing envsubst variables fail config loading. For optional CI credentials,
+omit the config value and let DiffPal read the standard environment variable.
+
+## Alternate Hosted OpenAI Provider
+
+Copilot ACP is the default onboarding provider. If you prefer hosted OpenAI,
+switch the provider block:
+
+```yaml
+defaults:
+  provider: openai-fast
+
+providers:
+  openai-fast:
+    type: openai
+    openai:
+      model: "${DIFFPAL_OPENAI_MODEL}"
+      api_key: "${OPENAI_API_KEY}"
+```
+
+Then set `OPENAI_API_KEY` in CI.
+
+## Environment Overrides
+
+These environment variables override config values:
 
 - `DIFFPAL_PROFILE`
 - `DIFFPAL_PROVIDER`
@@ -101,70 +165,14 @@ Environment overrides:
 - `DIFFPAL_REVIEW_LANGUAGE`
 - `DIFFPAL_REVIEW_CHECKS`
 
-`review.language` controls the language used for generated finding text.
-`review.checks` controls the review scope:
+## Exit Codes
 
-- `bugs`: security, correctness, and reliability findings
-- `performance`: performance and resource findings
-- `best-practices`: maintainability, testing, and style findings
-
-The same values can be overridden per run with `--language` and
-`--review-checks`.
-
-## GitHub Summary Comment
-
-`review github --mode summary` posts a PR-level summary comment by default,
-including when the review has no findings. Disable that visible PR-thread
-summary with:
-
-```yaml
-platforms:
-  github:
-    summary_comment:
-      enabled: false
-```
-
-Inline finding comments remain controlled by `--mode comments`.
-
-## Platform Auth
-
-Host review modes resolve platform API credentials from direct config values or
-standard CI environment variables:
-
-- `platforms.github.auth.token`
-- `GITHUB_TOKEN`
-- `platforms.gitlab.auth.api_token`
-- `GITLAB_TOKEN`
-- `platforms.gitlab.auth.job_token`
-- `CI_JOB_TOKEN`
-- `platforms.azure.auth.system_access_token`
-- `SYSTEM_ACCESSTOKEN`
-- `platforms.azure.auth.pat`
-- `AZURE_DEVOPS_EXT_PAT`
-
-Rules:
-
-- `review local` ignores `platforms`.
-- `review github` requires configured `token` or `GITHUB_TOKEN`.
-- `review gitlab` prefers API token, then falls back to job token.
-- `review ado` uses `platforms.azure` and prefers system access token, then falls back to PAT.
-- Envsubst placeholders remain supported for required values. For optional CI
-  credentials, omit the config value and let command-specific auth resolution
-  read the standard environment variables above.
-
-## Policy and Exit Codes
-
-`block_on` marks findings at or above a severity threshold as blocking. It does
-not mean the tooling failed.
-
-- `0`: review completed; non-gated runs may still report `status=blocked`
-- `1`: review blocked because `--gate` was set and blocking findings exist
-- `2`: config/profile/provider/auth validation failure
-- `3`: provider temporary failure (timeout/rate-limit/network)
-- `4`: publish failure
-- `5`: internal unexpected tooling failure
-- `130`: interrupted / cancelled
-
-DiffPal normalizes findings into canonical `findings.json` and derives
-deterministic IDs using repository, review, sha, path, line range, rule, and
-evidence/message signatures.
+| Code | Meaning |
+| --- | --- |
+| `0` | Review completed. |
+| `1` | Blocking findings exist and `--gate` was set. |
+| `2` | Config, profile, provider, or auth validation failed. |
+| `3` | Provider timeout, rate limit, or transient failure. |
+| `4` | Platform publish failed. |
+| `5` | Internal tooling failure. |
+| `130` | Interrupted or cancelled. |

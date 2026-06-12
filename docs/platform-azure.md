@@ -5,6 +5,10 @@ Public CLI naming uses `ado`; config uses `azure`:
 - command: `diffpal review ado`
 - config: `platforms.azure`
 
+For a copy-paste Azure Pipelines setup, start with the
+[CI setup guide](ci-examples.md#azure-pipelines). This page documents adapter
+behavior and task requirements.
+
 ## Context resolution
 
 `Azure` context is resolved from:
@@ -54,9 +58,10 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 ## Token and setup guidance
 
 - The `DiffPalReview@1` task expects the `diffpal` CLI to be installed before
-  the task runs. Install the CLI with npm, for example
-  `npm install @diffpal/diffpal@latest`, then set `diffpalPath:
-  ./node_modules/.bin/diffpal` when using a local project install.
+  the task runs. Install the CLI and Copilot provider with npm, for example
+  `npm install --global @diffpal/diffpal@latest @github/copilot@latest`.
+  If you use a local project install, set `diffpalPath:
+  ./node_modules/.bin/diffpal`.
 - Optional task inputs `language` and `reviewChecks` map to the CLI flags
   `--language` and `--review-checks`.
 - Config auth values:

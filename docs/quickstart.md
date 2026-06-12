@@ -1,115 +1,124 @@
 # DiffPal Quickstart
 
-## Install
+This guide gets DiffPal running with the Copilot ACP provider and one CI
+system. For production workflows, pin package versions after the first working
+setup.
 
-### Local
-
-```bash
-npm install @diffpal/diffpal@latest
-npx diffpal version
-npx diffpal doctor
-```
-
-Go source installs remain available for development:
+## 1. Install Locally
 
 ```bash
-go install github.com/diffpal/diffpal/cmd/diffpal@latest
+npm install --global @diffpal/diffpal@latest @github/copilot@latest
 diffpal version
 diffpal doctor
 ```
 
-### GitHub Action
+`diffpal` is the review CLI. `copilot` is the default AI provider command used
+by the generated config.
 
-```yaml
-- uses: actions/setup-go@v6
-  with:
-    go-version-file: go.mod
-- run: npm install --global @diffpal/diffpal@latest
-- run: diffpal review github --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
-  env:
-    BASE_SHA: ${{ github.event.pull_request.base.sha }}
-    HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+## 2. Create Config
 
-## First run
-
-1. Initialize configuration files in a repository:
+Run this at the root of your repository:
 
 ```bash
 diffpal init
 ```
 
-2. Review a local diff:
+This writes:
+
+- `.config/diffpal/config.yaml`
+- `.config/diffpal/templates/`
+- `.diffpalignore`
+
+The generated config uses `copilot-acp` by default and reviews for:
+
+- `bugs`
+- `performance`
+- `best-practices`
+
+Edit `.config/diffpal/config.yaml` if you want a different language,
+threshold, context size, or provider.
+
+## 3. Add Secrets
+
+DiffPal needs two kinds of credentials in CI:
+
+| Secret | Purpose |
+| --- | --- |
+| `COPILOT_GITHUB_TOKEN` | Lets the Copilot CLI act as the review provider. |
+| Platform token | Lets DiffPal publish comments/checks/statuses back to the PR. |
+
+Platform tokens:
+
+- GitHub Actions: built-in `GITHUB_TOKEN`
+- GitLab CI: built-in `CI_JOB_TOKEN` or a `GITLAB_TOKEN`
+- Azure Pipelines: built-in `SYSTEM_ACCESSTOKEN`
+
+Do not commit token values into `.config/diffpal/config.yaml`. Use CI secrets or
+the standard environment variables above.
+
+## 4. Check the Environment
+
+Before enabling a blocking gate, run the relevant doctor check:
+
+```bash
+diffpal doctor --mode github
+diffpal doctor --mode gitlab
+diffpal doctor --mode ado
+```
+
+Doctor validates config, provider selection, and platform auth for the selected
+mode.
+
+## 5. Run a Local Review
 
 ```bash
 diffpal review local \
   --base origin/main \
   --head HEAD \
-  --context-lines 20 \
-  --max-files 200 \
-  --language en \
-  --review-checks bugs,performance,best-practices \
   --out .artifacts/diffpal/findings.json
 ```
 
-3. Check local runtime and configuration:
+Local review writes a structured findings bundle and does not publish comments.
+
+## 6. Add CI
+
+Use the full copy-paste setup guide for your platform:
+
+- [GitHub Actions](ci-examples.md#github-actions)
+- [GitLab CI](ci-examples.md#gitlab-ci)
+- [Azure Pipelines](ci-examples.md#azure-pipelines)
+
+Each recipe includes required permissions, secrets, install steps, and expected
+PR output.
+
+## Common Review Controls
+
+These flags work with `review local`, `review github`, `review gitlab`, and
+`review ado`:
 
 ```bash
-diffpal doctor
+--language en
+--review-checks bugs,performance,best-practices
+--block-on high
+--gate
 ```
 
-4. Produce machine output:
+- `--language`: language for generated review text.
+- `--review-checks`: checks to run.
+- `--block-on`: severity threshold that marks findings as blocking.
+- `--gate`: exits non-zero when blocking findings exist.
+
+## What Success Looks Like
+
+After a CI run, expect:
+
+- a DiffPal summary comment or status/check
+- inline comments only when actionable findings exist
+- `.artifacts/diffpal/findings.json`
+- exit code `0` when the review passes
+
+If setup fails, start with:
 
 ```bash
-diffpal sarif --input .artifacts/diffpal/findings.json --out .artifacts/diffpal/diffpal.sarif
+diffpal doctor --mode <github|gitlab|ado>
 ```
-
-5. Run a host-scoped CI review:
-
-```bash
-diffpal review github \
-  --base "${BASE_SHA}" \
-  --head "${HEAD_SHA}" \
-  --block-on high \
-  --language en \
-  --review-checks bugs,performance,best-practices \
-  --gate
-```
-
-Host review modes require platform auth through config values or standard CI
-environment variables such as `GITHUB_TOKEN`. Envsubst placeholders such as
-`token: "${GITHUB_TOKEN}"` remain supported, but missing referenced variables
-fail config load before the command can run.
-
-Equivalent host modes exist for GitLab and Azure DevOps:
-
-```bash
-diffpal review gitlab --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
-diffpal review ado --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
-```
-
-## Common flags
-
-`review local` accepts:
-
-- `--base`: base commit SHA or ref
-- `--head`: head commit SHA or ref
-- `--max-files`: hard diff file limit
-- `--context-lines`: changed-line neighborhood context
-- `--language`: language for generated review findings
-- `--review-checks`: comma-separated checks to run (`bugs`, `performance`, `best-practices`)
-- `--block-on`: mark findings at this severity and above as blocking
-- `--gate`: exit 1 with `review blocked` when blocking findings are present
-
-`review github|gitlab|ado` additionally accept:
-
-- `--mode`: override the selected host's default publish surfaces
-
-All commands emit structured finding bundles to:
-
-`.artifacts/diffpal/findings.json`
-
-Starter config is written to:
-
-`.config/diffpal/config.yaml`
