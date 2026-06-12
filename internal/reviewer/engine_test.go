@@ -64,6 +64,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("runtime input review checks = %v, want defaults", runtime.inputs[0].ReviewChecks)
 	}
+	if !strings.Contains(runtime.inputs[0].ReviewTask, "Perform a code review") {
+		t.Fatalf("runtime input review task = %q, want explicit review task", runtime.inputs[0].ReviewTask)
+	}
 	if result.ChangedFiles != 1 || result.ReviewableFiles != 1 {
 		t.Fatalf("file counts = changed %d reviewable %d, want 1/1", result.ChangedFiles, result.ReviewableFiles)
 	}

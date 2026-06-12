@@ -63,6 +63,7 @@ type ChunkInput struct {
 	HeadSHA      string      `json:"head_sha"`
 	ChunkIndex   int         `json:"chunk_index"`
 	ChunkCount   int         `json:"chunk_count"`
+	ReviewTask   string      `json:"review_task"`
 	Language     string      `json:"language"`
 	ReviewChecks []string    `json:"review_checks"`
 	Instructions string      `json:"instructions,omitempty"`
@@ -344,12 +345,17 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, re
 		HeadSHA:      headSHA,
 		ChunkIndex:   chunkIndex,
 		ChunkCount:   chunkCount,
+		ReviewTask:   reviewTask(reviewChecks),
 		Language:     language,
 		ReviewChecks: append([]string(nil), reviewChecks...),
 		Instructions: strings.TrimSpace(instructions),
 		TestSummary:  testSummary,
 		Files:        files,
 	}
+}
+
+func reviewTask(checks []string) string {
+	return "Perform a code review of every provided file snippet and changed line span. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after reviewing each snippet for those checks."
 }
 
 func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig.ProviderConfig {

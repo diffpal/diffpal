@@ -11,6 +11,7 @@ const inputSchemaJSON = `{
     "head_sha": {"type": "string"},
     "chunk_index": {"type": "integer", "minimum": 0},
     "chunk_count": {"type": "integer", "minimum": 1},
+    "review_task": {"type": "string"},
     "language": {"type": "string"},
 	    "review_checks": {
 	      "type": "array",
@@ -42,7 +43,7 @@ const inputSchemaJSON = `{
       }
     }
   },
-	  "required": ["review_id", "repo", "base_sha", "head_sha", "chunk_index", "chunk_count", "language", "review_checks", "test_summary", "files"]
+	  "required": ["review_id", "repo", "base_sha", "head_sha", "chunk_index", "chunk_count", "review_task", "language", "review_checks", "test_summary", "files"]
 }`
 
 const outputSchemaJSON = `{
@@ -86,6 +87,7 @@ func reviewInstruction(custom string) string {
 		"Do not make change_summary a list of changed files. Mention paths only when they clarify the change.",
 		"Good change_summary bullets explain intent, such as release workflow setup, CI validation changes, API behavior changes, documentation updates, or configuration changes.",
 		"Keep change_summary factual and based only on visible paths, snippets, signatures, and spans.",
+		"Treat input.review_task as the direct user task for this chunk.",
 		"Only run the requested input.review_checks.",
 		"Apply input.instructions as repository-local review tuning when it is present.",
 		"Map review_checks to categories as follows: security covers security; bugs covers correctness and reliability; performance covers performance; best-practices covers maintainability, testing, and style.",

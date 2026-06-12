@@ -12,6 +12,7 @@ func TestReviewInstructionDefinesReviewCheckCategories(t *testing.T) {
 		"bugs covers correctness and reliability",
 		"When security is requested",
 		"When bugs is requested",
+		"input.review_task",
 		"input.instructions",
 		"Use severity critical",
 	}
