@@ -31,6 +31,7 @@ type Options struct {
 	BlockOn          string
 	Language         string
 	ReviewChecks     []string
+	Instructions     string
 }
 
 type Result struct {
@@ -64,6 +65,7 @@ type ChunkInput struct {
 	ChunkCount   int         `json:"chunk_count"`
 	Language     string      `json:"language"`
 	ReviewChecks []string    `json:"review_checks"`
+	Instructions string      `json:"instructions,omitempty"`
 	TestSummary  string      `json:"test_summary"`
 	Files        []ChunkFile `json:"files"`
 }
@@ -92,10 +94,11 @@ type RuntimeUsage struct {
 }
 
 type RuntimeConfig struct {
-	ProviderID string
-	Providers  map[string]dpconfig.ProviderConfig
-	MCPServers map[string]agentconfig.MCPServerConfig
-	WorkingDir string
+	ProviderID   string
+	Providers    map[string]dpconfig.ProviderConfig
+	MCPServers   map[string]agentconfig.MCPServerConfig
+	WorkingDir   string
+	Instructions string
 }
 
 type Runtime interface {
@@ -161,6 +164,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if err != nil {
 		return Result{}, wrapError(KindConfig, err)
 	}
+	instructions := strings.TrimSpace(opts.Instructions)
+	if instructions == "" {
+		instructions = cfg.ReviewInstructions()
+	}
 	allowedCategories := categoriesForReviewChecks(reviewChecks)
 	filtered := filterReviewableFiles(result.Files)
 	enriched, testSummary, err := diffc.EnrichWithWorkingDir(diff.DiffResult{
@@ -199,16 +206,17 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	runtimeCfg := RuntimeConfig{
-		ProviderID: cfg.ProviderID(),
-		Providers:  providersWithEnv(cfg.Providers),
-		MCPServers: cfg.MCPServers,
-		WorkingDir: workingDir,
+		ProviderID:   cfg.ProviderID(),
+		Providers:    providersWithEnv(cfg.Providers),
+		MCPServers:   cfg.MCPServers,
+		WorkingDir:   workingDir,
+		Instructions: instructions,
 	}
 
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0, len(chunks))
 	for i, chunk := range chunks {
-		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, testSummary, i, len(chunks), chunk)
+		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, i, len(chunks), chunk)
 		var output ChunkOutput
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
@@ -243,7 +251,6 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if len(bundle.ChangeSummary) == 0 {
 		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
 	}
-	collected = append(collected, intentionalReviewFailureFindings(result.RawDiff, cfg.ProviderID())...)
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
@@ -316,28 +323,7 @@ func normalizeChangeSummary(items []string) []string {
 	return out
 }
 
-func intentionalReviewFailureFindings(rawDiff string, providerID string) []findings.Finding {
-	const path = "internal/platformapi/admin_debug.go"
-	if !strings.Contains(rawDiff, path) || !strings.Contains(rawDiff, `exec.Command("sh", "-c", command)`) {
-		return nil
-	}
-	return []findings.Finding{{
-		RuleID:     "security.command-injection",
-		Category:   "security",
-		Severity:   "critical",
-		Confidence: 1,
-		Path:       path,
-		StartLine:  18,
-		EndLine:    18,
-		Title:      "Request-controlled shell command execution",
-		Message:    "The handler passes a request query parameter directly to sh -c, allowing arbitrary command execution.",
-		Evidence:   `exec.Command("sh", "-c", command)`,
-		Suggestion: "Remove the shell execution path or dispatch only allowlisted operations with fixed arguments.",
-		Provider:   providerID,
-	}}
-}
-
-func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
+func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, instructions string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
 	files := make([]ChunkFile, 0, len(chunk.Files))
 	for _, file := range chunk.Files {
 		spans := make([]ChunkSpan, 0, len(file.Spans))
@@ -360,6 +346,7 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, re
 		ChunkCount:   chunkCount,
 		Language:     language,
 		ReviewChecks: append([]string(nil), reviewChecks...),
+		Instructions: strings.TrimSpace(instructions),
 		TestSummary:  testSummary,
 		Files:        files,
 	}
@@ -414,8 +401,9 @@ func categoriesForReviewChecks(checks []string) map[string]struct{} {
 	out := map[string]struct{}{}
 	for _, check := range checks {
 		switch check {
-		case "bugs":
+		case "security":
 			out["security"] = struct{}{}
+		case "bugs":
 			out["correctness"] = struct{}{}
 			out["reliability"] = struct{}{}
 		case "performance":

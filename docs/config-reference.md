@@ -30,7 +30,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
     checks:
+      - security
       - bugs
       - performance
       - best-practices
@@ -70,13 +73,15 @@ config file.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
-| `diffpal.review.checks` | `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
+| `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
+| `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
 
 Review checks map to finding categories:
 
 | Check | Categories |
 | --- | --- |
-| `bugs` | security, correctness, reliability |
+| `security` | security |
+| `bugs` | correctness, reliability |
 | `performance` | performance |
 | `best-practices` | maintainability, testing, style |
 
@@ -87,7 +92,8 @@ diffpal review github \
   --base "$BASE_SHA" \
   --head "$HEAD_SHA" \
   --language en \
-  --review-checks bugs,performance,best-practices \
+  --review-checks security,bugs,performance,best-practices \
+  --instructions-file .config/diffpal/review-instructions.md \
   --feedback balanced
 ```
 

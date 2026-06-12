@@ -152,6 +152,8 @@ async function run(): Promise<void> {
   }
   addOptional(args, "--language", input("language"));
   addOptional(args, "--review-checks", input("reviewChecks"));
+  addOptional(args, "--instructions", input("instructions"));
+  addOptional(args, "--instructions-file", input("instructionsFile"));
   addOptional(args, "--out", input("out"));
   addOptional(args, "--repo", input("repo"));
   addOptional(args, "--review-id", input("reviewId"));

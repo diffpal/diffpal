@@ -61,7 +61,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if runtime.inputs[0].Language != "en" {
 		t.Fatalf("runtime input language = %q, want en", runtime.inputs[0].Language)
 	}
-	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "bugs,performance,best-practices" {
+	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("runtime input review checks = %v, want defaults", runtime.inputs[0].ReviewChecks)
 	}
 	if result.ChangedFiles != 1 || result.ReviewableFiles != 1 {
@@ -92,7 +92,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if result.Bundle.Language != "en" {
 		t.Fatalf("Bundle.Language = %q, want en", result.Bundle.Language)
 	}
-	if strings.Join(result.Bundle.ReviewChecks, ",") != "bugs,performance,best-practices" {
+	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
@@ -207,6 +207,98 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 	}
 	if result.Bundle.Findings[0].Category != "correctness" {
 		t.Fatalf("finding category = %q, want correctness", result.Bundle.Findings[0].Category)
+	}
+}
+
+func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T) {
+	repo := newGitRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "internal", "platformapi"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(platformapi) error = %v", err)
+	}
+	safeHandler := strings.Join([]string{
+		"package platformapi",
+		"",
+		"import (",
+		`	"net/http"`,
+		")",
+		"",
+		"func AdminDebugHandler() http.HandlerFunc {",
+		"	return func(w http.ResponseWriter, r *http.Request) {",
+		`		_, _ = w.Write([]byte("ok"))`,
+		"	}",
+		"}",
+	}, "\n") + "\n"
+	writeRepoFile(t, filepath.Join(repo, "go.mod"), "module example.com/repo\n\ngo 1.26\n")
+	writeRepoFile(t, filepath.Join(repo, "internal", "platformapi", "admin_debug.go"), safeHandler)
+	runGitCmd(t, repo, "add", ".")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+
+	unsafeHandler := strings.Join([]string{
+		"package platformapi",
+		"",
+		"import (",
+		`	"net/http"`,
+		`	"os/exec"`,
+		")",
+		"",
+		"func AdminDebugHandler() http.HandlerFunc {",
+		"	return func(w http.ResponseWriter, r *http.Request) {",
+		`		command := r.URL.Query().Get("command")`,
+		`		_ = exec.Command("sh", "-c", command).Run()`,
+		"	}",
+		"}",
+	}, "\n") + "\n"
+	writeRepoFile(t, filepath.Join(repo, "internal", "platformapi", "admin_debug.go"), unsafeHandler)
+
+	runtime := &fakeRuntime{
+		outputs: []ChunkOutput{{
+			ChangeSummary: []string{"Added a debug HTTP handler that executes request-provided commands."},
+			Findings: []ChunkFinding{{
+				RuleID:     "security.command-injection",
+				Category:   "security",
+				Severity:   "critical",
+				Confidence: 0.98,
+				Path:       "internal/platformapi/admin_debug.go",
+				StartLine:  11,
+				EndLine:    11,
+				Title:      "Request-controlled shell command execution",
+				Message:    "The handler passes the command query parameter directly to sh -c.",
+				Evidence:   `exec.Command("sh", "-c", command)`,
+				Suggestion: "Remove shell execution or dispatch only fixed allowlisted operations.",
+			}},
+		}},
+	}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-security",
+		ReviewID:         "review-security",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+		ReviewChecks:     []string{"security"},
+		Instructions:     "Focus on externally reachable handlers.",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %d, want 1", len(runtime.inputs))
+	}
+	if !strings.Contains(runtime.inputs[0].Files[0].Snippet, `exec.Command("sh", "-c", command)`) {
+		t.Fatalf("runtime input snippet did not include unsafe command:\n%s", runtime.inputs[0].Files[0].Snippet)
+	}
+	if runtime.inputs[0].Instructions != "Focus on externally reachable handlers." {
+		t.Fatalf("runtime input instructions = %q, want custom instructions", runtime.inputs[0].Instructions)
+	}
+	if len(result.Bundle.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
+	}
+	got := result.Bundle.Findings[0]
+	if got.RuleID != "security.command-injection" || got.Severity != "critical" || !got.Blocking {
+		t.Fatalf("finding = %+v, want blocking critical command injection", got)
 	}
 }
 

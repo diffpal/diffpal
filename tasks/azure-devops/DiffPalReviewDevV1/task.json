@@ -9,7 +9,7 @@
   "author": "DiffPal",
   "version": {
     "Major": 1,
-    "Minor": 3,
+    "Minor": 4,
     "Patch": 0
   },
   "minimumAgentVersion": "3.224.0",
@@ -128,7 +128,23 @@
       "label": "Review checks",
       "required": false,
       "defaultValue": "",
-      "helpMarkDown": "Comma-separated checks to run: bugs, performance, best-practices."
+      "helpMarkDown": "Comma-separated checks to run: security, bugs, performance, best-practices."
+    },
+    {
+      "name": "instructions",
+      "type": "multiLine",
+      "label": "Review instructions",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Additional review instructions for local prompt tuning."
+    },
+    {
+      "name": "instructionsFile",
+      "type": "filePath",
+      "label": "Review instructions file",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Path to additional review instructions."
     },
     {
       "name": "out",

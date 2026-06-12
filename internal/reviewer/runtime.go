@@ -42,7 +42,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		AgentID:           cfg.ProviderID,
 		Name:              "DiffPalReviewerAgent",
 		Description:       "DiffPal provider-backed review agent",
-		GlobalInstruction: reviewInstruction(),
+		GlobalInstruction: reviewInstruction(cfg.Instructions),
 		WorkingDirectory:  cfg.WorkingDir,
 	})
 	if err != nil {
@@ -55,6 +55,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
 		structuredagent.WithInputSchema(inputSchemaJSON),
 		structuredagent.WithOutputSchema(outputSchemaJSON),
+		structuredagent.WithSystemInstruction(reviewInstruction(cfg.Instructions)),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
