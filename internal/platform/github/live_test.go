@@ -51,7 +51,7 @@ func TestPublishSummaryCommentUpdatesExistingMarker(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
 			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary --> old"}]`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/7/comments/42":
+		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
 			patched = true
 			w.WriteHeader(http.StatusOK)
 		default:
