@@ -127,13 +127,12 @@ separate explicit step.
 
 ## CI baseline
 
-- The `ci` workflow provides `lint`, `test`, `security`, `azure-devops-task`, and `omnidist-package` jobs in one workflow run.
+- The `ci` workflow provides `lint`, `test`, `security`, and `azure-devops-task` jobs in one workflow run.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
 - `azure-devops-task` runs `npm ci`, runtime dependency audit, TypeScript build, and prod/dev VSIX packaging.
-- `omnidist-package` builds, stages, and verifies the npm package without publishing.
-- Release automation uses omnidist and the Go version from `go.mod`.
+- `omnidist-release` runs only on SemVer tags and handles build, npm publish, and GitHub release assets.
 
 ## Self-review gate
 
