@@ -12,7 +12,7 @@ have tested.
 Every CI system needs:
 
 1. A full git checkout, so DiffPal can compare base and head commits.
-2. Node.js, because the public CLI and Copilot provider are installed with npm.
+2. Node.js, because the Copilot provider is installed with npm.
 3. A DiffPal config committed at `.config/diffpal/config.yaml`.
 4. `COPILOT_GITHUB_TOKEN` as a secret for the Copilot provider.
 5. A platform token so DiffPal can publish PR feedback.
@@ -210,7 +210,7 @@ diffpal-review:
 In Azure Pipelines, enable **Allow scripts to access the OAuth token** so
 `$(System.AccessToken)` is available to the task.
 
-The `DiffPalReview@1` task expects `diffpal` to already be on `PATH`.
+The `DiffPalReview@1` task installs the DiffPal CLI by default.
 
 ### Pipeline
 
@@ -232,12 +232,13 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @diffpal/diffpal@latest @github/copilot@latest
-    displayName: Install DiffPal and Copilot
+  - script: npm install --global @github/copilot@latest
+    displayName: Install Copilot provider
 
   - task: DiffPalReview@1
     displayName: DiffPal review
     inputs:
+      diffpalVersion: latest
       language: en
       reviewChecks: bugs,performance,best-practices
       feedback: balanced
@@ -257,7 +258,9 @@ steps:
 ### Common Azure Fixes
 
 - `SYSTEM_ACCESSTOKEN` is empty: enable OAuth token access for scripts.
-- Task cannot find `diffpal`: install the CLI first or set `diffpalPath`.
+- Task cannot find `diffpal`: keep `install: true`, or set `install: false`
+  only when `diffpal` is already on `PATH`.
+- Custom binary path: set `diffpalPath`; custom paths skip automatic install.
 - Status does not block merge: add an Azure branch status policy for DiffPal.
 
 ## Feedback and Outputs

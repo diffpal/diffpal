@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as tl from "azure-pipelines-task-lib/task";
 
 function input(name: string): string {
@@ -38,6 +40,14 @@ function addOptional(args: string[], flag: string, value: string): void {
   }
 }
 
+function boolInput(name: string, defaultValue: boolean): boolean {
+  const value = input(name).toLowerCase();
+  if (!value) {
+    return defaultValue;
+  }
+  return ["1", "true", "yes", "y", "on"].includes(value);
+}
+
 function resolveBase(inputBase: string): string {
   return inputBase || firstEnv([
     "SYSTEM_PULLREQUEST_TARGETCOMMITID",
@@ -53,7 +63,7 @@ function resolveHead(inputHead: string): string {
   ]);
 }
 
-function spawnDiffPal(command: string, args: string[]): Promise<number> {
+function spawnCommand(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       env: process.env,
@@ -66,11 +76,62 @@ function spawnDiffPal(command: string, args: string[]): Promise<number> {
   });
 }
 
+async function installDiffPal(version: string): Promise<string> {
+  const npm = tl.which("npm", true);
+  const tempDir = tl.getVariable("Agent.TempDirectory") || process.env.AGENT_TEMPDIRECTORY || process.env.RUNNER_TEMP || process.cwd();
+  const installRoot = path.join(tempDir, "diffpal-task");
+  fs.mkdirSync(installRoot, { recursive: true });
+
+  const packageSpec = `@diffpal/diffpal@${version || "latest"}`;
+  tl.debug(`Installing ${packageSpec} into ${installRoot}`);
+  const code = await spawnCommand(npm, [
+    "install",
+    "--global",
+    "--prefix",
+    installRoot,
+    packageSpec,
+    "--omit=dev",
+    "--no-audit",
+    "--no-fund"
+  ]);
+  if (code !== 0) {
+    throw new Error(`npm install ${packageSpec} exited with code ${code}`);
+  }
+
+  const candidates = process.platform === "win32"
+    ? [
+        path.join(installRoot, "diffpal.cmd"),
+        path.join(installRoot, "diffpal"),
+        path.join(installRoot, "bin", "diffpal.cmd")
+      ]
+    : [
+        path.join(installRoot, "bin", "diffpal"),
+        path.join(installRoot, "diffpal")
+      ];
+
+  const diffpal = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!diffpal) {
+    throw new Error(`installed diffpal binary was not found in ${installRoot}`);
+  }
+  tl.debug(`Installed DiffPal binary: ${diffpal}`);
+  return diffpal;
+}
+
+async function resolveDiffPalCommand(): Promise<string> {
+  const diffpalPath = input("diffpalPath") || "diffpal";
+  if (diffpalPath !== "diffpal") {
+    return tl.which(diffpalPath, true);
+  }
+  if (!boolInput("install", true)) {
+    return tl.which(diffpalPath, true);
+  }
+  return installDiffPal(input("diffpalVersion") || "latest");
+}
+
 async function run(): Promise<void> {
   hydrateSystemAccessToken();
 
-  const diffpalPath = input("diffpalPath") || "diffpal";
-  const command = tl.which(diffpalPath, true);
+  const command = await resolveDiffPalCommand();
   const base = requireValue("base or System.PullRequest.TargetCommitId", resolveBase(input("base")));
   const head = requireValue("head or System.PullRequest.SourceCommitId", resolveHead(input("head")));
   const blockOn = input("blockOn") || "high";
@@ -100,7 +161,7 @@ async function run(): Promise<void> {
   addOptional(args, "--max-files-per-chunk", input("maxFilesPerChunk"));
 
   tl.debug(`Running ${command} ${args.join(" ")}`);
-  const code = await spawnDiffPal(command, args);
+  const code = await spawnCommand(command, args);
   if (code !== 0) {
     process.exitCode = code;
     tl.setResult(tl.TaskResult.Failed, `diffpal exited with code ${code}`);

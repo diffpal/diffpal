@@ -4,24 +4,40 @@
   "name": "DiffPalReview",
   "friendlyName": "DiffPal Review",
   "description": "Run DiffPal review for Azure DevOps pull requests.",
-  "helpMarkDown": "Runs `diffpal review ado` using a diffpal binary that is already installed on the agent PATH.",
+  "helpMarkDown": "Installs DiffPal by default, then runs `diffpal review ado`.",
   "category": "Build",
   "author": "DiffPal",
   "version": {
     "Major": 1,
-    "Minor": 2,
+    "Minor": 3,
     "Patch": 0
   },
   "minimumAgentVersion": "3.224.0",
   "instanceNameFormat": "DiffPal Review",
   "inputs": [
     {
+      "name": "install",
+      "type": "boolean",
+      "label": "Install DiffPal",
+      "required": false,
+      "defaultValue": "true",
+      "helpMarkDown": "Install @diffpal/diffpal before running the review. Disable this when diffpal is already installed on PATH."
+    },
+    {
+      "name": "diffpalVersion",
+      "type": "string",
+      "label": "DiffPal version",
+      "required": false,
+      "defaultValue": "latest",
+      "helpMarkDown": "npm version or dist-tag for @diffpal/diffpal."
+    },
+    {
       "name": "diffpalPath",
       "type": "string",
       "label": "DiffPal path",
       "required": false,
       "defaultValue": "diffpal",
-      "helpMarkDown": "Path or command name for the diffpal binary."
+      "helpMarkDown": "Path or command name for the diffpal binary. Custom paths skip automatic installation."
     },
     {
       "name": "base",

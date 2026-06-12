@@ -57,11 +57,12 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 
 ## Token and setup guidance
 
-- The `DiffPalReview@1` task expects the `diffpal` CLI to be installed before
-  the task runs. Install the CLI and Copilot provider with npm, for example
-  `npm install --global @diffpal/diffpal@latest @github/copilot@latest`.
-  If you use a local project install, set `diffpalPath:
-  ./node_modules/.bin/diffpal`.
+- The `DiffPalReview@1` task installs `@diffpal/diffpal` by default. Set
+  `diffpalVersion` to pin a version or dist-tag.
+- Install the provider command separately, for example
+  `npm install --global @github/copilot@latest`.
+- Set `install: false` to use `diffpal` from `PATH`, or set `diffpalPath` to a
+  custom binary path. Custom paths skip automatic installation.
 - Optional task inputs `language`, `reviewChecks`, and `feedback` map to the
   CLI flags `--language`, `--review-checks`, and `--feedback`.
 - `feedback: balanced` is the default and publishes status, a PR summary

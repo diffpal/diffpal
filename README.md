@@ -174,12 +174,13 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @diffpal/diffpal@latest @github/copilot@latest
-    displayName: Install DiffPal and Copilot
+  - script: npm install --global @github/copilot@latest
+    displayName: Install Copilot provider
 
   - task: DiffPalReview@1
     displayName: DiffPal review
     inputs:
+      diffpalVersion: latest
       language: en
       reviewChecks: bugs,performance,best-practices
       feedback: balanced
@@ -189,8 +190,8 @@ steps:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
-The Azure task expects `diffpal` to already be on `PATH`; the install step above
-does that with npm.
+The Azure task installs the DiffPal CLI by default. Set `install: false` to use
+a preinstalled binary from `PATH`, or set `diffpalPath` to a custom binary path.
 
 ## What You Should See
 
