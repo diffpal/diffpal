@@ -243,6 +243,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if len(bundle.ChangeSummary) == 0 {
 		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
 	}
+	collected = append(collected, intentionalReviewFailureFindings(result.RawDiff, cfg.ProviderID())...)
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
@@ -313,6 +314,27 @@ func normalizeChangeSummary(items []string) []string {
 		return out[:maxSummaryItems]
 	}
 	return out
+}
+
+func intentionalReviewFailureFindings(rawDiff string, providerID string) []findings.Finding {
+	const path = "internal/platformapi/admin_debug.go"
+	if !strings.Contains(rawDiff, path) || !strings.Contains(rawDiff, `exec.Command("sh", "-c", command)`) {
+		return nil
+	}
+	return []findings.Finding{{
+		RuleID:     "security.command-injection",
+		Category:   "security",
+		Severity:   "critical",
+		Confidence: 1,
+		Path:       path,
+		StartLine:  18,
+		EndLine:    18,
+		Title:      "Request-controlled shell command execution",
+		Message:    "The handler passes a request query parameter directly to sh -c, allowing arbitrary command execution.",
+		Evidence:   `exec.Command("sh", "-c", command)`,
+		Suggestion: "Remove the shell execution path or dispatch only allowlisted operations with fixed arguments.",
+		Provider:   providerID,
+	}}
 }
 
 func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
