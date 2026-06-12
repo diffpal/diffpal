@@ -34,7 +34,8 @@ defaults:
 providers:
   copilot-acp:
     type: copilot_acp
-    copilot_acp: {}
+    copilot_acp:
+      model: gpt-5.4-mini
 
 review:
   language: en
