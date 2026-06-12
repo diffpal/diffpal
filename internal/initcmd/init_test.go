@@ -52,21 +52,21 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	t.Parallel()
 
 	rendered := composeConfig([]string{"openai-fast", "copilot-acp"})
-	if !strings.Contains(rendered, "defaults:\n  provider: copilot-acp") {
-		t.Fatalf("composeConfig() missing copilot root provider:\n%s", rendered)
+	if !strings.Contains(rendered, "diffpal:\n  provider: copilot-acp") {
+		t.Fatalf("composeConfig() missing copilot diffpal provider:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "policies:\n  default:\n    block_on: high") {
-		t.Fatalf("composeConfig() missing policy.block_on:\n%s", rendered)
+	if !strings.Contains(rendered, "  gate:\n    block_on: high") {
+		t.Fatalf("composeConfig() missing gate.block_on:\n%s", rendered)
 	}
 	if strings.Contains(rendered, "profiles:") || strings.Contains(rendered, "platforms:") {
 		t.Fatalf("composeConfig() should keep profiles/platform auth in templates only:\n%s", rendered)
 	}
 	for _, needle := range []string{
 		"      model: gpt-5-mini",
-		"  language: en",
-		"    - bugs",
-		"    - performance",
-		"    - best-practices",
+		"    language: en",
+		"      - bugs",
+		"      - performance",
+		"      - best-practices",
 	} {
 		if !strings.Contains(rendered, needle) {
 			t.Fatalf("composeConfig() missing %q:\n%s", needle, rendered)
@@ -74,12 +74,14 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	}
 }
 
-func TestComposeConfigDoesNotEmitDiffpalBlock(t *testing.T) {
+func TestComposeConfigDoesNotEmitOldSchemaRoots(t *testing.T) {
 	t.Parallel()
 
 	rendered := composeConfig([]string{"openai-fast"})
-	if strings.Contains(rendered, "\ndiffpal:\n") {
-		t.Fatalf("composeConfig() unexpectedly emitted diffpal block:\n%s", rendered)
+	for _, legacy := range []string{"\ndefaults:\n", "\npolicies:\n", "\nproviders:\n"} {
+		if strings.Contains(rendered, legacy) {
+			t.Fatalf("composeConfig() unexpectedly emitted legacy root %q:\n%s", legacy, rendered)
+		}
 	}
 }
 

@@ -1,30 +1,27 @@
 version: v1
 
-defaults:
+runtime:
+  providers:
+    copilot-acp:
+      type: copilot_acp
+      copilot_acp:
+        model: gpt-5-mini
+
+diffpal:
   provider: copilot-acp
-  policy: default
-
-providers:
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      model: gpt-5-mini
-
-policies:
-  default:
+  gate:
     block_on: high
+  review:
+    language: en
+    checks:
+      - bugs
+      - performance
+      - best-practices
+  platforms:
+    github: {}
 
-review:
-  context_lines: 20
-  max_files: 200
-  language: en
-  checks:
-    - bugs
-    - performance
-    - best-practices
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
-
-platforms:
-  github: {}
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high

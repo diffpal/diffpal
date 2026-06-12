@@ -424,11 +424,9 @@ func (f *fakeRuntime) ReviewChunk(_ context.Context, _ RuntimeConfig, input Chun
 
 func testConfig() dpconfig.Config {
 	return dpconfig.Config{
-		Version: "v1",
-		Defaults: dpconfig.DefaultsConfig{
-			Provider: "openai-fast",
-			Policy:   "default",
-		},
+		Version:  "v1",
+		Provider: "openai-fast",
+		Gate:     dpconfig.GateConfig{BlockOn: "high"},
 		Providers: map[string]dpconfig.ProviderConfig{
 			"openai-fast": {
 				Type: "openai",
@@ -437,13 +435,6 @@ func testConfig() dpconfig.Config {
 					APIKey: "test-key",
 				},
 			},
-		},
-		Policies: map[string]dpconfig.PolicyConfig{
-			"default": {BlockOn: "high"},
-		},
-		Review: dpconfig.ReviewConfig{
-			ContextLines: 20,
-			MaxFiles:     200,
 		},
 	}
 }

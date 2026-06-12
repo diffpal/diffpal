@@ -34,13 +34,13 @@ func Resolve(cfg config.Config, platform string) (Resolved, error) {
 
 func resolveGitHub(cfg config.Config) (Resolved, error) {
 	token := strings.TrimSpace(cfg.Platforms.GitHub.Auth.Token)
-	source := "platforms.github.auth.token"
+	source := "diffpal.platforms.github.auth.token"
 	if token == "" {
 		token = strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
 		source = "GITHUB_TOKEN"
 	}
 	if token == "" {
-		return Resolved{}, fmt.Errorf("platforms.github.auth.token or GITHUB_TOKEN is required for review github")
+		return Resolved{}, fmt.Errorf("diffpal.platforms.github.auth.token or GITHUB_TOKEN is required for review github")
 	}
 	return Resolved{
 		Platform: "github",
@@ -53,8 +53,8 @@ func resolveGitHub(cfg config.Config) (Resolved, error) {
 func resolveGitLab(cfg config.Config) (Resolved, error) {
 	apiToken := strings.TrimSpace(cfg.Platforms.GitLab.Auth.APIToken)
 	jobToken := strings.TrimSpace(cfg.Platforms.GitLab.Auth.JobToken)
-	apiSource := "platforms.gitlab.auth.api_token"
-	jobSource := "platforms.gitlab.auth.job_token"
+	apiSource := "diffpal.platforms.gitlab.auth.api_token"
+	jobSource := "diffpal.platforms.gitlab.auth.job_token"
 	if apiToken == "" {
 		apiToken = strings.TrimSpace(os.Getenv("GITLAB_TOKEN"))
 		apiSource = "GITLAB_TOKEN"
@@ -64,7 +64,7 @@ func resolveGitLab(cfg config.Config) (Resolved, error) {
 		jobSource = "CI_JOB_TOKEN"
 	}
 	if apiToken == "" && jobToken == "" {
-		return Resolved{}, fmt.Errorf("platforms.gitlab.auth.api_token, GITLAB_TOKEN, platforms.gitlab.auth.job_token, or CI_JOB_TOKEN is required for review gitlab")
+		return Resolved{}, fmt.Errorf("diffpal.platforms.gitlab.auth.api_token, GITLAB_TOKEN, diffpal.platforms.gitlab.auth.job_token, or CI_JOB_TOKEN is required for review gitlab")
 	}
 	if apiToken != "" {
 		return Resolved{
@@ -85,8 +85,8 @@ func resolveGitLab(cfg config.Config) (Resolved, error) {
 func resolveADO(cfg config.Config) (Resolved, error) {
 	systemToken := strings.TrimSpace(cfg.Platforms.Azure.Auth.SystemAccessToken)
 	pat := strings.TrimSpace(cfg.Platforms.Azure.Auth.PAT)
-	systemSource := "platforms.azure.auth.system_access_token"
-	patSource := "platforms.azure.auth.pat"
+	systemSource := "diffpal.platforms.azure.auth.system_access_token"
+	patSource := "diffpal.platforms.azure.auth.pat"
 	if systemToken == "" {
 		systemToken = strings.TrimSpace(os.Getenv("SYSTEM_ACCESSTOKEN"))
 		systemSource = "SYSTEM_ACCESSTOKEN"
@@ -96,7 +96,7 @@ func resolveADO(cfg config.Config) (Resolved, error) {
 		patSource = "AZURE_DEVOPS_EXT_PAT"
 	}
 	if systemToken == "" && pat == "" {
-		return Resolved{}, fmt.Errorf("platforms.azure.auth.system_access_token, SYSTEM_ACCESSTOKEN, platforms.azure.auth.pat, or AZURE_DEVOPS_EXT_PAT is required for review ado")
+		return Resolved{}, fmt.Errorf("diffpal.platforms.azure.auth.system_access_token, SYSTEM_ACCESSTOKEN, diffpal.platforms.azure.auth.pat, or AZURE_DEVOPS_EXT_PAT is required for review ado")
 	}
 	if systemToken != "" {
 		return Resolved{

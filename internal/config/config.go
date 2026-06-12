@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
@@ -24,34 +23,34 @@ var defaultConfigYAML []byte
 
 type Config struct {
 	Version    string                                 `json:"version"               yaml:"version"     mapstructure:"version"`
-	Defaults   DefaultsConfig                         `json:"defaults"              yaml:"defaults"    mapstructure:"defaults"`
+	Provider   string                                 `json:"provider"              yaml:"provider"    mapstructure:"provider"`
+	Gate       GateConfig                             `json:"gate"                  yaml:"gate"        mapstructure:"gate"`
 	Providers  map[string]ProviderConfig              `json:"providers"             yaml:"providers"   mapstructure:"providers"`
-	Policies   map[string]PolicyConfig                `json:"policies"              yaml:"policies"    mapstructure:"policies"`
 	Review     ReviewConfig                           `json:"review"                yaml:"review"      mapstructure:"review"`
 	Platforms  PlatformConfigs                        `json:"platforms,omitempty"   yaml:"platforms"   mapstructure:"platforms"`
 	MCPServers map[string]agentconfig.MCPServerConfig `json:"mcp_servers,omitempty" yaml:"mcp_servers" mapstructure:"mcp_servers"`
 }
 
-type DefaultsConfig struct {
-	Provider string `json:"provider" yaml:"provider" mapstructure:"provider"`
-	Policy   string `json:"policy"   yaml:"policy"   mapstructure:"policy"`
+type configDocument struct {
+	Version string                  `mapstructure:"version"`
+	Runtime appconfig.RuntimeConfig `mapstructure:"runtime"`
+	DiffPal DiffPalConfig           `mapstructure:"diffpal"`
 }
 
-type PolicyConfig struct {
+type DiffPalConfig struct {
+	Provider  string          `json:"provider"            yaml:"provider"            mapstructure:"provider"`
+	Gate      GateConfig      `json:"gate"                yaml:"gate"                mapstructure:"gate"`
+	Review    ReviewConfig    `json:"review"              yaml:"review"              mapstructure:"review"`
+	Platforms PlatformConfigs `json:"platforms,omitempty" yaml:"platforms,omitempty" mapstructure:"platforms"`
+}
+
+type GateConfig struct {
 	BlockOn string `json:"block_on" yaml:"block_on" mapstructure:"block_on"`
 }
 
 type ReviewConfig struct {
-	ContextLines int            `json:"context_lines" yaml:"context_lines" mapstructure:"context_lines"`
-	MaxFiles     int            `json:"max_files"     yaml:"max_files"     mapstructure:"max_files"`
-	Language     string         `json:"language"      yaml:"language"      mapstructure:"language"`
-	Checks       []string       `json:"checks"        yaml:"checks"        mapstructure:"checks"`
-	Chunking     ChunkingConfig `json:"chunking"      yaml:"chunking"      mapstructure:"chunking"`
-}
-
-type ChunkingConfig struct {
-	MaxPatchChars    int `json:"max_patch_chars"     yaml:"max_patch_chars"     mapstructure:"max_patch_chars"`
-	MaxFilesPerChunk int `json:"max_files_per_chunk" yaml:"max_files_per_chunk" mapstructure:"max_files_per_chunk"`
+	Language string   `json:"language" yaml:"language" mapstructure:"language"`
+	Checks   []string `json:"checks"   yaml:"checks"   mapstructure:"checks"`
 }
 
 type PlatformConfigs struct {
@@ -108,6 +107,14 @@ var validSeverityThresholds = map[string]struct{}{
 
 var defaultReviewChecks = []string{"bugs", "performance", "best-practices"}
 
+const (
+	DefaultReviewMaxFiles         = 200
+	DefaultReviewContextLines     = 20
+	DefaultReviewMaxPatchChars    = 12000
+	DefaultReviewMaxFilesPerChunk = 20
+	defaultBlockOn                = "high"
+)
+
 func LoadConfig(workingDir, configDir, profile string) (Config, error) {
 	loaded, err := LoadConfigWithMetadata(workingDir, configDir, profile)
 	if err != nil {
@@ -131,7 +138,8 @@ func LoadConfigWithMetadata(workingDir, configDir, profile string) (LoadedConfig
 		selectedProfile = strings.TrimSpace(os.Getenv("DIFFPAL_PROFILE"))
 	}
 
-	settings, resolvedProfile, err := appconfig.LoadResolvedSettings(
+	var doc configDocument
+	resolvedProfile, err := appconfig.LoadConfigDocument(
 		appconfig.RuntimeLoadOptions{
 			WorkingDir: resolvedWorkingDir,
 			ConfigDir:  strings.TrimSpace(configDir),
@@ -143,18 +151,12 @@ func LoadConfigWithMetadata(workingDir, configDir, profile string) (LoadedConfig
 			DefaultsYAML:       defaultConfigYAML,
 			UseDotConfigAppDir: true,
 		},
+		&doc,
 	)
 	if err != nil {
 		return LoadedConfig{}, err
 	}
-	if err := validateRawSettings(settings); err != nil {
-		return LoadedConfig{}, err
-	}
-
-	var cfg Config
-	if err := appconfig.DecodeSettings(settings, &cfg); err != nil {
-		return LoadedConfig{}, fmt.Errorf("decode config: %w", err)
-	}
+	cfg := configFromDocument(doc)
 	if err := cfg.ApplyEnvOverrides(); err != nil {
 		return LoadedConfig{}, err
 	}
@@ -172,6 +174,18 @@ func LoadConfigWithMetadata(workingDir, configDir, profile string) (LoadedConfig
 	}, nil
 }
 
+func configFromDocument(doc configDocument) Config {
+	return Config{
+		Version:    doc.Version,
+		Provider:   doc.DiffPal.Provider,
+		Gate:       doc.DiffPal.Gate,
+		Providers:  doc.Runtime.Providers,
+		Review:     doc.DiffPal.Review,
+		Platforms:  doc.DiffPal.Platforms,
+		MCPServers: doc.Runtime.MCPServers,
+	}
+}
+
 func (cfg Config) Validate() error {
 	if cfg.Version != "" && cfg.Version != "v1" {
 		return fmt.Errorf("unsupported config version %q", cfg.Version)
@@ -185,21 +199,14 @@ func (cfg Config) Validate() error {
 	}
 	providerID := cfg.ProviderID()
 	if providerID == "" {
-		return fmt.Errorf("defaults.provider is required")
+		return fmt.Errorf("diffpal.provider is required")
 	}
 	if _, ok := cfg.Providers[providerID]; !ok {
-		return fmt.Errorf("unknown defaults.provider %q", providerID)
+		return fmt.Errorf("unknown diffpal.provider %q", providerID)
 	}
-	policyName := cfg.PolicyName()
-	policyCfg, ok := cfg.Policies[policyName]
-	if !ok {
-		return fmt.Errorf("unknown defaults.policy %q", policyName)
-	}
-	if policyCfg.BlockOn == "" {
-		return fmt.Errorf("policies.%s.block_on is required", policyName)
-	}
-	if _, ok := validSeverityThresholds[policyCfg.BlockOn]; !ok {
-		return fmt.Errorf("invalid policies.%s.block_on %q", policyName, policyCfg.BlockOn)
+	blockOn := cfg.BlockOn()
+	if _, ok := validSeverityThresholds[blockOn]; !ok {
+		return fmt.Errorf("invalid diffpal.gate.block_on %q", blockOn)
 	}
 	if _, err := NormalizeReviewLanguage(cfg.Review.Language); err != nil {
 		return err
@@ -224,27 +231,24 @@ func (cfg *Config) Normalize() error {
 	}
 	cfg.Review.Language = language
 	cfg.Review.Checks = checks
+	cfg.Provider = strings.TrimSpace(cfg.Provider)
+	cfg.Gate.BlockOn = strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
+	if cfg.Gate.BlockOn == "" {
+		cfg.Gate.BlockOn = defaultBlockOn
+	}
 	return nil
 }
 
 func (cfg Config) ProviderID() string {
-	return strings.TrimSpace(cfg.Defaults.Provider)
-}
-
-func (cfg Config) PolicyName() string {
-	name := strings.TrimSpace(cfg.Defaults.Policy)
-	if name == "" {
-		return "default"
-	}
-	return name
+	return strings.TrimSpace(cfg.Provider)
 }
 
 func (cfg Config) BlockOn() string {
-	policyCfg, ok := cfg.Policies[cfg.PolicyName()]
-	if !ok {
-		return ""
+	blockOn := strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
+	if blockOn == "" {
+		return defaultBlockOn
 	}
-	return strings.TrimSpace(policyCfg.BlockOn)
+	return blockOn
 }
 
 func (cfg Config) ReviewLanguage() string {
@@ -265,30 +269,13 @@ func (cfg Config) ReviewChecks() []string {
 
 func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_PROVIDER")); value != "" {
-		cfg.Defaults.Provider = value
-	}
-	if value := strings.TrimSpace(os.Getenv("DIFFPAL_POLICY")); value != "" {
-		cfg.Defaults.Policy = value
+		cfg.Provider = value
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_BLOCK_ON")); value != "" {
-		cfg.setSelectedBlockOn(value)
+		cfg.Gate.BlockOn = value
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_OPENAI_MODEL")); value != "" {
 		cfg.setOpenAIModel(value)
-	}
-	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_MAX_FILES")); value != "" {
-		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_MAX_FILES", value)
-		if err != nil {
-			return err
-		}
-		cfg.Review.MaxFiles = parsed
-	}
-	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CONTEXT_LINES")); value != "" {
-		parsed, err := parseNonNegativeEnvInt("DIFFPAL_REVIEW_CONTEXT_LINES", value)
-		if err != nil {
-			return err
-		}
-		cfg.Review.ContextLines = parsed
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_LANGUAGE")); value != "" {
 		cfg.Review.Language = value
@@ -360,27 +347,6 @@ func splitCommaList(value string) []string {
 	return out
 }
 
-func parseNonNegativeEnvInt(name, value string) (int, error) {
-	parsed, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, fmt.Errorf("invalid %s %q: %w", name, value, err)
-	}
-	if parsed < 0 {
-		return 0, fmt.Errorf("invalid %s %q: must be non-negative", name, value)
-	}
-	return parsed, nil
-}
-
-func (cfg *Config) setSelectedBlockOn(value string) {
-	name := cfg.PolicyName()
-	if cfg.Policies == nil {
-		cfg.Policies = map[string]PolicyConfig{}
-	}
-	policyCfg := cfg.Policies[name]
-	policyCfg.BlockOn = value
-	cfg.Policies[name] = policyCfg
-}
-
 func (cfg *Config) setOpenAIModel(value string) {
 	for name, providerCfg := range cfg.Providers {
 		if !strings.EqualFold(strings.TrimSpace(providerCfg.Type), "openai") || providerCfg.OpenAI == nil {
@@ -396,19 +362,19 @@ func (cfg *Config) setOpenAIModel(value string) {
 func (cfg PlatformConfigs) Validate() error {
 	var errs []string
 	if cfg.GitHub.Auth.Token != "" && strings.TrimSpace(cfg.GitHub.Auth.Token) == "" {
-		errs = append(errs, "platforms.github.auth.token must not be blank")
+		errs = append(errs, "diffpal.platforms.github.auth.token must not be blank")
 	}
 	if cfg.GitLab.Auth.JobToken != "" && strings.TrimSpace(cfg.GitLab.Auth.JobToken) == "" {
-		errs = append(errs, "platforms.gitlab.auth.job_token must not be blank")
+		errs = append(errs, "diffpal.platforms.gitlab.auth.job_token must not be blank")
 	}
 	if cfg.GitLab.Auth.APIToken != "" && strings.TrimSpace(cfg.GitLab.Auth.APIToken) == "" {
-		errs = append(errs, "platforms.gitlab.auth.api_token must not be blank")
+		errs = append(errs, "diffpal.platforms.gitlab.auth.api_token must not be blank")
 	}
 	if cfg.Azure.Auth.SystemAccessToken != "" && strings.TrimSpace(cfg.Azure.Auth.SystemAccessToken) == "" {
-		errs = append(errs, "platforms.azure.auth.system_access_token must not be blank")
+		errs = append(errs, "diffpal.platforms.azure.auth.system_access_token must not be blank")
 	}
 	if cfg.Azure.Auth.PAT != "" && strings.TrimSpace(cfg.Azure.Auth.PAT) == "" {
-		errs = append(errs, "platforms.azure.auth.pat must not be blank")
+		errs = append(errs, "diffpal.platforms.azure.auth.pat must not be blank")
 	}
 	if len(errs) == 0 {
 		return nil
@@ -480,98 +446,6 @@ func resolveWorkingDir(workingDir string) (string, error) {
 	return filepath.Abs(cwd)
 }
 
-func validateRawSettings(settings map[string]any) error {
-	if settings == nil {
-		return fmt.Errorf("config settings are empty")
-	}
-	for _, key := range []string{"diffpal", "runtime"} {
-		if _, ok := settings[key]; ok {
-			return fmt.Errorf("top-level key %q is not supported; use defaults, providers, policies, review, and platforms", key)
-		}
-	}
-	for _, key := range []string{"defaults", "providers", "policies", "review"} {
-		if _, ok := settings[key]; !ok {
-			return fmt.Errorf("config key %q is required", key)
-		}
-	}
-	if err := validatePlatformSettings(settings["platforms"], "platforms"); err != nil {
-		return err
-	}
-	rawProfiles, ok := settings["profiles"]
-	if !ok || rawProfiles == nil {
-		return nil
-	}
-	profiles, ok := toStringAnyMap(rawProfiles)
-	if !ok {
-		return fmt.Errorf("top-level key %q must be an object", "profiles")
-	}
-	for name, rawProfile := range profiles {
-		profileMap, ok := toStringAnyMap(rawProfile)
-		if !ok {
-			return fmt.Errorf("profiles.%s must be an object", name)
-		}
-		if err := validatePlatformSettings(profileMap["platforms"], "profiles."+name+".platforms"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validatePlatformSettings(rawPlatforms any, path string) error {
-	if rawPlatforms == nil {
-		return nil
-	}
-	platformsMap, ok := toStringAnyMap(rawPlatforms)
-	if !ok {
-		return fmt.Errorf("%s must be an object", path)
-	}
-	for host, rawPlatform := range platformsMap {
-		switch host {
-		case "github", "gitlab", "azure":
-		default:
-			return fmt.Errorf("%s.%s is not supported", path, host)
-		}
-		platformMap, ok := toStringAnyMap(rawPlatform)
-		if !ok {
-			return fmt.Errorf("%s.%s must be an object", path, host)
-		}
-		if _, exists := platformMap["enabled"]; exists {
-			return fmt.Errorf("%s.%s.enabled is not supported", path, host)
-		}
-		if rawAuth, exists := platformMap["auth"]; exists && rawAuth != nil {
-			authMap, ok := toStringAnyMap(rawAuth)
-			if !ok {
-				return fmt.Errorf("%s.%s.auth must be an object", path, host)
-			}
-			if err := validatePlatformAuthSettings(authMap, path, host); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func validatePlatformAuthSettings(authMap map[string]any, path string, host string) error {
-	allowed := map[string]struct{}{}
-	switch host {
-	case "github":
-		allowed["token"] = struct{}{}
-	case "gitlab":
-		allowed["api_token"] = struct{}{}
-		allowed["job_token"] = struct{}{}
-	case "azure":
-		allowed["system_access_token"] = struct{}{}
-		allowed["pat"] = struct{}{}
-	}
-	for key := range authMap {
-		if _, ok := allowed[key]; ok {
-			continue
-		}
-		return fmt.Errorf("%s.%s.auth.%s is not supported", path, host, key)
-	}
-	return nil
-}
-
 func configSearchPaths(workingDir, configuredRoot string) []string {
 	paths := make([]string, 0, 3)
 
@@ -606,25 +480,6 @@ func dedupePaths(paths []string) []string {
 		out = append(out, cleaned)
 	}
 	return out
-}
-
-func toStringAnyMap(value any) (map[string]any, bool) {
-	switch typed := value.(type) {
-	case map[string]any:
-		return typed, true
-	case map[any]any:
-		out := make(map[string]any, len(typed))
-		for key, raw := range typed {
-			keyString, ok := key.(string)
-			if !ok {
-				return nil, false
-			}
-			out[keyString] = raw
-		}
-		return out, true
-	default:
-		return nil, false
-	}
 }
 
 func ProviderKeys(cfg Config) []string {

@@ -20,7 +20,7 @@ func TestSemanticChangeSummaryGroupsPathsByPurpose(t *testing.T) {
 
 	joined := strings.Join(got, "\n")
 	for _, want := range []string{
-		"Updated DiffPal configuration defaults and examples.",
+		"Updated DiffPal configuration and examples.",
 		"Updated the GitHub Action integration for installing and running DiffPal.",
 		"Updated CI workflow automation for testing, review, or release packaging.",
 		"Updated Azure DevOps task packaging or pipeline integration.",

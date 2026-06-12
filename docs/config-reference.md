@@ -1,10 +1,10 @@
 # DiffPal Config Reference
 
-DiffPal reads one config file from the repository:
+DiffPal reads one repository config file:
 
 `.config/diffpal/config.yaml`
 
-Generate it with:
+Generate a starter file with:
 
 ```bash
 diffpal init
@@ -17,38 +17,29 @@ The public onboarding path uses Copilot ACP:
 ```yaml
 version: v1
 
-defaults:
+runtime:
+  providers:
+    copilot-acp:
+      type: copilot_acp
+      copilot_acp:
+        model: gpt-5-mini
+
+diffpal:
   provider: copilot-acp
-  policy: default
-
-providers:
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      model: gpt-5-mini
-
-policies:
-  default:
+  gate:
     block_on: high
-
-review:
-  context_lines: 20
-  max_files: 200
-  language: en
-  checks:
-    - bugs
-    - performance
-    - best-practices
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
-
-platforms:
-  github:
-    summary_comment:
-      enabled: true
-  gitlab: {}
-  azure: {}
+  review:
+    language: en
+    checks:
+      - bugs
+      - performance
+      - best-practices
+  platforms:
+    github:
+      summary_comment:
+        enabled: true
+    gitlab: {}
+    azure: {}
 ```
 
 Install the matching provider command in CI:
@@ -60,16 +51,26 @@ npm install --global @github/copilot@latest
 Set `COPILOT_GITHUB_TOKEN` as a CI secret. Do not commit token values into the
 config file.
 
+## Root Sections
+
+| Field | Purpose |
+| --- | --- |
+| `version` | Config schema version. Use `v1`. |
+| `runtime.providers` | Norma runtime provider definitions. |
+| `runtime.mcp_servers` | Optional MCP servers shared by providers. |
+| `diffpal.provider` | Provider ID selected for reviews. Must exist in `runtime.providers`. |
+| `diffpal.gate.block_on` | Minimum severity that marks a finding as blocking. |
+| `diffpal.review` | User-facing review language and check scopes. |
+| `diffpal.platforms` | Optional platform publishing configuration. |
+| `profiles.<name>.diffpal` | Profile-specific DiffPal overrides. |
+| `profiles.<name>.runtime` | Profile-specific runtime overrides. |
+
 ## Review Settings
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `review.language` | `en` | Language for finding text and summaries. |
-| `review.checks` | `bugs`, `performance`, `best-practices` | Review scopes to run. |
-| `review.context_lines` | `20` | Neighboring source lines included with each diff hunk. |
-| `review.max_files` | `200` | Maximum changed files to review. |
-| `review.chunking.max_patch_chars` | `12000` | Maximum context size per model chunk. |
-| `review.chunking.max_files_per_chunk` | `20` | Maximum files per model chunk. |
+| `diffpal.review.language` | `en` | Language for finding text and summaries. |
+| `diffpal.review.checks` | `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
 
 Review checks map to finding categories:
 
@@ -90,13 +91,13 @@ diffpal review github \
   --feedback balanced
 ```
 
-## Policy and Gating
+## Gate
 
-`policies.default.block_on` controls which findings are blocking:
+`diffpal.gate.block_on` controls which findings are blocking:
 
 ```yaml
-policies:
-  default:
+diffpal:
+  gate:
     block_on: high
 ```
 
@@ -116,17 +117,18 @@ variables are preferred.
 
 | Platform | Preferred env | Config field |
 | --- | --- | --- |
-| GitHub | `GITHUB_TOKEN` | `platforms.github.auth.token` |
-| GitLab | `CI_JOB_TOKEN` or `GITLAB_TOKEN` | `platforms.gitlab.auth.job_token`, `platforms.gitlab.auth.api_token` |
-| Azure | `SYSTEM_ACCESSTOKEN` | `platforms.azure.auth.system_access_token` |
+| GitHub | `GITHUB_TOKEN` | `diffpal.platforms.github.auth.token` |
+| GitLab | `CI_JOB_TOKEN` or `GITLAB_TOKEN` | `diffpal.platforms.gitlab.auth.job_token`, `diffpal.platforms.gitlab.auth.api_token` |
+| Azure | `SYSTEM_ACCESSTOKEN` | `diffpal.platforms.azure.auth.system_access_token` |
 
 Only use envsubst placeholders for values that are guaranteed to exist:
 
 ```yaml
-platforms:
-  github:
-    auth:
-      token: "${GITHUB_TOKEN}"
+diffpal:
+  platforms:
+    github:
+      auth:
+        token: "${GITHUB_TOKEN}"
 ```
 
 Missing envsubst variables fail config loading. For optional CI credentials,
@@ -135,21 +137,38 @@ omit the config value and let DiffPal read the standard environment variable.
 ## Alternate Hosted OpenAI Provider
 
 Copilot ACP is the default onboarding provider. If you prefer hosted OpenAI,
-switch the provider block:
+switch the selected provider and add a matching runtime provider:
 
 ```yaml
-defaults:
-  provider: openai-fast
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: "${DIFFPAL_OPENAI_MODEL}"
+        api_key: "${OPENAI_API_KEY}"
 
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: "${DIFFPAL_OPENAI_MODEL}"
-      api_key: "${OPENAI_API_KEY}"
+diffpal:
+  provider: openai-fast
 ```
 
 Then set `OPENAI_API_KEY` in CI.
+
+## Profiles
+
+Profiles override the base document under the same root sections:
+
+```yaml
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high
+      review:
+        language: en
+```
+
+Select a profile with `--profile ci` or `DIFFPAL_PROFILE=ci`.
 
 ## Environment Overrides
 
@@ -157,11 +176,8 @@ These environment variables override config values:
 
 - `DIFFPAL_PROFILE`
 - `DIFFPAL_PROVIDER`
-- `DIFFPAL_POLICY`
 - `DIFFPAL_BLOCK_ON`
 - `DIFFPAL_OPENAI_MODEL`
-- `DIFFPAL_REVIEW_MAX_FILES`
-- `DIFFPAL_REVIEW_CONTEXT_LINES`
 - `DIFFPAL_REVIEW_LANGUAGE`
 - `DIFFPAL_REVIEW_CHECKS`
 

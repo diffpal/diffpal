@@ -26,8 +26,8 @@ func TestResolveGitHubUsesConfiguredToken(t *testing.T) {
 	if resolved.Mode != "github_token" {
 		t.Fatalf("Mode = %q, want github_token", resolved.Mode)
 	}
-	if resolved.Source != "platforms.github.auth.token" {
-		t.Fatalf("Source = %q, want platforms.github.auth.token", resolved.Source)
+	if resolved.Source != "diffpal.platforms.github.auth.token" {
+		t.Fatalf("Source = %q, want diffpal.platforms.github.auth.token", resolved.Source)
 	}
 }
 
@@ -133,7 +133,7 @@ func TestResolveGitLabFailsWhenTokensMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want missing token error")
 	}
-	if !strings.Contains(err.Error(), "platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
+	if !strings.Contains(err.Error(), "diffpal.platforms.gitlab.auth.api_token, GITLAB_TOKEN") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

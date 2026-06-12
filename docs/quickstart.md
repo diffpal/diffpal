@@ -14,28 +14,23 @@ Commit `.config/diffpal/config.yaml`:
 ```yaml
 version: v1
 
-defaults:
+runtime:
+  providers:
+    copilot-acp:
+      type: copilot_acp
+      copilot_acp:
+        model: gpt-5-mini
+
+diffpal:
   provider: copilot-acp
-  policy: default
-
-providers:
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      model: gpt-5-mini
-
-policies:
-  default:
+  gate:
     block_on: high
-
-review:
-  context_lines: 20
-  max_files: 200
-  language: en
-  checks:
-    - bugs
-    - performance
-    - best-practices
+  review:
+    language: en
+    checks:
+      - bugs
+      - performance
+      - best-practices
 ```
 
 You can generate a starter config locally with `diffpal init`, but the important

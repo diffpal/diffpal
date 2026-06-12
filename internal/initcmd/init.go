@@ -98,46 +98,38 @@ func composeConfig(detected []string) string {
 	lines := []string{
 		"version: v1",
 		"",
-		"defaults:",
-		fmt.Sprintf("  provider: %s", defaultProvider),
-		"  policy: default",
-		"",
-		"providers:",
+		"runtime:",
+		"  providers:",
 	}
 	for _, p := range detected {
-		lines = append(lines, fmt.Sprintf("  %s:", p))
+		lines = append(lines, fmt.Sprintf("    %s:", p))
 		switch p {
 		case "openai-fast":
-			lines = append(lines, "    type: openai")
-			lines = append(lines, "    openai:")
-			lines = append(lines, "      model: gpt-5.4-mini")
+			lines = append(lines, "      type: openai")
+			lines = append(lines, "      openai:")
+			lines = append(lines, "        model: gpt-5.4-mini")
 		case "copilot-acp":
-			lines = append(lines, "    type: copilot_acp")
-			lines = append(lines, "    copilot_acp:")
-			lines = append(lines, "      model: gpt-5-mini")
+			lines = append(lines, "      type: copilot_acp")
+			lines = append(lines, "      copilot_acp:")
+			lines = append(lines, "        model: gpt-5-mini")
 		default:
 			blockName := providerTypeForKey(p)
-			lines = append(lines, "    type: "+blockName)
-			lines = append(lines, "    "+blockName+":")
-			lines = append(lines, "      mode: \"\"")
+			lines = append(lines, "      type: "+blockName)
+			lines = append(lines, "      "+blockName+":")
+			lines = append(lines, "        mode: \"\"")
 		}
 	}
 	lines = append(lines, "")
-	lines = append(lines, "policies:")
-	lines = append(lines, "  default:")
+	lines = append(lines, "diffpal:")
+	lines = append(lines, fmt.Sprintf("  provider: %s", defaultProvider))
+	lines = append(lines, "  gate:")
 	lines = append(lines, "    block_on: high")
-	lines = append(lines, "")
-	lines = append(lines, "review:")
-	lines = append(lines, "  context_lines: 20")
-	lines = append(lines, "  max_files: 200")
-	lines = append(lines, "  language: en")
-	lines = append(lines, "  checks:")
-	lines = append(lines, "    - bugs")
-	lines = append(lines, "    - performance")
-	lines = append(lines, "    - best-practices")
-	lines = append(lines, "  chunking:")
-	lines = append(lines, "    max_patch_chars: 12000")
-	lines = append(lines, "    max_files_per_chunk: 20")
+	lines = append(lines, "  review:")
+	lines = append(lines, "    language: en")
+	lines = append(lines, "    checks:")
+	lines = append(lines, "      - bugs")
+	lines = append(lines, "      - performance")
+	lines = append(lines, "      - best-practices")
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
@@ -163,12 +155,13 @@ func configTemplates() []configTemplate {
 			content: strings.Join([]string{
 				"# Copy the relevant fields into config.yaml when you want envsubst-backed hosted config.",
 				"# Config loading expands $VAR and ${VAR} before YAML parsing; missing vars fail config load.",
-				"providers:",
-				"  openai-fast:",
-				"    type: openai",
-				"    openai:",
-				"      model: \"${DIFFPAL_OPENAI_MODEL}\"",
-				"      api_key: \"${OPENAI_API_KEY}\"",
+				"runtime:",
+				"  providers:",
+				"    openai-fast:",
+				"      type: openai",
+				"      openai:",
+				"        model: \"${DIFFPAL_OPENAI_MODEL}\"",
+				"        api_key: \"${OPENAI_API_KEY}\"",
 				"",
 			}, "\n"),
 		},
@@ -177,18 +170,19 @@ func configTemplates() []configTemplate {
 			content: strings.Join([]string{
 				"# Copy a platform block into config.yaml when enabling host publish modes.",
 				"# These fields use envsubst values. Keep the placeholders quoted.",
-				"platforms:",
-				"  github:",
-				"    auth:",
-				"      token: \"${GITHUB_TOKEN}\"",
-				"  gitlab:",
-				"    auth:",
-				"      job_token: \"${CI_JOB_TOKEN}\"",
-				"      api_token: \"${GITLAB_TOKEN}\"",
-				"  azure:",
-				"    auth:",
-				"      system_access_token: \"${SYSTEM_ACCESSTOKEN}\"",
-				"      pat: \"${AZURE_DEVOPS_EXT_PAT}\"",
+				"diffpal:",
+				"  platforms:",
+				"    github:",
+				"      auth:",
+				"        token: \"${GITHUB_TOKEN}\"",
+				"    gitlab:",
+				"      auth:",
+				"        job_token: \"${CI_JOB_TOKEN}\"",
+				"        api_token: \"${GITLAB_TOKEN}\"",
+				"    azure:",
+				"      auth:",
+				"        system_access_token: \"${SYSTEM_ACCESSTOKEN}\"",
+				"        pat: \"${AZURE_DEVOPS_EXT_PAT}\"",
 				"",
 			}, "\n"),
 		},
@@ -198,14 +192,9 @@ func configTemplates() []configTemplate {
 				"# Copy profiles into config.yaml when you need scenario-specific overrides.",
 				"profiles:",
 				"  ci:",
-				"    defaults:",
-				"      policy: default",
-				"    policies:",
-				"      default:",
+				"    diffpal:",
+				"      gate:",
 				"        block_on: high",
-				"    review:",
-				"      context_lines: 20",
-				"      max_files: 200",
 				"",
 			}, "\n"),
 		},
