@@ -99,12 +99,14 @@ These flags work with `review local`, `review github`, `review gitlab`, and
 ```bash
 --language en
 --review-checks bugs,performance,best-practices
+--feedback balanced
 --block-on high
 --gate
 ```
 
 - `--language`: language for generated review text.
 - `--review-checks`: checks to run.
+- `--feedback`: review output shape, either `summary`, `balanced`, or `inline`.
 - `--block-on`: severity threshold that marks findings as blocking.
 - `--gate`: exits non-zero when blocking findings exist.
 

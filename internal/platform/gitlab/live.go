@@ -6,50 +6,80 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/diffpal/diffpal/internal/platformapi"
+	gl "gitlab.com/gitlab-org/api/client-go"
 )
 
 func PublishDiscussions(ctx context.Context, tokenMode, token string, reviewCtx Context, plan DiscussionPlan, client *http.Client) error {
-	if strings.TrimSpace(reviewCtx.Repo) == "" {
-		return fmt.Errorf("missing GitLab repository/project")
+	gitlabClient, mrIID, err := newClient(tokenMode, token, reviewCtx, client)
+	if err != nil {
+		return err
 	}
-	if strings.TrimSpace(reviewCtx.MergeRequestIID) == "" {
-		return fmt.Errorf("missing GitLab merge request iid")
-	}
-	headers := gitLabHeaders(tokenMode, token)
-	baseURL := strings.TrimRight(gitLabAPIBaseURL(reviewCtx), "/") + "/projects/" + url.PathEscape(reviewCtx.Repo) + "/merge_requests/" + url.PathEscape(reviewCtx.MergeRequestIID) + "/discussions"
 	for _, action := range plan.Actions {
 		if action.Type == ActionSkip {
 			continue
 		}
-		req := map[string]any{
-			"body": action.Body,
-		}
-		if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req); err != nil {
+		body := action.Body
+		if _, _, err := gitlabClient.Discussions.CreateMergeRequestDiscussion(reviewCtx.Repo, mrIID, &gl.CreateMergeRequestDiscussionOptions{
+			Body: &body,
+		}, gl.WithContext(ctx)); err != nil {
 			return err
 		}
 	}
 	if strings.TrimSpace(plan.AdvisorySummary) != "" {
-		if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, map[string]any{
-			"body": plan.AdvisorySummary,
-		}); err != nil {
+		if err := publishSummary(ctx, gitlabClient, reviewCtx, mrIID, plan.AdvisorySummary); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func gitLabHeaders(tokenMode, token string) map[string]string {
-	headers := map[string]string{}
-	switch tokenMode {
-	case "gitlab_token":
-		headers["PRIVATE-TOKEN"] = token
-	case "ci_job_token":
-		headers["JOB-TOKEN"] = token
+func PublishSummaryDiscussion(ctx context.Context, tokenMode, token string, reviewCtx Context, summary string, client *http.Client) error {
+	gitlabClient, mrIID, err := newClient(tokenMode, token, reviewCtx, client)
+	if err != nil {
+		return err
 	}
-	return headers
+	return publishSummary(ctx, gitlabClient, reviewCtx, mrIID, summary)
+}
+
+func publishSummary(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, summary string) error {
+	body := strings.TrimSpace(summary)
+	if body == "" {
+		return nil
+	}
+	_, _, err := gitlabClient.Discussions.CreateMergeRequestDiscussion(reviewCtx.Repo, mrIID, &gl.CreateMergeRequestDiscussionOptions{
+		Body: &body,
+	}, gl.WithContext(ctx))
+	return err
+}
+
+func newClient(tokenMode, token string, reviewCtx Context, client *http.Client) (*gl.Client, int64, error) {
+	if strings.TrimSpace(reviewCtx.Repo) == "" {
+		return nil, 0, fmt.Errorf("missing GitLab repository/project")
+	}
+	if strings.TrimSpace(reviewCtx.MergeRequestIID) == "" {
+		return nil, 0, fmt.Errorf("missing GitLab merge request iid")
+	}
+	mrIID, err := strconv.ParseInt(reviewCtx.MergeRequestIID, 10, 64)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid GitLab merge request iid %q: %w", reviewCtx.MergeRequestIID, err)
+	}
+	options := []gl.ClientOptionFunc{
+		gl.WithBaseURL(gitLabAPIBaseURL(reviewCtx)),
+	}
+	if client != nil {
+		options = append(options, gl.WithHTTPClient(client))
+	}
+	switch tokenMode {
+	case "ci_job_token":
+		gitlabClient, err := gl.NewJobClient(token, options...)
+		return gitlabClient, mrIID, err
+	default:
+		gitlabClient, err := gl.NewClient(token, options...)
+		return gitlabClient, mrIID, err
+	}
 }
 
 func gitLabAPIBaseURL(ctx Context) string {

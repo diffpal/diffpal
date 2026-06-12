@@ -22,7 +22,15 @@ type publishOutput struct {
 	Status string `json:"status,omitempty"`
 }
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, out string) ([]publishOutput, int, error) {
+type FeedbackProfile string
+
+const (
+	FeedbackBalanced FeedbackProfile = "balanced"
+	FeedbackSummary  FeedbackProfile = "summary"
+	FeedbackInline   FeedbackProfile = "inline"
+)
+
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, out string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -31,8 +39,9 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	blockThresholds := []string{blockOn}
 	outputs := make([]publishOutput, 0, len(modes))
 	blocking := 0
-	if len(modes) == 0 {
-		modes = defaultModes(platform)
+	modes, profile, err := resolvePublishModes(platform, modes, feedback)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	for _, mode := range modes {
@@ -69,7 +78,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err != nil {
 				return nil, 0, err
 			}
-			plan := github.PlanInlineComments(existing, bundle.Findings)
+			plan := github.PlanInlineCommentsWithProfile(existing, bundle.Findings, string(profile))
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
 				return nil, 0, err
@@ -131,7 +140,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 					HeadSHA: bundle.HeadSHA,
 				}
 			}
-			threads := azure.PlanThreads(existing, bundle.Findings, ctx)
+			threads := azure.PlanThreadsWithProfile(existing, bundle.Findings, ctx, string(profile))
 			payload := map[string]interface{}{
 				"threads": threads,
 			}
@@ -167,6 +176,56 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	}
 
 	return outputs, blocking, nil
+}
+
+func resolvePublishModes(platform string, modes []string, feedback string) ([]string, FeedbackProfile, error) {
+	if len(modes) > 0 {
+		return modes, FeedbackProfile(""), nil
+	}
+	profile, err := normalizeFeedback(feedback)
+	if err != nil {
+		return nil, "", err
+	}
+	return modesForFeedback(platform, profile), profile, nil
+}
+
+func normalizeFeedback(value string) (FeedbackProfile, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", string(FeedbackBalanced):
+		return FeedbackBalanced, nil
+	case string(FeedbackSummary):
+		return FeedbackSummary, nil
+	case string(FeedbackInline):
+		return FeedbackInline, nil
+	default:
+		return "", fmt.Errorf("invalid feedback %q", value)
+	}
+}
+
+func modesForFeedback(platform string, feedback FeedbackProfile) []string {
+	switch strings.ToLower(platform) {
+	case "gitlab":
+		switch feedback {
+		case FeedbackSummary:
+			return []string{"code-quality", "sarif", "summary"}
+		default:
+			return []string{"code-quality", "discussions", "sarif", "summary"}
+		}
+	case "azure":
+		switch feedback {
+		case FeedbackSummary:
+			return []string{"status", "summary"}
+		default:
+			return []string{"threads", "status", "summary"}
+		}
+	default:
+		switch feedback {
+		case FeedbackSummary:
+			return []string{"check-run", "sarif", "summary"}
+		default:
+			return []string{"check-run", "comments", "sarif", "summary"}
+		}
+	}
 }
 
 func parseModeList(raw string) []string {
@@ -229,14 +288,7 @@ func normalizePublishMode(platform string, mode string) string {
 }
 
 func defaultModes(platform string) []string {
-	switch platform {
-	case "gitlab":
-		return []string{"code-quality", "discussions", "sarif", "summary"}
-	case "azure":
-		return []string{"threads", "status"}
-	default:
-		return []string{"check-run", "comments", "sarif", "summary"}
-	}
+	return modesForFeedback(platform, FeedbackBalanced)
 }
 
 func defaultModeOutput(platform string, mode string) string {

@@ -9,7 +9,7 @@
   "author": "DiffPal",
   "version": {
     "Major": 1,
-    "Minor": 1,
+    "Minor": 2,
     "Patch": 0
   },
   "minimumAgentVersion": "3.224.0",
@@ -83,7 +83,20 @@
       "label": "Publish modes",
       "required": false,
       "defaultValue": "",
-      "helpMarkDown": "Comma-separated Azure DevOps publish modes."
+      "helpMarkDown": "Advanced comma-separated Azure DevOps publish modes. Overrides feedback when set."
+    },
+    {
+      "name": "feedback",
+      "type": "pickList",
+      "label": "Feedback",
+      "required": false,
+      "defaultValue": "balanced",
+      "options": {
+        "summary": "Summary",
+        "balanced": "Balanced",
+        "inline": "Inline"
+      },
+      "helpMarkDown": "Review feedback shape. Summary posts status and one PR summary. Balanced adds actionable inline threads. Inline uses a more permissive inline threshold."
     },
     {
       "name": "language",

@@ -100,3 +100,23 @@ func TestLoadExistingStateReadsPriorPlan(t *testing.T) {
 		t.Fatalf("unexpected state map: %#v", state)
 	}
 }
+
+func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-inline",
+		RuleID:     "correctness.edge",
+		Severity:   "medium",
+		Confidence: 0.7,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "edge case",
+	}}
+	if got := PlanInlineCommentsWithProfile(nil, items, "balanced"); len(got.Actions) != 0 {
+		t.Fatalf("balanced actions = %d, want 0", len(got.Actions))
+	}
+	if got := PlanInlineCommentsWithProfile(nil, items, "inline"); len(got.Actions) != 1 {
+		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	}
+}

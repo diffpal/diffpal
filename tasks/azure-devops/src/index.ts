@@ -84,7 +84,11 @@ async function run(): Promise<void> {
   if (gate) {
     args.push("--gate");
   }
-  addOptional(args, "--mode", input("mode"));
+  const mode = input("mode");
+  addOptional(args, "--mode", mode);
+  if (!mode) {
+    addOptional(args, "--feedback", input("feedback") || "balanced");
+  }
   addOptional(args, "--language", input("language"));
   addOptional(args, "--review-checks", input("reviewChecks"));
   addOptional(args, "--out", input("out"));

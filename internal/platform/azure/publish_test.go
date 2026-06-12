@@ -96,6 +96,27 @@ func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	}
 }
 
+func TestPlanThreadsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-inline",
+		RuleID:     "correctness.edge",
+		Category:   "correctness",
+		Severity:   "medium",
+		Confidence: 0.7,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "edge case",
+	}}
+	if got := PlanThreadsWithProfile(nil, items, Context{}, "balanced"); len(got.Actions) != 0 {
+		t.Fatalf("balanced actions = %d, want 0", len(got.Actions))
+	}
+	if got := PlanThreadsWithProfile(nil, items, Context{}, "inline"); len(got.Actions) != 1 {
+		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	}
+}
+
 func TestPolicyStatusDistinguishesBlockedReviewAndToolingError(t *testing.T) {
 	t.Parallel()
 

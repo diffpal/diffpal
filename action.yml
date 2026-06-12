@@ -35,6 +35,10 @@ inputs:
     description: Comma-separated GitHub publish modes.
     required: false
     default: ""
+  feedback:
+    description: Review feedback shape. Use summary, balanced, or inline.
+    required: false
+    default: balanced
   out:
     description: Output findings bundle path.
     required: false
@@ -85,6 +89,7 @@ runs:
         INPUT_BLOCK_ON: ${{ inputs.block-on }}
         INPUT_GATE: ${{ inputs.gate }}
         INPUT_MODE: ${{ inputs.mode }}
+        INPUT_FEEDBACK: ${{ inputs.feedback }}
         INPUT_OUT: ${{ inputs.out }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_REVIEW_ID: ${{ inputs.review-id }}

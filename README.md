@@ -85,9 +85,9 @@ review:
 ```bash
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD
-diffpal review github --base "$BASE_SHA" --head "$HEAD_SHA" --gate
-diffpal review gitlab --base "$BASE_SHA" --head "$HEAD_SHA" --gate
-diffpal review ado --base "$BASE_SHA" --head "$HEAD_SHA" --gate
+diffpal review github --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
+diffpal review gitlab --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
+diffpal review ado --base "$BASE_SHA" --head "$HEAD_SHA" --feedback balanced --gate
 ```
 
 ## Documentation

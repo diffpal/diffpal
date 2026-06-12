@@ -51,6 +51,9 @@ fi
 if [[ -n "${INPUT_MODE:-}" ]]; then
   argv+=(--mode "$INPUT_MODE")
 fi
+if [[ -z "${INPUT_MODE:-}" && -n "${INPUT_FEEDBACK:-}" ]]; then
+  argv+=(--feedback "$INPUT_FEEDBACK")
+fi
 if [[ -n "${INPUT_OUT:-}" ]]; then
   argv+=(--out "$INPUT_OUT")
 fi

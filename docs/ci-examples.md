@@ -116,7 +116,7 @@ jobs:
           --review-id github-pr-${{ github.event.pull_request.number }}
           --language en
           --review-checks bugs,performance,best-practices
-          --mode check-run,comments,summary
+          --feedback balanced
           --gate
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
@@ -176,6 +176,7 @@ diffpal-review:
       --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
       --language en
       --review-checks bugs,performance,best-practices
+      --feedback balanced
       --gate
   variables:
     GIT_DEPTH: "0"
@@ -249,6 +250,7 @@ steps:
     inputs:
       language: en
       reviewChecks: bugs,performance,best-practices
+      feedback: balanced
       gate: true
     env:
       COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
@@ -258,6 +260,7 @@ steps:
 ### What You Should See
 
 - Azure PR threads for actionable findings.
+- An Azure PR summary thread headed `DiffPal Review Summary`.
 - Azure PR status named `DiffPal Review`.
 - Failed task when `gate` is true and blocking findings exist.
 
@@ -267,15 +270,26 @@ steps:
 - Task cannot find `diffpal`: install the CLI first or set `diffpalPath`.
 - Status does not block merge: add an Azure branch status policy for DiffPal.
 
-## Modes and Outputs
+## Feedback and Outputs
 
-Default publish modes:
+Use `feedback` for normal setup:
+
+| Feedback | Behavior |
+| --- | --- |
+| `summary` | PR summary plus status/check, no inline comments or threads. |
+| `balanced` | Summary plus actionable high-confidence inline comments or threads. |
+| `inline` | Summary plus a more permissive inline threshold for actionable findings. |
+
+Raw `mode` remains available for advanced publish-surface control and overrides
+`feedback` when set.
+
+Default balanced publish modes:
 
 | Platform | Default modes |
 | --- | --- |
 | GitHub | `check-run,comments,sarif,summary` |
 | GitLab | `code-quality,discussions,sarif,summary` |
-| Azure | `threads,status` |
+| Azure | `threads,status,summary` |
 
 Common artifacts:
 

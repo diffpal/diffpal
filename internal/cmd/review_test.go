@@ -306,6 +306,41 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	}
 }
 
+func TestReviewHostRejectsInvalidFeedbackBeforeRunningReview(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	called := false
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called = true
+		return testReviewResult("github"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--feedback", "verbose", "--out", filepath.Join(dir, "findings.json")})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want invalid feedback error")
+	}
+	if called {
+		t.Fatal("review runner was called for invalid feedback")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != 2 {
+		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "invalid feedback") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -322,7 +357,7 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		if r.URL.Path != "/projects/acme/diffpal/merge_requests/42/discussions" {
+		if r.URL.EscapedPath() != "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/discussions" {
 			handlerErrs <- fmt.Errorf("path = %q, want GitLab discussions endpoint", r.URL.Path)
 			http.Error(w, "unexpected path", http.StatusBadRequest)
 			return
@@ -333,6 +368,7 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"discussion-1","notes":[]}`))
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITLAB_API_URL", server.URL)
@@ -366,7 +402,6 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	writeHostTestConfig(t, dir)
-	t.Setenv("SYSTEM_COLLECTIONURI", "https://dev.azure.com/acme/")
 	t.Setenv("SYSTEM_TEAMPROJECT", "proj")
 	t.Setenv("BUILD_REPOSITORY_ID", "repo-1")
 	t.Setenv("SYSTEM_PULLREQUEST_PULLREQUESTID", "55")
@@ -375,22 +410,63 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 
 	var requests atomic.Int32
 	handlerErrs := make(chan error, 2)
+	serverURL := ""
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		if !strings.HasSuffix(r.URL.Path, "/statuses") {
-			handlerErrs <- fmt.Errorf("path = %q, want ADO statuses endpoint", r.URL.Path)
-			http.Error(w, "unexpected path", http.StatusBadRequest)
-			return
-		}
 		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
 			handlerErrs <- fmt.Errorf("Authorization = %q, want Basic auth", got)
 			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
+		switch {
+		case r.Method == http.MethodOptions && r.URL.Path == "/_apis":
+			_, _ = w.Write([]byte(`{
+  "count": 2,
+  "value": [
+    {
+      "id": "e81700f7-3be2-46de-8624-2eb35882fcaa",
+      "area": "Location",
+      "resourceName": "ResourceAreas",
+      "routeTemplate": "_apis/resourceAreas",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "b5f6bb4f-8d1e-4d79-8d11-4c9172c99c35",
+      "area": "git",
+      "resourceName": "pullRequestStatuses",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    }
+  ]
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/_apis/resourceAreas":
+			_, _ = w.Write([]byte(`{
+  "count": 1,
+  "value": [
+    {
+      "id": "4e080c62-fa21-4fbc-8fef-2a10a2b38049",
+      "locationUrl": "` + serverURL + `",
+      "name": "git"
+    }
+  ]
+}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/statuses":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
 	}))
 	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_ADO_API_URL", server.URL+"/_apis/git/repositories/repo-1/pullRequests/55")
+	serverURL = server.URL
+	t.Setenv("SYSTEM_COLLECTIONURI", server.URL+"/")
 
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("ado"), nil
@@ -404,8 +480,8 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 1 {
-		t.Fatalf("requests = %d, want 1", got)
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("requests = %d, want 3 SDK discovery/status requests", got)
 	}
 	select {
 	case err := <-handlerErrs:

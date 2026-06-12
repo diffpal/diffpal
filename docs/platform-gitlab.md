@@ -24,6 +24,15 @@ Required context:
 
 ## Discussion publisher
 
+Normal CI setup should use `--feedback`:
+
+- `summary`: posts Code Quality/SARIF artifacts and one MR summary discussion.
+- `balanced`: adds high-confidence actionable discussions for blocking findings.
+- `inline`: uses a more permissive inline threshold for actionable findings.
+
+Advanced `--mode` values still exist for direct surface selection and override
+`--feedback` when set.
+
 Severity to discussion policy:
 
 - `high/critical`: blocking discussion that remains unresolved until manual action

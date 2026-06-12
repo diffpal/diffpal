@@ -49,7 +49,7 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", []string{"code-quality", "sarif"}, "")
+	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", []string{"code-quality", "sarif"}, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}

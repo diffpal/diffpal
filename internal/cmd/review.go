@@ -6,6 +6,7 @@ import (
 
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/diffpal/diffpal/internal/markdown"
 	"github.com/diffpal/diffpal/internal/platform/azure"
 	"github.com/diffpal/diffpal/internal/platform/github"
 	gitlabpub "github.com/diffpal/diffpal/internal/platform/gitlab"
@@ -90,6 +91,7 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 
 func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
+	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -116,13 +118,20 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 }
 
 func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
+	modeSpec, _ := cmd.Flags().GetString("mode")
+	modes := parseModeList(modeSpec)
+	feedback, _ := cmd.Flags().GetString("feedback")
+	if len(modes) == 0 {
+		if _, err := normalizeFeedback(feedback); err != nil {
+			return withExitCode(2, err)
+		}
+	}
+
 	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
 
-	modeSpec, _ := cmd.Flags().GetString("mode")
-	modes := parseModeList(modeSpec)
 	blocking := countBlockingFindings(execution.Result.Bundle)
 
 	if platform == "github" && shouldSkipGitHubPublish(execution.Config, execution.Result.Bundle) {
@@ -141,7 +150,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return nil
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, "")
+	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, "")
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -149,7 +158,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -322,13 +331,15 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if len(modes) == 0 {
-		modes = defaultModes(platform)
+	resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
+	if err != nil {
+		return err
 	}
+	modes = resolvedModes
 
 	switch platform {
 	case "github":
@@ -340,7 +351,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		commentPlan := github.PlanInlineComments(existingComments, bundle.Findings)
+		commentPlan := github.PlanInlineCommentsWithProfile(existingComments, bundle.Findings, string(profile))
 		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
@@ -377,11 +388,15 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
-				if normalizePublishMode(platform, mode) != "discussions" {
-					continue
-				}
-				if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
-					return err
+				switch normalizePublishMode(platform, mode) {
+				case "discussions":
+					if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if err := gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, markdown.RenderSummary(bundle), nil); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -395,7 +410,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
+		plan := azure.PlanThreadsWithProfile(existing, bundle.Findings, reviewCtx, string(profile))
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {
@@ -407,6 +422,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					}
 				case "status":
 					if err := azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, markdown.RenderSummary(bundle), nil); err != nil {
 						return err
 					}
 				}

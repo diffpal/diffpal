@@ -87,7 +87,8 @@ diffpal review github \
   --base "$BASE_SHA" \
   --head "$HEAD_SHA" \
   --language en \
-  --review-checks bugs,performance,best-practices
+  --review-checks bugs,performance,best-practices \
+  --feedback balanced
 ```
 
 ## Policy and Gating
