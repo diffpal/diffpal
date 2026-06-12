@@ -198,16 +198,16 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return reviewExecution{}, withExitCode(2, err)
 	}
 	if !cmd.Flags().Changed("max-files") {
-		maxFiles = cfg.Review.MaxFiles
+		maxFiles = config.DefaultReviewMaxFiles
 	}
 	if !cmd.Flags().Changed("context-lines") {
-		contextLines = cfg.Review.ContextLines
+		contextLines = config.DefaultReviewContextLines
 	}
 	if !cmd.Flags().Changed("max-patch-chars") {
-		maxPatchChars = cfg.Review.Chunking.MaxPatchChars
+		maxPatchChars = config.DefaultReviewMaxPatchChars
 	}
 	if !cmd.Flags().Changed("max-files-per-chunk") {
-		maxFilesPerChunk = cfg.Review.Chunking.MaxFilesPerChunk
+		maxFilesPerChunk = config.DefaultReviewMaxFilesPerChunk
 	}
 	if !cmd.Flags().Changed("language") {
 		language = cfg.ReviewLanguage()

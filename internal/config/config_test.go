@@ -13,32 +13,29 @@ func TestLoadConfigAppliesProfileOverlay(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-policies:
-  default:
+  gate:
     block_on: high
-  strict:
-    block_on: critical
-review:
-  context_lines: 10
-  max_files: 100
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
+  review:
+    language: en
+    checks:
+      - bugs
 profiles:
   ci:
-    defaults:
-      policy: strict
-    review:
-      context_lines: 20
-      max_files: 200
+    diffpal:
+      gate:
+        block_on: critical
+      review:
+        language: Spanish
+        checks:
+          - performance
 `)
 
 	cfg, err := LoadConfig(dir, "", "ci")
@@ -48,14 +45,14 @@ profiles:
 	if cfg.ProviderID() != "openai-fast" {
 		t.Fatalf("ProviderID() = %q, want openai-fast", cfg.ProviderID())
 	}
-	if cfg.Review.ContextLines != 20 {
-		t.Fatalf("Review.ContextLines = %d, want 20", cfg.Review.ContextLines)
-	}
-	if cfg.Review.MaxFiles != 200 {
-		t.Fatalf("Review.MaxFiles = %d, want 200", cfg.Review.MaxFiles)
-	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
+	}
+	if cfg.Review.Language != "Spanish" {
+		t.Fatalf("Review.Language = %q, want Spanish", cfg.Review.Language)
+	}
+	if strings.Join(cfg.Review.Checks, ",") != "performance" {
+		t.Fatalf("Review.Checks = %v, want [performance]", cfg.Review.Checks)
 	}
 }
 
@@ -63,31 +60,24 @@ func TestLoadConfigEnvProfileOverridesDefaultSelection(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+    copilot-acp:
+      type: copilot_acp
+      copilot_acp:
+        mode: ""
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      mode: ""
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
 profiles:
   enterprise:
-    defaults:
+    diffpal:
       provider: copilot-acp
-    review:
-      context_lines: 7
-      max_files: 42
 `)
 
 	t.Setenv("DIFFPAL_PROFILE", "enterprise")
@@ -98,20 +88,12 @@ profiles:
 	if cfg.ProviderID() != "copilot-acp" {
 		t.Fatalf("ProviderID() = %q, want copilot-acp", cfg.ProviderID())
 	}
-	if cfg.Review.ContextLines != 7 {
-		t.Fatalf("Review.ContextLines = %d, want 7", cfg.Review.ContextLines)
-	}
-	if cfg.Review.MaxFiles != 42 {
-		t.Fatalf("Review.MaxFiles = %d, want 42", cfg.Review.MaxFiles)
-	}
 }
 
 func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
 
-	t.Setenv("DIFFPAL_REVIEW_CONTEXT_LINES", "33")
-	t.Setenv("DIFFPAL_REVIEW_MAX_FILES", "55")
 	t.Setenv("DIFFPAL_REVIEW_LANGUAGE", "Portuguese")
 	t.Setenv("DIFFPAL_REVIEW_CHECKS", "bugs,best_practices")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
@@ -119,12 +101,6 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	cfg, err := LoadConfig(dir, "", "")
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
-	}
-	if cfg.Review.ContextLines != 33 {
-		t.Fatalf("Review.ContextLines = %d, want 33", cfg.Review.ContextLines)
-	}
-	if cfg.Review.MaxFiles != 55 {
-		t.Fatalf("Review.MaxFiles = %d, want 55", cfg.Review.MaxFiles)
 	}
 	if cfg.Review.Language != "Portuguese" {
 		t.Fatalf("Review.Language = %q, want Portuguese", cfg.Review.Language)
@@ -137,32 +113,6 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.Providers["openai-fast"].OpenAI.Model != "gpt-env" {
 		t.Fatalf("OpenAI.Model = %q, want gpt-env", cfg.Providers["openai-fast"].OpenAI.Model)
-	}
-}
-
-func TestLoadConfigRejectsNegativeReviewEnvOverrides(t *testing.T) {
-	tests := []struct {
-		name string
-		env  string
-	}{
-		{name: "max files", env: "DIFFPAL_REVIEW_MAX_FILES"},
-		{name: "context lines", env: "DIFFPAL_REVIEW_CONTEXT_LINES"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
-			t.Setenv(tc.env, "-1")
-
-			_, err := LoadConfig(dir, "", "")
-			if err == nil {
-				t.Fatal("LoadConfig() error = nil, want invalid env override error")
-			}
-			if !strings.Contains(err.Error(), "must be non-negative") {
-				t.Fatalf("LoadConfig() error = %v, want non-negative validation", err)
-			}
-		})
 	}
 }
 
@@ -183,28 +133,24 @@ func TestLoadConfigExpandsEnvsubstValuesBeforeYAMLDecode(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: "${DIFFPAL_MODEL_TEST}"
+        api_key: "${OPENAI_API_KEY_TEST}"
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: "${DIFFPAL_MODEL_TEST}"
-      api_key: "${OPENAI_API_KEY_TEST}"
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
-platforms:
-  github:
-    auth:
-      token: "${GITHUB_TOKEN_TEST}"
-  azure:
-    auth:
-      pat: "${AZURE_DEVOPS_PAT_TEST}"
+  platforms:
+    github:
+      auth:
+        token: "${GITHUB_TOKEN_TEST}"
+    azure:
+      auth:
+        pat: "${AZURE_DEVOPS_PAT_TEST}"
 `)
 
 	t.Setenv("DIFFPAL_MODEL_TEST", "gpt-test")
@@ -236,36 +182,31 @@ func TestLoadConfigRejectsUnknownProvider(t *testing.T) {
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("missing-provider"))
 
 	_, err := LoadConfig(dir, "", "")
-	if err == nil || !strings.Contains(err.Error(), `unknown defaults.provider "missing-provider"`) {
+	if err == nil || !strings.Contains(err.Error(), `unknown diffpal.provider "missing-provider"`) {
 		t.Fatalf("LoadConfig() error = %v, want unknown provider error", err)
 	}
 }
 
-func TestLoadConfigRejectsUnknownPolicy(t *testing.T) {
+func TestLoadConfigRequiresProvider(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
-  provider: openai-fast
-  policy: missing-policy
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-policies:
-  default:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
 `)
 
 	_, err := LoadConfig(dir, "", "")
-	if err == nil || !strings.Contains(err.Error(), `unknown defaults.policy "missing-policy"`) {
-		t.Fatalf("LoadConfig() error = %v, want unknown policy error", err)
+	if err == nil || !strings.Contains(err.Error(), `diffpal.provider is required`) {
+		t.Fatalf("LoadConfig() error = %v, want missing provider error", err)
 	}
 }
 
@@ -275,24 +216,20 @@ func TestLoadConfigRejectsInvalidBlockOn(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-policies:
-  default:
+  gate:
     block_on: severe
-review:
-  context_lines: 20
-  max_files: 200
 `)
 
 	_, err := LoadConfig(dir, "", "")
-	if err == nil || !strings.Contains(err.Error(), `invalid policies.default.block_on "severe"`) {
+	if err == nil || !strings.Contains(err.Error(), `invalid diffpal.gate.block_on "severe"`) {
 		t.Fatalf("LoadConfig() error = %v, want invalid block_on error", err)
 	}
 }
@@ -303,22 +240,19 @@ func TestLoadConfigRejectsInvalidReviewChecks(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
-  checks:
-    - architecture
+  review:
+    checks:
+      - architecture
 `)
 
 	_, err := LoadConfig(dir, "", "")
@@ -400,23 +334,16 @@ func TestResolveConfigPathFallsBackToRepositoryConfig(t *testing.T) {
 func minimalConfig(provider string) string {
 	return `
 version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
   provider: ` + provider + `
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5.4-mini
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
 `
 }
 

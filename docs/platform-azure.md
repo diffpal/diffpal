@@ -3,7 +3,7 @@
 Public CLI naming uses `ado`; config uses `azure`:
 
 - command: `diffpal review ado`
-- config: `platforms.azure`
+- config: `diffpal.platforms.azure`
 
 For a copy-paste Azure Pipelines setup, start with the
 [CI setup guide](ci-examples.md#azure-pipelines). This page documents adapter
@@ -67,8 +67,8 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - `feedback: balanced` is the default and publishes status, a PR summary
   thread, and actionable high-confidence inline threads.
 - Config auth values:
-  - `platforms.azure.auth.system_access_token`
-  - `platforms.azure.auth.pat`
+  - `diffpal.platforms.azure.auth.system_access_token`
+  - `diffpal.platforms.azure.auth.pat`
 - Standard CI env fallbacks are `SYSTEM_ACCESSTOKEN` and `AZURE_DEVOPS_EXT_PAT`.
 - Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access.
 - Prefer the standard CI environment fallback for `SYSTEM_ACCESSTOKEN` rather than committed token placeholders. If you use envsubst placeholders for explicit config injection, define those variables in the pipeline before loading config.

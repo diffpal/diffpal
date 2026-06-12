@@ -98,14 +98,14 @@ func TestDiagnosePlatformAuthGitHubResolvesConfiguredEnv(t *testing.T) {
 		t.Fatalf("fatal = %q, want empty", fatal)
 	}
 	joined := strings.Join(issues, "\n")
-	if !strings.Contains(joined, "github auth resolved via platforms.github.auth.token") {
+	if !strings.Contains(joined, "github auth resolved via diffpal.platforms.github.auth.token") {
 		t.Fatalf("diagnosePlatformAuth() missing GitHub auth success:\n%s", joined)
 	}
 }
 
 func TestDiagnoseSelectedProviderHostedSuccess(t *testing.T) {
 	cfg := config.Config{
-		Defaults: config.DefaultsConfig{Provider: "openai-fast"},
+		Provider: "openai-fast",
 		Providers: map[string]config.ProviderConfig{
 			"openai-fast": {
 				Type:   "openai",
@@ -127,7 +127,7 @@ func TestDiagnoseSelectedProviderHostedSuccess(t *testing.T) {
 
 func TestDiagnoseSelectedProviderHostedMissingAuth(t *testing.T) {
 	cfg := config.Config{
-		Defaults: config.DefaultsConfig{Provider: "openai-fast"},
+		Provider: "openai-fast",
 		Providers: map[string]config.ProviderConfig{
 			"openai-fast": {
 				Type:   "openai",
@@ -149,7 +149,7 @@ func TestDiagnoseSelectedProviderHostedMissingAuth(t *testing.T) {
 
 func TestDiagnoseSelectedProviderHostedMissingAuthRequired(t *testing.T) {
 	cfg := config.Config{
-		Defaults: config.DefaultsConfig{Provider: "openai-fast"},
+		Provider: "openai-fast",
 		Providers: map[string]config.ProviderConfig{
 			"openai-fast": {
 				Type:   "openai",

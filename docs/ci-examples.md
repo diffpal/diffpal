@@ -17,33 +17,28 @@ Every CI system needs:
 4. `COPILOT_GITHUB_TOKEN` as a secret for the Copilot provider.
 5. A platform token so DiffPal can publish PR feedback.
 
-Commit `.config/diffpal/config.yaml` with the provider and review policy:
+Commit `.config/diffpal/config.yaml` with the provider and review gate:
 
 ```yaml
 version: v1
 
-defaults:
+runtime:
+  providers:
+    copilot-acp:
+      type: copilot_acp
+      copilot_acp:
+        model: gpt-5-mini
+
+diffpal:
   provider: copilot-acp
-  policy: default
-
-providers:
-  copilot-acp:
-    type: copilot_acp
-    copilot_acp:
-      model: gpt-5-mini
-
-policies:
-  default:
+  gate:
     block_on: high
-
-review:
-  context_lines: 20
-  max_files: 200
-  language: en
-  checks:
-    - bugs
-    - performance
-    - best-practices
+  review:
+    language: en
+    checks:
+      - bugs
+      - performance
+      - best-practices
 ```
 
 You can generate a starting config locally with `diffpal init`, then commit the

@@ -29,13 +29,13 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 			t.Fatalf("ReviewID = %q, want local default", opts.ReviewID)
 		}
 		if opts.MaxFiles != 200 {
-			t.Fatalf("MaxFiles = %d, want 200 from config", opts.MaxFiles)
+			t.Fatalf("MaxFiles = %d, want 200 default", opts.MaxFiles)
 		}
 		if opts.ContextLines != 20 {
-			t.Fatalf("ContextLines = %d, want 20 from config", opts.ContextLines)
+			t.Fatalf("ContextLines = %d, want 20 default", opts.ContextLines)
 		}
 		if opts.Language != "en" {
-			t.Fatalf("Language = %q, want en from config defaults", opts.Language)
+			t.Fatalf("Language = %q, want en from config", opts.Language)
 		}
 		if strings.Join(opts.ReviewChecks, ",") != "bugs,performance,best-practices" {
 			t.Fatalf("ReviewChecks = %v, want defaults", opts.ReviewChecks)
@@ -301,7 +301,7 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	if coder.ExitCode() != 2 {
 		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
 	}
-	if !strings.Contains(err.Error(), "platforms.github.auth.token or GITHUB_TOKEN is required") {
+	if !strings.Contains(err.Error(), "diffpal.platforms.github.auth.token or GITHUB_TOKEN is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -551,24 +551,17 @@ func writeTestConfig(t *testing.T, dir string) {
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
 	const payload = `version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5
+        api_key: test-key
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5
-      api_key: test-key
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
 `
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)
@@ -586,30 +579,23 @@ func writeHostTestConfigWithGitHubSummary(t *testing.T, dir string, enabled bool
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
 	payload := fmt.Sprintf(`version: v1
-defaults:
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5
+        api_key: test-key
+diffpal:
   provider: openai-fast
-  policy: default
-providers:
-  openai-fast:
-    type: openai
-    openai:
-      model: gpt-5
-      api_key: test-key
-policies:
-  default:
+  gate:
     block_on: high
-review:
-  context_lines: 20
-  max_files: 200
-  chunking:
-    max_patch_chars: 12000
-    max_files_per_chunk: 20
-platforms:
-  github:
-    summary_comment:
-      enabled: %t
-  gitlab: {}
-  azure: {}
+  platforms:
+    github:
+      summary_comment:
+        enabled: %t
+    gitlab: {}
+    azure: {}
 `, enabled)
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)

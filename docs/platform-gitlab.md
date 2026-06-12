@@ -61,8 +61,8 @@ Both artifacts are generated from one deterministic source so dedupe keys remain
 ## Operational requirements
 
 - Config auth values:
-  - `platforms.gitlab.auth.api_token`
-  - `platforms.gitlab.auth.job_token`
+  - `diffpal.platforms.gitlab.auth.api_token`
+  - `diffpal.platforms.gitlab.auth.job_token`
 - Standard CI env fallbacks are `GITLAB_TOKEN` and `CI_JOB_TOKEN`; API token is preferred over job token.
 - Envsubst placeholders such as `api_token: "${GITLAB_TOKEN}"` are supported when you want config-file injection, but missing referenced variables fail config load.
 - Retry policy: platform retries are batched and use exponential backoff with idempotent thread keys.

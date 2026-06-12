@@ -54,7 +54,7 @@ func SemanticChangeSummary(files []ReviewedFile) []string {
 		"implementation",
 	}
 	text := map[string]string{
-		"config":           "Updated DiffPal configuration defaults and examples.",
+		"config":           "Updated DiffPal configuration and examples.",
 		"github-action":    "Updated the GitHub Action integration for installing and running DiffPal.",
 		"ci":               "Updated CI workflow automation for testing, review, or release packaging.",
 		"azure":            "Updated Azure DevOps task packaging or pipeline integration.",
