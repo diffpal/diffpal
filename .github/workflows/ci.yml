@@ -103,7 +103,7 @@ jobs:
         run: npm --prefix tasks/azure-devops ci
 
       - name: Audit runtime dependencies
-        run: npm --prefix tasks/azure-devops audit --omit=dev
+        run: npm --prefix tasks/azure-devops audit --omit=dev --audit-level=high
 
       - name: Build task handler
         run: npm --prefix tasks/azure-devops run build
