@@ -39,6 +39,9 @@ jobs:
       - name: Validate GitHub Actions
         run: go tool actionlint
 
+      - name: Smoke test GitHub Action
+        run: bash tasks/github/smoke-test.sh
+
       - name: Validate CLI surface
         run: go run ./cmd/diffpal --help
 

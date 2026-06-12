@@ -5,8 +5,16 @@ branding:
   icon: check-circle
   color: blue
 inputs:
+  install:
+    description: Install @diffpal/diffpal before running the review.
+    required: false
+    default: "true"
+  diffpal-version:
+    description: npm version or dist-tag for @diffpal/diffpal.
+    required: false
+    default: latest
   diffpal-path:
-    description: Path to the diffpal binary. Defaults to diffpal on PATH.
+    description: Path to an existing diffpal binary. Custom paths skip automatic installation.
     required: false
     default: diffpal
   base:
@@ -78,6 +86,14 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Install DiffPal
+      shell: bash
+      env:
+        INPUT_INSTALL: ${{ inputs.install }}
+        INPUT_DIFFPAL_VERSION: ${{ inputs.diffpal-version }}
+        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
+      run: ${{ github.action_path }}/tasks/github/install-diffpal.sh
+
     - name: Run DiffPal review
       shell: bash
       env:

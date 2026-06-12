@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-diffpal_bin="${INPUT_DIFFPAL_PATH:-diffpal}"
+diffpal_bin="${DIFFPAL_ACTION_BIN:-${INPUT_DIFFPAL_PATH:-diffpal}}"
 
 if ! command -v "$diffpal_bin" >/dev/null 2>&1; then
   echo "diffpal binary was not found: $diffpal_bin" >&2

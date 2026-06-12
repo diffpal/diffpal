@@ -88,8 +88,9 @@ Use the full copy-paste setup guide for your platform:
 - [GitLab CI](ci-examples.md#gitlab-ci)
 - [Azure Pipelines](ci-examples.md#azure-pipelines)
 
-Each recipe includes required permissions, secrets, install steps, and expected
-PR output.
+Each recipe includes required permissions, secrets, provider setup, and expected
+PR output. The GitHub Action installs the DiffPal CLI by default; provider CLIs
+such as Copilot remain explicit setup.
 
 ## Common Review Controls
 

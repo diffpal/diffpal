@@ -98,26 +98,20 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install DiffPal and Copilot
-        run: npm install --global @diffpal/diffpal@latest @github/copilot@latest
-
-      - name: Check DiffPal setup
-        run: diffpal doctor --mode github
-        env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Copilot provider
+        run: npm install --global @github/copilot@latest
 
       - name: Review pull request
-        run: >-
-          diffpal review github
-          --base ${{ github.event.pull_request.base.sha }}
-          --head ${{ github.event.pull_request.head.sha }}
-          --repo ${{ github.repository }}
-          --review-id github-pr-${{ github.event.pull_request.number }}
-          --language en
-          --review-checks bugs,performance,best-practices
-          --feedback balanced
-          --gate
+        uses: diffpal/action@v1
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          repo: ${{ github.repository }}
+          review-id: github-pr-${{ github.event.pull_request.number }}
+          language: en
+          review-checks: bugs,performance,best-practices
+          feedback: balanced
+          gate: true
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -135,6 +129,7 @@ jobs:
 - `GITHUB_TOKEN is required`: keep the `env` block on the review step.
 - No summary comment: confirm `pull-requests: write`.
 - No check run: confirm `checks: write`.
+- To pin the CLI, set `diffpal-version: 0.1.x` on `diffpal/action@v1`.
 - Fork PRs do not run: this is intentional when using secrets.
 
 ## GitLab CI
