@@ -176,14 +176,15 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	chunks := diffc.ChunkByLimits(enriched, opts.MaxPatchChars, opts.MaxFilesPerChunk)
 	reviewed := reviewedFiles(filtered)
 	bundle := findings.FindingsBundle{
-		Version:      findings.VersionV1,
-		ReviewID:     reviewID,
-		BaseSHA:      result.BaseSHA,
-		HeadSHA:      result.HeadSHA,
-		Language:     language,
-		ReviewChecks: append([]string(nil), reviewChecks...),
-		Files:        reviewed,
-		Findings:     []findings.Finding{},
+		Version:       findings.VersionV1,
+		ReviewID:      reviewID,
+		BaseSHA:       result.BaseSHA,
+		HeadSHA:       result.HeadSHA,
+		Language:      language,
+		ReviewChecks:  append([]string(nil), reviewChecks...),
+		ChangeSummary: findings.SemanticChangeSummary(reviewed),
+		Files:         reviewed,
+		Findings:      []findings.Finding{},
 	}
 	if len(chunks) == 0 {
 		return Result{
@@ -239,6 +240,9 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	bundle.ChangeSummary = normalizeChangeSummary(summaries)
+	if len(bundle.ChangeSummary) == 0 {
+		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
+	}
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)

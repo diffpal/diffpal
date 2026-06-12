@@ -175,7 +175,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
 }
 
-func TestRenderSummaryDoesNotUseFilesAsChangeOverview(t *testing.T) {
+func TestRenderSummaryFallsBackToSemanticChangeOverview(t *testing.T) {
 	t.Parallel()
 
 	got := RenderSummary(findings.FindingsBundle{
@@ -187,7 +187,8 @@ func TestRenderSummaryDoesNotUseFilesAsChangeOverview(t *testing.T) {
 	})
 
 	assertContains(t, got, "## Summary of Changes")
-	assertContains(t, got, "DiffPal could not generate a semantic change overview from the reviewed diff.")
+	assertContains(t, got, "- Updated user-facing documentation and setup guidance.")
+	assertContains(t, got, "- Updated DiffPal implementation files.")
 	assertNotContains(t, got, "Updated `README.md`.")
 	assertNotContains(t, got, "Updated `internal/app/service.go`.")
 }

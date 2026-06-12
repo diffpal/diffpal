@@ -100,12 +100,15 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 }
 
-func TestRunWithRuntimeDoesNotInventFileListChangeSummary(t *testing.T) {
+func TestRunWithRuntimeFallsBackToSemanticChangeSummary(t *testing.T) {
 	repo := newGitRepo(t)
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
-	runGitCmd(t, repo, "add", "main.go")
+	if err := os.MkdirAll(filepath.Join(repo, "docs"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(docs) error = %v", err)
+	}
+	writeRepoFile(t, filepath.Join(repo, "docs", "quickstart.md"), "before\n")
+	runGitCmd(t, repo, "add", "docs/quickstart.md")
 	runGitCmd(t, repo, "commit", "-m", "initial")
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+	writeRepoFile(t, filepath.Join(repo, "docs", "quickstart.md"), "after\n")
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
 		WorkingDir:       repo,
@@ -122,8 +125,12 @@ func TestRunWithRuntimeDoesNotInventFileListChangeSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
 	}
-	if len(result.Bundle.ChangeSummary) != 0 {
-		t.Fatalf("ChangeSummary = %v, want no invented file-list summary", result.Bundle.ChangeSummary)
+	got := strings.Join(result.Bundle.ChangeSummary, "\n")
+	if got != "Updated user-facing documentation and setup guidance." {
+		t.Fatalf("ChangeSummary = %v, want semantic fallback", result.Bundle.ChangeSummary)
+	}
+	if strings.Contains(got, "docs/quickstart.md") {
+		t.Fatalf("ChangeSummary contains file-list detail: %v", result.Bundle.ChangeSummary)
 	}
 }
 

@@ -140,7 +140,7 @@ func changeSummaryItems(bundle findings.FindingsBundle) []string {
 	if len(out) > 0 {
 		return out
 	}
-	return nil
+	return findings.SemanticChangeSummary(bundle.Files)
 }
 
 type feedbackRow struct {
