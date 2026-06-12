@@ -3,7 +3,7 @@ module github.com/diffpal/diffpal
 go 1.26.4
 
 require (
-	github.com/normahq/norma v0.0.5
+	github.com/normahq/norma v0.0.8
 	github.com/spf13/cobra v1.10.2
 )
 

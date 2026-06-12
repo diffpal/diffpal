@@ -113,9 +113,7 @@ func composeConfig(detected []string) string {
 			lines = append(lines, "      model: gpt-5.4-mini")
 		case "copilot-acp":
 			lines = append(lines, "    type: copilot_acp")
-			lines = append(lines, "    copilot_acp:")
-			lines = append(lines, "      extra_args:")
-			lines = append(lines, "        - --stdio")
+			lines = append(lines, "    copilot_acp: {}")
 		default:
 			blockName := providerTypeForKey(p)
 			lines = append(lines, "    type: "+blockName)

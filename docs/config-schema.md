@@ -21,9 +21,7 @@ defaults:
 providers:
   copilot-acp:
     type: copilot_acp
-    copilot_acp:
-      extra_args:
-        - --stdio
+    copilot_acp: {}
 
 policies:
   default:

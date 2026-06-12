@@ -62,7 +62,7 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 		t.Fatalf("composeConfig() should keep profiles/platform auth in templates only:\n%s", rendered)
 	}
 	for _, needle := range []string{
-		"      extra_args:\n        - --stdio",
+		"    copilot_acp: {}",
 		"  language: en",
 		"    - bugs",
 		"    - performance",
