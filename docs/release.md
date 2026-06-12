@@ -44,11 +44,12 @@ node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile defa
 `OMNIDIST_VERSION` from the pushed SemVer tag automatically. Major action aliases
 such as `v1` are not release triggers and should be pushed only after the SemVer
 release tag succeeds.
-NPM publishing uses trusted publishing/OIDC with provenance enabled.
+NPM publishing uses token auth from `NPM_PUBLISH_TOKEN`; trusted
+publishing/OIDC is not part of the current release path.
 Keep release credentials least-privilege and scoped to the one service that
 needs them. Do not echo token values, run commands with shell tracing, or copy
 secrets into artifacts/logs. Use GitHub Environment secrets with required
-reviewers for any non-OIDC credential that cannot be avoided.
+reviewers for publish credentials.
 Concrete controls:
 
 - Run `diffpal-review` only for same-repository pull requests; do not expose
@@ -83,7 +84,7 @@ npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts through trusted publishing/OIDC.
+5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
 6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
 7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
@@ -92,7 +93,7 @@ npm --prefix tasks/azure-devops run package:dev
 Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
-- Configure npm trusted publishing for `.github/workflows/omnidist-release.yml`.
+- Add `NPM_PUBLISH_TOKEN` for `.github/workflows/omnidist-release.yml`.
 - Add `COPILOT_GITHUB_TOKEN` as a protected Environment secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
