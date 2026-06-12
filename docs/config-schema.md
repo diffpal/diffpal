@@ -15,13 +15,13 @@ Later entries override earlier entries; CLI flags have the highest precedence.
 version: v1
 
 defaults:
-  provider: openai-fast
+  provider: copilot-acp
   policy: default
 
 providers:
-  openai-fast:
-    type: openai
-    openai:
+  copilot-acp:
+    type: copilot_acp
+    copilot_acp:
       model: gpt-5-mini
 
 policies:
@@ -31,6 +31,11 @@ policies:
 review:
   context_lines: 20
   max_files: 200
+  language: en
+  checks:
+    - bugs
+    - performance
+    - best-practices
   chunking:
     max_patch_chars: 12000
     max_files_per_chunk: 20
@@ -57,6 +62,8 @@ Environment overrides:
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
+- `DIFFPAL_REVIEW_LANGUAGE`
+- `DIFFPAL_REVIEW_CHECKS`
 
 Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
 are used for required values. Missing referenced variables fail config load, so
@@ -68,6 +75,10 @@ Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
 
+The default public onboarding provider is `copilot-acp`. Install it with
+`npm install --global @github/copilot@latest` and provide
+`COPILOT_GITHUB_TOKEN` in CI.
+
 `platforms.github.summary_comment.enabled` defaults to `true`. When `summary`
 mode is selected, DiffPal posts or updates a PR-level GitHub summary comment
 even if there are no findings.
@@ -75,3 +86,7 @@ even if there are no findings.
 Validation requires `version: v1`, a `defaults.provider` key present in
 `providers`, a `defaults.policy` key present in `policies`, and a valid
 `policies.<name>.block_on` severity.
+
+`review.language` defaults to `en`. `review.checks` defaults to
+`bugs`, `performance`, and `best-practices`; those values can be overridden by
+the `--language` and `--review-checks` review flags.

@@ -29,6 +29,8 @@ type Options struct {
 	MaxPatchChars    int
 	MaxFilesPerChunk int
 	BlockOn          string
+	Language         string
+	ReviewChecks     []string
 }
 
 type Result struct {
@@ -54,14 +56,16 @@ type ChunkFile struct {
 }
 
 type ChunkInput struct {
-	ReviewID    string      `json:"review_id"`
-	Repo        string      `json:"repo"`
-	BaseSHA     string      `json:"base_sha"`
-	HeadSHA     string      `json:"head_sha"`
-	ChunkIndex  int         `json:"chunk_index"`
-	ChunkCount  int         `json:"chunk_count"`
-	TestSummary string      `json:"test_summary"`
-	Files       []ChunkFile `json:"files"`
+	ReviewID     string      `json:"review_id"`
+	Repo         string      `json:"repo"`
+	BaseSHA      string      `json:"base_sha"`
+	HeadSHA      string      `json:"head_sha"`
+	ChunkIndex   int         `json:"chunk_index"`
+	ChunkCount   int         `json:"chunk_count"`
+	Language     string      `json:"language"`
+	ReviewChecks []string    `json:"review_checks"`
+	TestSummary  string      `json:"test_summary"`
+	Files        []ChunkFile `json:"files"`
 }
 
 type ChunkFinding struct {
@@ -79,7 +83,8 @@ type ChunkFinding struct {
 }
 
 type ChunkOutput struct {
-	Findings []ChunkFinding `json:"findings"`
+	ChangeSummary []string       `json:"change_summary,omitempty"`
+	Findings      []ChunkFinding `json:"findings"`
 }
 
 type RuntimeUsage struct {
@@ -140,6 +145,23 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if blockOn == "" {
 		blockOn = "high"
 	}
+	language := strings.TrimSpace(opts.Language)
+	if language == "" {
+		language = cfg.ReviewLanguage()
+	}
+	language, err = dpconfig.NormalizeReviewLanguage(language)
+	if err != nil {
+		return Result{}, wrapError(KindConfig, err)
+	}
+	reviewChecks := opts.ReviewChecks
+	if len(reviewChecks) == 0 {
+		reviewChecks = cfg.ReviewChecks()
+	}
+	reviewChecks, err = dpconfig.NormalizeReviewChecks(reviewChecks)
+	if err != nil {
+		return Result{}, wrapError(KindConfig, err)
+	}
+	allowedCategories := categoriesForReviewChecks(reviewChecks)
 	filtered := filterReviewableFiles(result.Files)
 	enriched, testSummary, err := diffc.EnrichWithWorkingDir(diff.DiffResult{
 		BaseSHA:      result.BaseSHA,
@@ -152,12 +174,17 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		return Result{}, wrapError(KindInternal, fmt.Errorf("enrich diff context: %w", err))
 	}
 	chunks := diffc.ChunkByLimits(enriched, opts.MaxPatchChars, opts.MaxFilesPerChunk)
+	reviewed := reviewedFiles(filtered)
 	bundle := findings.FindingsBundle{
-		Version:  findings.VersionV1,
-		ReviewID: reviewID,
-		BaseSHA:  result.BaseSHA,
-		HeadSHA:  result.HeadSHA,
-		Findings: []findings.Finding{},
+		Version:       findings.VersionV1,
+		ReviewID:      reviewID,
+		BaseSHA:       result.BaseSHA,
+		HeadSHA:       result.HeadSHA,
+		Language:      language,
+		ReviewChecks:  append([]string(nil), reviewChecks...),
+		ChangeSummary: findings.SemanticChangeSummary(reviewed),
+		Files:         reviewed,
+		Findings:      []findings.Finding{},
 	}
 	if len(chunks) == 0 {
 		return Result{
@@ -179,8 +206,9 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	collected := make([]findings.Finding, 0)
+	summaries := make([]string, 0, len(chunks))
 	for i, chunk := range chunks {
-		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, testSummary, i, len(chunks), chunk)
+		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, testSummary, i, len(chunks), chunk)
 		var output ChunkOutput
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
@@ -207,9 +235,14 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			}
 			return Result{}, err
 		}
-		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID())...)
+		summaries = append(summaries, output.ChangeSummary...)
+		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID(), allowedCategories)...)
 	}
 
+	bundle.ChangeSummary = normalizeChangeSummary(summaries)
+	if len(bundle.ChangeSummary) == 0 {
+		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
+	}
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
@@ -237,7 +270,52 @@ func filterReviewableFiles(files []diff.FileChange) []diff.FileChange {
 	return out
 }
 
-func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
+func reviewedFiles(files []diff.FileChange) []findings.ReviewedFile {
+	out := make([]findings.ReviewedFile, 0, len(files))
+	for _, file := range files {
+		path := strings.TrimSpace(file.ToPath)
+		if path == "" || path == "/dev/null" {
+			path = strings.TrimSpace(file.FromPath)
+		}
+		if path == "" || path == "/dev/null" {
+			continue
+		}
+		out = append(out, findings.ReviewedFile{
+			Path:   path,
+			Status: string(file.Status),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+func normalizeChangeSummary(items []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		item = strings.TrimPrefix(item, "- ")
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		key := strings.ToLower(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+	}
+	const maxSummaryItems = 8
+	if len(out) > maxSummaryItems {
+		return out[:maxSummaryItems]
+	}
+	return out
+}
+
+func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
 	files := make([]ChunkFile, 0, len(chunk.Files))
 	for _, file := range chunk.Files {
 		spans := make([]ChunkSpan, 0, len(file.Spans))
@@ -252,14 +330,16 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, testSummary string,
 		})
 	}
 	return ChunkInput{
-		ReviewID:    reviewID,
-		Repo:        repo,
-		BaseSHA:     baseSHA,
-		HeadSHA:     headSHA,
-		ChunkIndex:  chunkIndex,
-		ChunkCount:  chunkCount,
-		TestSummary: testSummary,
-		Files:       files,
+		ReviewID:     reviewID,
+		Repo:         repo,
+		BaseSHA:      baseSHA,
+		HeadSHA:      headSHA,
+		ChunkIndex:   chunkIndex,
+		ChunkCount:   chunkCount,
+		Language:     language,
+		ReviewChecks: append([]string(nil), reviewChecks...),
+		TestSummary:  testSummary,
+		Files:        files,
 	}
 }
 
@@ -286,7 +366,7 @@ func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig
 	return out
 }
 
-func validateChunkFindings(items []ChunkFinding, files []ChunkFile, providerID string) []findings.Finding {
+func validateChunkFindings(items []ChunkFinding, files []ChunkFile, providerID string, allowedCategories map[string]struct{}) []findings.Finding {
 	if len(items) == 0 {
 		return nil
 	}
@@ -300,7 +380,29 @@ func validateChunkFindings(items []ChunkFinding, files []ChunkFile, providerID s
 		if !ok {
 			continue
 		}
+		if _, ok := allowedCategories[finding.Category]; !ok {
+			continue
+		}
 		out = append(out, finding)
+	}
+	return out
+}
+
+func categoriesForReviewChecks(checks []string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, check := range checks {
+		switch check {
+		case "bugs":
+			out["security"] = struct{}{}
+			out["correctness"] = struct{}{}
+			out["reliability"] = struct{}{}
+		case "performance":
+			out["performance"] = struct{}{}
+		case "best-practices":
+			out["maintainability"] = struct{}{}
+			out["testing"] = struct{}{}
+			out["style"] = struct{}{}
+		}
 	}
 	return out
 }

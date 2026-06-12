@@ -50,5 +50,6 @@
 - Go toolchain minimum: `1.26`
 - Language of CLI defaults to `review` mode flows and findings JSON outputs.
 - Primary review modes are `local`, `github`, `gitlab`, and `ado`.
-- Policy/host publish behavior is configurable by review `--mode`.
+- User-facing host output behavior is configurable by review `--feedback`;
+  advanced publish surfaces remain configurable by `--mode`.
 - Merge gating is based on `check/status` style surfaces, not bot approval semantics.

@@ -5,6 +5,18 @@ branding:
   icon: check-circle
   color: blue
 inputs:
+  install:
+    description: Install @diffpal/diffpal before running the review.
+    required: false
+    default: "true"
+  diffpal-version:
+    description: npm version or dist-tag for @diffpal/diffpal.
+    required: false
+    default: latest
+  diffpal-path:
+    description: Path to an existing diffpal binary. Custom paths skip automatic installation.
+    required: false
+    default: diffpal
   base:
     description: Base revision passed to diffpal review github.
     required: true
@@ -31,6 +43,26 @@ inputs:
     description: Comma-separated GitHub publish modes.
     required: false
     default: ""
+  feedback:
+    description: Review feedback shape. Use summary, balanced, or inline.
+    required: false
+    default: balanced
+  summary-overview:
+    description: Include a semantic change overview in review summaries.
+    required: false
+    default: "true"
+  out:
+    description: Output findings bundle path.
+    required: false
+    default: ""
+  repo:
+    description: Repository id for deterministic fingerprints.
+    required: false
+    default: ""
+  review-id:
+    description: Review identifier for deterministic outputs.
+    required: false
+    default: ""
   max-files:
     description: Maximum files from diff.
     required: false
@@ -47,9 +79,25 @@ inputs:
     description: Maximum files per context chunk.
     required: false
     default: ""
+  language:
+    description: Language for generated review findings.
+    required: false
+    default: ""
+  review-checks:
+    description: Comma-separated checks to run: bugs, performance, best-practices.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
+    - name: Install DiffPal
+      shell: bash
+      env:
+        INPUT_INSTALL: ${{ inputs.install }}
+        INPUT_DIFFPAL_VERSION: ${{ inputs.diffpal-version }}
+        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
+      run: ${{ github.action_path }}/tasks/github/install-diffpal.sh
+
     - name: Run DiffPal review
       shell: bash
       env:
@@ -60,8 +108,15 @@ runs:
         INPUT_BLOCK_ON: ${{ inputs.block-on }}
         INPUT_GATE: ${{ inputs.gate }}
         INPUT_MODE: ${{ inputs.mode }}
+        INPUT_FEEDBACK: ${{ inputs.feedback }}
+        INPUT_SUMMARY_OVERVIEW: ${{ inputs.summary-overview }}
+        INPUT_OUT: ${{ inputs.out }}
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_REVIEW_ID: ${{ inputs.review-id }}
         INPUT_MAX_FILES: ${{ inputs.max-files }}
         INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
         INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}
         INPUT_MAX_FILES_PER_CHUNK: ${{ inputs.max-files-per-chunk }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_REVIEW_CHECKS: ${{ inputs.review-checks }}
       run: ${{ github.action_path }}/tasks/github/run-diffpal-review.sh

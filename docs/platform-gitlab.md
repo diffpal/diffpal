@@ -1,5 +1,9 @@
 # GitLab Adapter Contract (v1)
 
+For a copy-paste GitLab CI setup, start with the
+[CI setup guide](ci-examples.md#gitlab-ci). This page documents adapter
+behavior and publishing semantics.
+
 ## Context resolution
 
 `Review` and `publish` for GitLab resolve target PR context in this precedence:
@@ -19,6 +23,15 @@ Required context:
   - `gitlab_token` when a dedicated API token is configured
 
 ## Discussion publisher
+
+Normal CI setup should use `--feedback`:
+
+- `summary`: posts Code Quality/SARIF artifacts and one MR summary discussion.
+- `balanced`: adds high-confidence actionable discussions for blocking findings.
+- `inline`: uses a more permissive inline threshold for actionable findings.
+
+Advanced `--mode` values still exist for direct surface selection and override
+`--feedback` when set.
 
 Severity to discussion policy:
 

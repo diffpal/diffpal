@@ -92,13 +92,14 @@ func writeIfMissing(path, content string, force bool) error {
 
 func composeConfig(detected []string) string {
 	if len(detected) == 0 {
-		detected = []string{"openai-fast"}
+		detected = []string{"copilot-acp"}
 	}
+	defaultProvider := selectedDefaultProvider(detected)
 	lines := []string{
 		"version: v1",
 		"",
 		"defaults:",
-		fmt.Sprintf("  provider: %s", detected[0]),
+		fmt.Sprintf("  provider: %s", defaultProvider),
 		"  policy: default",
 		"",
 		"providers:",
@@ -110,6 +111,10 @@ func composeConfig(detected []string) string {
 			lines = append(lines, "    type: openai")
 			lines = append(lines, "    openai:")
 			lines = append(lines, "      model: gpt-5.4-mini")
+		case "copilot-acp":
+			lines = append(lines, "    type: copilot_acp")
+			lines = append(lines, "    copilot_acp:")
+			lines = append(lines, "      model: gpt-5-mini")
 		default:
 			blockName := providerTypeForKey(p)
 			lines = append(lines, "    type: "+blockName)
@@ -125,11 +130,25 @@ func composeConfig(detected []string) string {
 	lines = append(lines, "review:")
 	lines = append(lines, "  context_lines: 20")
 	lines = append(lines, "  max_files: 200")
+	lines = append(lines, "  language: en")
+	lines = append(lines, "  checks:")
+	lines = append(lines, "    - bugs")
+	lines = append(lines, "    - performance")
+	lines = append(lines, "    - best-practices")
 	lines = append(lines, "  chunking:")
 	lines = append(lines, "    max_patch_chars: 12000")
 	lines = append(lines, "    max_files_per_chunk: 20")
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
+}
+
+func selectedDefaultProvider(detected []string) string {
+	for _, provider := range detected {
+		if provider == "copilot-acp" {
+			return provider
+		}
+	}
+	return detected[0]
 }
 
 type configTemplate struct {

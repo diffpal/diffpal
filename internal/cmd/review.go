@@ -81,6 +81,8 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 	cmd.Flags().Int("context-lines", 0, "Context lines to enrich each changed file")
 	cmd.Flags().Int("max-patch-chars", 12000, "Maximum context characters per chunk")
 	cmd.Flags().Int("max-files-per-chunk", 20, "Maximum files per context chunk")
+	cmd.Flags().String("language", "", "Language for generated review findings")
+	cmd.Flags().String("review-checks", "", "Comma-separated checks to run: bugs, performance, best-practices")
 	cmd.Flags().String("out", findings.DefaultBundlePath, "Output findings bundle path")
 	cmd.Flags().String("repo", "local", "Repository id for deterministic fingerprints")
 	cmd.Flags().String("review-id", defaultReviewID, "Review identifier for deterministic outputs")
@@ -88,6 +90,8 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 
 func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
+	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
+	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -114,13 +118,21 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 }
 
 func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
+	modeSpec, _ := cmd.Flags().GetString("mode")
+	modes := parseModeList(modeSpec)
+	feedback, _ := cmd.Flags().GetString("feedback")
+	summaryOverview, _ := cmd.Flags().GetBool("summary-overview")
+	if len(modes) == 0 {
+		if _, err := normalizeFeedback(feedback); err != nil {
+			return withExitCode(2, err)
+		}
+	}
+
 	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
 		return err
 	}
 
-	modeSpec, _ := cmd.Flags().GetString("mode")
-	modes := parseModeList(modeSpec)
 	blocking := countBlockingFindings(execution.Result.Bundle)
 
 	if platform == "github" && shouldSkipGitHubPublish(execution.Config, execution.Result.Bundle) {
@@ -139,7 +151,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return nil
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, "")
+	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "")
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -147,7 +159,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback, summaryOverview); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -175,6 +187,8 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	contextLines, _ := cmd.Flags().GetInt("context-lines")
 	maxPatchChars, _ := cmd.Flags().GetInt("max-patch-chars")
 	maxFilesPerChunk, _ := cmd.Flags().GetInt("max-files-per-chunk")
+	language, _ := cmd.Flags().GetString("language")
+	reviewChecksSpec, _ := cmd.Flags().GetString("review-checks")
 	outPath, _ := cmd.Flags().GetString("out")
 	repo, _ := cmd.Flags().GetString("repo")
 	reviewID, _ := cmd.Flags().GetString("review-id")
@@ -194,6 +208,19 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	}
 	if !cmd.Flags().Changed("max-files-per-chunk") {
 		maxFilesPerChunk = cfg.Review.Chunking.MaxFilesPerChunk
+	}
+	if !cmd.Flags().Changed("language") {
+		language = cfg.ReviewLanguage()
+	}
+	var reviewChecks []string
+	if cmd.Flags().Changed("review-checks") {
+		var err error
+		reviewChecks, err = config.NormalizeReviewChecks(parseModeList(reviewChecksSpec))
+		if err != nil {
+			return reviewExecution{}, withExitCode(2, err)
+		}
+	} else {
+		reviewChecks = cfg.ReviewChecks()
 	}
 	blockOn := cfg.BlockOn()
 	flagValue, _ := cmd.Flags().GetString("block-on")
@@ -224,6 +251,8 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		MaxPatchChars:    maxPatchChars,
 		MaxFilesPerChunk: maxFilesPerChunk,
 		BlockOn:          blockOn,
+		Language:         language,
+		ReviewChecks:     reviewChecks,
 	})
 	if err != nil {
 		return reviewExecution{}, reviewExitError(err)
@@ -303,13 +332,16 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if len(modes) == 0 {
-		modes = defaultModes(platform)
+	resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
+	if err != nil {
+		return err
 	}
+	modes = resolvedModes
+	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
 
 	switch platform {
 	case "github":
@@ -321,13 +353,13 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		commentPlan := github.PlanInlineComments(existingComments, bundle.Findings)
+		commentPlan := github.PlanInlineCommentsWithProfile(existingComments, bundle.Findings, string(profile))
 		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
 				case "check_run":
-					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, github.CheckRunSummary(bundle)), nil); err != nil {
+					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, summary), nil); err != nil {
 						return err
 					}
 				case "github_comments":
@@ -338,7 +370,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					if !summaryCommentEnabled {
 						continue
 					}
-					if err := github.PublishSummaryComment(ctx, token, reviewCtx, github.CheckRunSummary(bundle), nil); err != nil {
+					if err := github.PublishSummaryComment(ctx, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
 				}
@@ -358,11 +390,15 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
-				if normalizePublishMode(platform, mode) != "discussions" {
-					continue
-				}
-				if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
-					return err
+				switch normalizePublishMode(platform, mode) {
+				case "discussions":
+					if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if err := gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -376,7 +412,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
+		plan := azure.PlanThreadsWithProfile(existing, bundle.Findings, reviewCtx, string(profile))
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {
@@ -388,6 +424,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					}
 				case "status":
 					if err := azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
+						return err
+					}
+				case "summary":
+					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
 				}

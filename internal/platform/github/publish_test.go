@@ -169,9 +169,10 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	}
 
 	summary := CheckRunSummary(bundle)
-	assertStringContains(t, summary, "# DiffPal Findings Summary", "title")
-	assertStringContains(t, summary, "## CRITICAL (1)", "severity section")
-	assertStringContains(t, summary, "### internal/db/query.go", "file section")
+	assertStringContains(t, summary, "# DiffPal Review Summary", "title")
+	assertStringContains(t, summary, "## Feedback on Files", "file feedback section")
+	assertStringContains(t, summary, "| `internal/db/query.go` | Needs attention | critical: 1 |", "file feedback row")
+	assertStringContains(t, summary, "## Detailed Comments", "detailed comments")
 }
 
 func assertStringContains(t *testing.T, got, want, label string) {

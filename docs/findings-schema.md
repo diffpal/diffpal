@@ -8,6 +8,10 @@ Required fields:
 - `review_id`
 - `base_sha`
 - `head_sha`
+- `language` (optional)
+- `review_checks[]` (optional)
+- `change_summary[]` (optional human-readable overview bullets)
+- `files[]` (optional reviewed file list)
 - `findings[]` with per-item fields:
   - `rule_id`
   - `category`

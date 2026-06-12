@@ -9,6 +9,7 @@ import (
 )
 
 const MinThreadConfidence = 0.8
+const MinExpandedThreadConfidence = 0.65
 
 type ThreadActionType string
 
@@ -45,10 +46,18 @@ type ThreadPlan struct {
 }
 
 func PlanThreads(existing map[string]string, findingsList []findings.Finding, ctx Context) ThreadPlan {
+	return PlanThreadsWithProfile(existing, findingsList, ctx, "")
+}
+
+func PlanThreadsWithProfile(existing map[string]string, findingsList []findings.Finding, ctx Context, profile string) ThreadPlan {
+	return planThreads(existing, findingsList, ctx, threadConfidenceThreshold(profile))
+}
+
+func planThreads(existing map[string]string, findingsList []findings.Finding, ctx Context, minConfidence float64) ThreadPlan {
 	out := make([]ThreadAction, 0, len(findingsList))
 	state := make([]ThreadState, 0, len(findingsList))
 	for _, f := range findingsList {
-		if f.Path == "" || f.StartLine <= 0 || f.RuleID == "" || f.Confidence < MinThreadConfidence {
+		if f.Path == "" || f.StartLine <= 0 || f.RuleID == "" || f.Confidence < minConfidence {
 			continue
 		}
 		key := threadKey(f.Path, f.StartLine, f.RuleID)
@@ -79,6 +88,13 @@ func PlanThreads(existing map[string]string, findingsList []findings.Finding, ct
 			HeadSHA:       ctx.HeadSHA,
 		},
 	}
+}
+
+func threadConfidenceThreshold(profile string) float64 {
+	if profile == "inline" {
+		return MinExpandedThreadConfidence
+	}
+	return MinThreadConfidence
 }
 
 func threadKey(path string, line int, ruleID string) string {

@@ -5,6 +5,10 @@ Public CLI naming uses `ado`; config uses `azure`:
 - command: `diffpal review ado`
 - config: `platforms.azure`
 
+For a copy-paste Azure Pipelines setup, start with the
+[CI setup guide](ci-examples.md#azure-pipelines). This page documents adapter
+behavior and task requirements.
+
 ## Context resolution
 
 `Azure` context is resolved from:
@@ -54,9 +58,14 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 ## Token and setup guidance
 
 - The `DiffPalReview@1` task expects the `diffpal` CLI to be installed before
-  the task runs. Pin the CLI to an audited SemVer version, for example
-  `npm install @diffpal/diffpal@1.2.3`, then `diffpalPath:
+  the task runs. Install the CLI and Copilot provider with npm, for example
+  `npm install --global @diffpal/diffpal@latest @github/copilot@latest`.
+  If you use a local project install, set `diffpalPath:
   ./node_modules/.bin/diffpal`.
+- Optional task inputs `language`, `reviewChecks`, and `feedback` map to the
+  CLI flags `--language`, `--review-checks`, and `--feedback`.
+- `feedback: balanced` is the default and publishes status, a PR summary
+  thread, and actionable high-confidence inline threads.
 - Config auth values:
   - `platforms.azure.auth.system_access_token`
   - `platforms.azure.auth.pat`
@@ -66,4 +75,4 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - Azure Pipelines must enable `Allow scripts to access the OAuth token` so `SYSTEM_ACCESSTOKEN` is present.
 - Keep token scope to PR validation service connections or project defaults.
 - Avoid broad service permissions in non-interactive PR contexts.
-- A typical rerun flow is: `review ado` recomputes the findings bundle, then `threads` and `status` reconcile against the same PR/base/head pair instead of creating duplicate thread keys.
+- A typical rerun flow is: `review ado` recomputes the findings bundle, then `summary`, `threads`, and `status` reconcile against the same PR/base/head pair instead of creating duplicate thread keys.

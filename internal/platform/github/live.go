@@ -89,7 +89,8 @@ func PublishSummaryComment(ctx context.Context, token string, reviewCtx Context,
 		return err
 	}
 	if existingID > 0 {
-		return platformapi.DoJSON(ctx, client, http.MethodPatch, baseURL+"/"+fmt.Sprint(existingID), headers, map[string]any{"body": body})
+		updateURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/issues/comments/" + fmt.Sprint(existingID)
+		return platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body})
 	}
 	return platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, map[string]any{"body": body})
 }

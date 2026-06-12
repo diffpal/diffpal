@@ -9,6 +9,7 @@ import (
 )
 
 const MinInlineConfidence = 0.8
+const MinExpandedInlineConfidence = 0.65
 
 type CommentActionType string
 
@@ -37,13 +38,21 @@ type CommentPlan struct {
 }
 
 func PlanInlineComments(existing map[string]string, findings []findings.Finding) CommentPlan {
+	return PlanInlineCommentsWithProfile(existing, findings, "")
+}
+
+func PlanInlineCommentsWithProfile(existing map[string]string, findings []findings.Finding, profile string) CommentPlan {
+	return planInlineComments(existing, findings, inlineConfidenceThreshold(profile))
+}
+
+func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64) CommentPlan {
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
 		if f.RuleID == "" || f.Path == "" {
 			continue
 		}
-		if f.StartLine <= 0 || f.Confidence < MinInlineConfidence {
+		if f.StartLine <= 0 || f.Confidence < minConfidence {
 			continue
 		}
 		key := commentKey(f.Path, f.StartLine, f.RuleID)
@@ -67,6 +76,13 @@ func PlanInlineComments(existing map[string]string, findings []findings.Finding)
 		Actions: out,
 		State:   state,
 	}
+}
+
+func inlineConfidenceThreshold(profile string) float64 {
+	if profile == "inline" {
+		return MinExpandedInlineConfidence
+	}
+	return MinInlineConfidence
 }
 
 func LoadExistingState(path string) (map[string]string, error) {

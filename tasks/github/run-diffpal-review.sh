@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v diffpal >/dev/null 2>&1; then
-  echo "diffpal binary was not found on PATH" >&2
+diffpal_bin="${DIFFPAL_BIN:-diffpal}"
+
+if ! command -v "$diffpal_bin" >/dev/null 2>&1; then
+  echo "diffpal binary was not found: $diffpal_bin" >&2
   exit 127
 fi
 
@@ -29,7 +31,7 @@ truthy() {
 require_input "base" "${INPUT_BASE:-}"
 require_input "head" "${INPUT_HEAD:-}"
 
-argv=(diffpal)
+argv=("$diffpal_bin")
 
 if [[ -n "${INPUT_CONFIG_DIR:-}" ]]; then
   argv+=(--config-dir "$INPUT_CONFIG_DIR")
@@ -48,6 +50,12 @@ if truthy "${INPUT_GATE:-false}"; then
 fi
 if [[ -n "${INPUT_MODE:-}" ]]; then
   argv+=(--mode "$INPUT_MODE")
+fi
+if [[ -z "${INPUT_MODE:-}" && -n "${INPUT_FEEDBACK:-}" ]]; then
+  argv+=(--feedback "$INPUT_FEEDBACK")
+fi
+if ! truthy "${INPUT_SUMMARY_OVERVIEW:-true}"; then
+  argv+=(--summary-overview=false)
 fi
 if [[ -n "${INPUT_OUT:-}" ]]; then
   argv+=(--out "$INPUT_OUT")
@@ -69,6 +77,12 @@ if [[ -n "${INPUT_MAX_PATCH_CHARS:-}" ]]; then
 fi
 if [[ -n "${INPUT_MAX_FILES_PER_CHUNK:-}" ]]; then
   argv+=(--max-files-per-chunk "$INPUT_MAX_FILES_PER_CHUNK")
+fi
+if [[ -n "${INPUT_LANGUAGE:-}" ]]; then
+  argv+=(--language "$INPUT_LANGUAGE")
+fi
+if [[ -n "${INPUT_REVIEW_CHECKS:-}" ]]; then
+  argv+=(--review-checks "$INPUT_REVIEW_CHECKS")
 fi
 
 exec "${argv[@]}"
