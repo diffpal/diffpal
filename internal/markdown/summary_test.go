@@ -11,33 +11,49 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	t.Parallel()
 
 	bundle := findings.FindingsBundle{
-		ReviewID: "review-123",
-		BaseSHA:  "base-1",
-		HeadSHA:  "head-1",
+		ReviewID:     "review-123",
+		BaseSHA:      "base-1",
+		HeadSHA:      "head-1",
+		Language:     "en",
+		ReviewChecks: []string{"bugs", "performance", "best-practices"},
+		Files: []findings.ReviewedFile{
+			{Path: "internal/app/service.go"},
+			{Path: "internal/db/query.go"},
+			{Path: "internal/web/handler.go"},
+		},
 		Findings: []findings.Finding{
 			{
 				RuleID:    "security.sql",
 				Severity:  "high",
+				Blocking:  true,
 				Path:      "internal/db/query.go",
 				StartLine: 20,
 				EndLine:   20,
+				Title:     "unsafe query",
 				Message:   "query concatenates untrusted input",
+				Evidence:  "db.Query(\"select \" + input)",
 			},
 			{
 				RuleID:    "security.sql",
 				Severity:  "high",
+				Blocking:  true,
 				Path:      "internal/db/query.go",
 				StartLine: 28,
 				EndLine:   28,
+				Title:     "second unsafe query",
 				Message:   "second unsafe SQL sink",
+				Evidence:  "db.Query(raw)",
 			},
 			{
 				RuleID:    "correctness.nil",
 				Severity:  "critical",
+				Blocking:  true,
 				Path:      "internal/app/service.go",
 				StartLine: 8,
 				EndLine:   8,
+				Title:     "nil dereference",
 				Message:   "possible nil dereference",
+				Evidence:  "cfg.Client.Do(req)",
 			},
 			{
 				RuleID:    "maintainability.deadcode",
@@ -45,31 +61,32 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				Path:      "internal/app/service.go",
 				StartLine: 41,
 				EndLine:   41,
+				Title:     "unreachable branch",
 				Message:   "branch is unreachable",
+				Evidence:  "return before if",
 			},
 		},
 	}
 
 	got := RenderSummary(bundle)
 
-	assertContains(t, got, "# DiffPal Findings Summary")
+	assertContains(t, got, "# DiffPal Review Summary")
 	assertContains(t, got, "review_id: review-123")
-	assertContains(t, got, "## CRITICAL (1)")
+	assertContains(t, got, "## Summary of Changes")
+	assertContains(t, got, "- Reviewed files: 3")
+	assertContains(t, got, "- Findings: 4")
+	assertContains(t, got, "- Blocking findings: 3")
+	assertContains(t, got, "- Review checks: bugs, performance, best-practices")
+	assertContains(t, got, "## Feedback on Files")
+	assertContains(t, got, "| `internal/app/service.go` | Blocked | critical: 1, low: 1 |")
+	assertContains(t, got, "| `internal/db/query.go` | Blocked | high: 2 |")
+	assertContains(t, got, "| `internal/web/handler.go` | Passed | No actionable findings. |")
+	assertContains(t, got, "## Detailed Comments")
 	assertContains(t, got, "### internal/app/service.go")
-	assertContains(t, got, "- `correctness.nil` (1)")
-	assertContains(t, got, "## HIGH (2)")
+	assertContains(t, got, "- **[critical][correctness.nil]** `L8`: possible nil dereference")
+	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
 	assertContains(t, got, "### internal/db/query.go")
-	assertContains(t, got, "- `security.sql` (2)")
-	assertContains(t, got, "  - [20-20] query concatenates untrusted input")
-	assertContains(t, got, "  - [28-28] second unsafe SQL sink")
-	assertContains(t, got, "## LOW (1)")
-
-	if strings.Index(got, "## CRITICAL") > strings.Index(got, "## HIGH") {
-		t.Fatalf("severity order is unstable:\n%s", got)
-	}
-	if strings.Index(got, "## HIGH") > strings.Index(got, "## LOW") {
-		t.Fatalf("severity order is unstable:\n%s", got)
-	}
+	assertContains(t, got, "- **[high][security.sql]** `L20`: query concatenates untrusted input")
 }
 
 func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
@@ -77,11 +94,18 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 
 	got := RenderSummary(findings.FindingsBundle{
 		ReviewID: "review-empty",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/app/service.go"},
+		},
 	})
 
-	assertContains(t, got, "# DiffPal Findings Summary")
+	assertContains(t, got, "# DiffPal Review Summary")
 	assertContains(t, got, "review_id: review-empty")
-	assertContains(t, got, "No findings.")
+	assertContains(t, got, "DiffPal found no actionable issues in the reviewed diff.")
+	assertContains(t, got, "| `internal/app/service.go` | Passed | No actionable findings. |")
+	if strings.Contains(got, "## Detailed Comments") {
+		t.Fatalf("empty summary includes detailed comments:\n%s", got)
+	}
 }
 
 func assertContains(t *testing.T, got string, want string) {

@@ -44,6 +44,8 @@ type PolicyConfig struct {
 type ReviewConfig struct {
 	ContextLines int            `json:"context_lines" yaml:"context_lines" mapstructure:"context_lines"`
 	MaxFiles     int            `json:"max_files"     yaml:"max_files"     mapstructure:"max_files"`
+	Language     string         `json:"language"      yaml:"language"      mapstructure:"language"`
+	Checks       []string       `json:"checks"        yaml:"checks"        mapstructure:"checks"`
 	Chunking     ChunkingConfig `json:"chunking"      yaml:"chunking"      mapstructure:"chunking"`
 }
 
@@ -104,6 +106,8 @@ var validSeverityThresholds = map[string]struct{}{
 	"critical": {},
 }
 
+var defaultReviewChecks = []string{"bugs", "performance", "best-practices"}
+
 func LoadConfig(workingDir, configDir, profile string) (Config, error) {
 	loaded, err := LoadConfigWithMetadata(workingDir, configDir, profile)
 	if err != nil {
@@ -154,6 +158,9 @@ func LoadConfigWithMetadata(workingDir, configDir, profile string) (LoadedConfig
 	if err := cfg.ApplyEnvOverrides(); err != nil {
 		return LoadedConfig{}, err
 	}
+	if err := cfg.Normalize(); err != nil {
+		return LoadedConfig{}, err
+	}
 	if err := cfg.Validate(); err != nil {
 		return LoadedConfig{}, err
 	}
@@ -194,9 +201,29 @@ func (cfg Config) Validate() error {
 	if _, ok := validSeverityThresholds[policyCfg.BlockOn]; !ok {
 		return fmt.Errorf("invalid policies.%s.block_on %q", policyName, policyCfg.BlockOn)
 	}
+	if _, err := NormalizeReviewLanguage(cfg.Review.Language); err != nil {
+		return err
+	}
+	if _, err := NormalizeReviewChecks(cfg.Review.Checks); err != nil {
+		return err
+	}
 	if err := cfg.Platforms.Validate(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (cfg *Config) Normalize() error {
+	language, err := NormalizeReviewLanguage(cfg.Review.Language)
+	if err != nil {
+		return err
+	}
+	checks, err := NormalizeReviewChecks(cfg.Review.Checks)
+	if err != nil {
+		return err
+	}
+	cfg.Review.Language = language
+	cfg.Review.Checks = checks
 	return nil
 }
 
@@ -218,6 +245,22 @@ func (cfg Config) BlockOn() string {
 		return ""
 	}
 	return strings.TrimSpace(policyCfg.BlockOn)
+}
+
+func (cfg Config) ReviewLanguage() string {
+	language, err := NormalizeReviewLanguage(cfg.Review.Language)
+	if err != nil {
+		return "en"
+	}
+	return language
+}
+
+func (cfg Config) ReviewChecks() []string {
+	checks, err := NormalizeReviewChecks(cfg.Review.Checks)
+	if err != nil {
+		return append([]string(nil), defaultReviewChecks...)
+	}
+	return checks
 }
 
 func (cfg *Config) ApplyEnvOverrides() error {
@@ -247,7 +290,74 @@ func (cfg *Config) ApplyEnvOverrides() error {
 		}
 		cfg.Review.ContextLines = parsed
 	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_LANGUAGE")); value != "" {
+		cfg.Review.Language = value
+	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CHECKS")); value != "" {
+		cfg.Review.Checks = splitCommaList(value)
+	}
 	return nil
+}
+
+func NormalizeReviewLanguage(value string) (string, error) {
+	language := strings.TrimSpace(value)
+	if language == "" {
+		return "en", nil
+	}
+	if strings.ContainsAny(language, "\r\n") {
+		return "", fmt.Errorf("review.language must be a single line")
+	}
+	return language, nil
+}
+
+func NormalizeReviewChecks(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return append([]string(nil), defaultReviewChecks...), nil
+	}
+	selected := map[string]struct{}{}
+	for _, raw := range values {
+		for _, part := range splitCommaList(raw) {
+			check, ok := canonicalReviewCheck(part)
+			if !ok {
+				return nil, fmt.Errorf("invalid review.checks value %q; supported values are bugs, performance, best-practices", part)
+			}
+			selected[check] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		return append([]string(nil), defaultReviewChecks...), nil
+	}
+	out := make([]string, 0, len(defaultReviewChecks))
+	for _, check := range defaultReviewChecks {
+		if _, ok := selected[check]; ok {
+			out = append(out, check)
+		}
+	}
+	return out, nil
+}
+
+func canonicalReviewCheck(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "bug", "bugs":
+		return "bugs", true
+	case "perf", "performance":
+		return "performance", true
+	case "best-practice", "best-practices", "best_practice", "best_practices", "practices":
+		return "best-practices", true
+	default:
+		return "", false
+	}
+}
+
+func splitCommaList(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func parseNonNegativeEnvInt(name, value string) (int, error) {

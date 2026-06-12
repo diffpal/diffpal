@@ -25,6 +25,7 @@ cover.out
 .cache/
 .gocache/
 .gomodcache/
+.taskkey
 
 # Node build outputs
 node_modules/

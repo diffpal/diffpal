@@ -55,6 +55,12 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if len(runtime.inputs) != 1 {
 		t.Fatalf("runtime calls = %d, want 1", len(runtime.inputs))
 	}
+	if runtime.inputs[0].Language != "en" {
+		t.Fatalf("runtime input language = %q, want en", runtime.inputs[0].Language)
+	}
+	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "bugs,performance,best-practices" {
+		t.Fatalf("runtime input review checks = %v, want defaults", runtime.inputs[0].ReviewChecks)
+	}
 	if result.ChangedFiles != 1 || result.ReviewableFiles != 1 {
 		t.Fatalf("file counts = changed %d reviewable %d, want 1/1", result.ChangedFiles, result.ReviewableFiles)
 	}
@@ -76,6 +82,91 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if got.ReviewID != "review-a" {
 		t.Fatalf("ReviewID = %q, want review-a", got.ReviewID)
+	}
+	if result.Bundle.Language != "en" {
+		t.Fatalf("Bundle.Language = %q, want en", result.Bundle.Language)
+	}
+	if strings.Join(result.Bundle.ReviewChecks, ",") != "bugs,performance,best-practices" {
+		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
+	}
+	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
+		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
+	}
+}
+
+func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	runtime := &fakeRuntime{
+		outputs: []ChunkOutput{{
+			Findings: []ChunkFinding{
+				{
+					RuleID:     "correctness.behavior-change",
+					Category:   "correctness",
+					Severity:   "high",
+					Confidence: 0.94,
+					Path:       "main.go",
+					StartLine:  4,
+					EndLine:    4,
+					Title:      "behavior changed",
+					Message:    "the output changed",
+					Evidence:   "line 4 changed",
+				},
+				{
+					RuleID:     "performance.extra-output",
+					Category:   "performance",
+					Severity:   "high",
+					Confidence: 0.9,
+					Path:       "main.go",
+					StartLine:  4,
+					EndLine:    4,
+					Title:      "performance finding",
+					Message:    "performance should be filtered",
+					Evidence:   "line 4 changed",
+				},
+			},
+		}},
+	}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-checks",
+		ReviewID:         "review-checks",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+		Language:         "Russian",
+		ReviewChecks:     []string{"bugs"},
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %d, want 1", len(runtime.inputs))
+	}
+	if runtime.inputs[0].Language != "Russian" {
+		t.Fatalf("runtime input language = %q, want Russian", runtime.inputs[0].Language)
+	}
+	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "bugs" {
+		t.Fatalf("runtime input review checks = %v, want [bugs]", runtime.inputs[0].ReviewChecks)
+	}
+	if result.Bundle.Language != "Russian" {
+		t.Fatalf("Bundle.Language = %q, want Russian", result.Bundle.Language)
+	}
+	if strings.Join(result.Bundle.ReviewChecks, ",") != "bugs" {
+		t.Fatalf("Bundle.ReviewChecks = %v, want [bugs]", result.Bundle.ReviewChecks)
+	}
+	if len(result.Bundle.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
+	}
+	if result.Bundle.Findings[0].Category != "correctness" {
+		t.Fatalf("finding category = %q, want correctness", result.Bundle.Findings[0].Category)
 	}
 }
 

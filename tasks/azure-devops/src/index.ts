@@ -85,6 +85,8 @@ async function run(): Promise<void> {
     args.push("--gate");
   }
   addOptional(args, "--mode", input("mode"));
+  addOptional(args, "--language", input("language"));
+  addOptional(args, "--review-checks", input("reviewChecks"));
   addOptional(args, "--out", input("out"));
   addOptional(args, "--repo", input("repo"));
   addOptional(args, "--review-id", input("reviewId"));

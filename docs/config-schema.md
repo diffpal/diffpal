@@ -31,6 +31,11 @@ policies:
 review:
   context_lines: 20
   max_files: 200
+  language: en
+  checks:
+    - bugs
+    - performance
+    - best-practices
   chunking:
     max_patch_chars: 12000
     max_files_per_chunk: 20
@@ -57,6 +62,8 @@ Environment overrides:
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
+- `DIFFPAL_REVIEW_LANGUAGE`
+- `DIFFPAL_REVIEW_CHECKS`
 
 Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
 are used for required values. Missing referenced variables fail config load, so
@@ -75,3 +82,7 @@ even if there are no findings.
 Validation requires `version: v1`, a `defaults.provider` key present in
 `providers`, a `defaults.policy` key present in `policies`, and a valid
 `policies.<name>.block_on` severity.
+
+`review.language` defaults to `en`. `review.checks` defaults to
+`bugs`, `performance`, and `best-practices`; those values can be overridden by
+the `--language` and `--review-checks` review flags.

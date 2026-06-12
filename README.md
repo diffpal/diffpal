@@ -56,7 +56,7 @@ This repository includes the canonical CLI command tree:
 ```bash
 diffpal init
 diffpal doctor
-diffpal review local --base origin/main --head HEAD
+diffpal review local --base origin/main --head HEAD --language en --review-checks bugs,performance,best-practices
 diffpal review github --base origin/main --head HEAD --gate
 ```
 

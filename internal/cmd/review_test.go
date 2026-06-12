@@ -34,6 +34,12 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 		if opts.ContextLines != 20 {
 			t.Fatalf("ContextLines = %d, want 20 from config", opts.ContextLines)
 		}
+		if opts.Language != "en" {
+			t.Fatalf("Language = %q, want en from config defaults", opts.Language)
+		}
+		if strings.Join(opts.ReviewChecks, ",") != "bugs,performance,best-practices" {
+			t.Fatalf("ReviewChecks = %v, want defaults", opts.ReviewChecks)
+		}
 		return testReviewResult("local"), nil
 	})
 
@@ -50,6 +56,36 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "status=blocked blocking=1") {
 		t.Fatalf("output missing blocked status:\n%s", out.String())
+	}
+}
+
+func TestReviewLocalSubcommandPassesLanguageAndReviewChecksFlags(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+		if opts.Language != "French" {
+			t.Fatalf("Language = %q, want French", opts.Language)
+		}
+		if strings.Join(opts.ReviewChecks, ",") != "performance" {
+			t.Fatalf("ReviewChecks = %v, want [performance]", opts.ReviewChecks)
+		}
+		return testReviewResult("local"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"local",
+		"--language", "French",
+		"--review-checks", "perf",
+		"--out", filepath.Join(dir, "findings.json"),
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
 	}
 }
 

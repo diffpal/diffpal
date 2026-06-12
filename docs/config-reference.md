@@ -47,6 +47,11 @@ policies:
 review:
   context_lines: 20
   max_files: 200
+  language: en
+  checks:
+    - bugs
+    - performance
+    - best-practices
   chunking:
     max_patch_chars: 12000
     max_files_per_chunk: 20
@@ -93,6 +98,18 @@ Environment overrides:
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_MAX_FILES`
 - `DIFFPAL_REVIEW_CONTEXT_LINES`
+- `DIFFPAL_REVIEW_LANGUAGE`
+- `DIFFPAL_REVIEW_CHECKS`
+
+`review.language` controls the language used for generated finding text.
+`review.checks` controls the review scope:
+
+- `bugs`: security, correctness, and reliability findings
+- `performance`: performance and resource findings
+- `best-practices`: maintainability, testing, and style findings
+
+The same values can be overridden per run with `--language` and
+`--review-checks`.
 
 ## GitHub Summary Comment
 

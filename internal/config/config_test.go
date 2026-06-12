@@ -112,6 +112,8 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 
 	t.Setenv("DIFFPAL_REVIEW_CONTEXT_LINES", "33")
 	t.Setenv("DIFFPAL_REVIEW_MAX_FILES", "55")
+	t.Setenv("DIFFPAL_REVIEW_LANGUAGE", "Portuguese")
+	t.Setenv("DIFFPAL_REVIEW_CHECKS", "bugs,best_practices")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
 	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
 	cfg, err := LoadConfig(dir, "", "")
@@ -123,6 +125,12 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.Review.MaxFiles != 55 {
 		t.Fatalf("Review.MaxFiles = %d, want 55", cfg.Review.MaxFiles)
+	}
+	if cfg.Review.Language != "Portuguese" {
+		t.Fatalf("Review.Language = %q, want Portuguese", cfg.Review.Language)
+	}
+	if strings.Join(cfg.Review.Checks, ",") != "bugs,best-practices" {
+		t.Fatalf("Review.Checks = %v, want [bugs best-practices]", cfg.Review.Checks)
 	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
@@ -286,6 +294,51 @@ review:
 	_, err := LoadConfig(dir, "", "")
 	if err == nil || !strings.Contains(err.Error(), `invalid policies.default.block_on "severe"`) {
 		t.Fatalf("LoadConfig() error = %v, want invalid block_on error", err)
+	}
+}
+
+func TestLoadConfigRejectsInvalidReviewChecks(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
+version: v1
+defaults:
+  provider: openai-fast
+  policy: default
+providers:
+  openai-fast:
+    type: openai
+    openai:
+      model: gpt-5.4-mini
+policies:
+  default:
+    block_on: high
+review:
+  context_lines: 20
+  max_files: 200
+  checks:
+    - architecture
+`)
+
+	_, err := LoadConfig(dir, "", "")
+	if err == nil || !strings.Contains(err.Error(), `invalid review.checks value "architecture"`) {
+		t.Fatalf("LoadConfig() error = %v, want invalid review.checks error", err)
+	}
+}
+
+func TestNormalizeReviewDefaults(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{}
+	if err := cfg.Normalize(); err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+	if cfg.Review.Language != "en" {
+		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
+	}
+	if strings.Join(cfg.Review.Checks, ",") != "bugs,performance,best-practices" {
+		t.Fatalf("Review.Checks = %v, want default checks", cfg.Review.Checks)
 	}
 }
 

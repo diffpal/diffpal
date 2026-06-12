@@ -47,6 +47,14 @@ inputs:
     description: Maximum files per context chunk.
     required: false
     default: ""
+  language:
+    description: Language for generated review findings.
+    required: false
+    default: ""
+  review-checks:
+    description: Comma-separated checks to run: bugs, performance, best-practices.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -64,4 +72,6 @@ runs:
         INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
         INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}
         INPUT_MAX_FILES_PER_CHUNK: ${{ inputs.max-files-per-chunk }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_REVIEW_CHECKS: ${{ inputs.review-checks }}
       run: ${{ github.action_path }}/tasks/github/run-diffpal-review.sh

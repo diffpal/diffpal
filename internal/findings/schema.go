@@ -17,11 +17,19 @@ var validSeverities = map[string]struct{}{
 }
 
 type FindingsBundle struct {
-	Version  string    `json:"version"`
-	ReviewID string    `json:"review_id"`
-	BaseSHA  string    `json:"base_sha"`
-	HeadSHA  string    `json:"head_sha"`
-	Findings []Finding `json:"findings"`
+	Version      string         `json:"version"`
+	ReviewID     string         `json:"review_id"`
+	BaseSHA      string         `json:"base_sha"`
+	HeadSHA      string         `json:"head_sha"`
+	Language     string         `json:"language,omitempty"`
+	ReviewChecks []string       `json:"review_checks,omitempty"`
+	Files        []ReviewedFile `json:"files,omitempty"`
+	Findings     []Finding      `json:"findings"`
+}
+
+type ReviewedFile struct {
+	Path   string `json:"path"`
+	Status string `json:"status,omitempty"`
 }
 
 type Finding struct {
@@ -57,6 +65,11 @@ func Validate(bundle FindingsBundle) error {
 	}
 	if bundle.ReviewID == "" {
 		return ValidationError{Field: "review_id", Msg: "review_id is required"}
+	}
+	for _, file := range bundle.Files {
+		if strings.TrimSpace(file.Path) == "" {
+			return ValidationError{Field: "file.path", Msg: "path is required"}
+		}
 	}
 	for _, f := range bundle.Findings {
 		if f.Path == "" {

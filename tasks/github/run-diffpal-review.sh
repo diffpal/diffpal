@@ -70,5 +70,11 @@ fi
 if [[ -n "${INPUT_MAX_FILES_PER_CHUNK:-}" ]]; then
   argv+=(--max-files-per-chunk "$INPUT_MAX_FILES_PER_CHUNK")
 fi
+if [[ -n "${INPUT_LANGUAGE:-}" ]]; then
+  argv+=(--language "$INPUT_LANGUAGE")
+fi
+if [[ -n "${INPUT_REVIEW_CHECKS:-}" ]]; then
+  argv+=(--review-checks "$INPUT_REVIEW_CHECKS")
+fi
 
 exec "${argv[@]}"

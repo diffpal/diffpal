@@ -9,7 +9,7 @@
   "author": "DiffPal",
   "version": {
     "Major": 1,
-    "Minor": 0,
+    "Minor": 1,
     "Patch": 0
   },
   "minimumAgentVersion": "3.224.0",
@@ -84,6 +84,22 @@
       "required": false,
       "defaultValue": "",
       "helpMarkDown": "Comma-separated Azure DevOps publish modes."
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "label": "Language",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Language for generated review findings."
+    },
+    {
+      "name": "reviewChecks",
+      "type": "string",
+      "label": "Review checks",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Comma-separated checks to run: bugs, performance, best-practices."
     },
     {
       "name": "out",

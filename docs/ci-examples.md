@@ -28,11 +28,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --global @diffpal/diffpal@1.2.3
+      - run: npm install --global @diffpal/diffpal@latest
       - run: >-
           diffpal review github
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
+          --language en
+          --review-checks bugs,performance,best-practices
           --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,10 +53,12 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   script:
-    - npm install --global @diffpal/diffpal@1.2.3
+    - npm install --global @diffpal/diffpal@latest
     - diffpal review gitlab \
         --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" \
         --head "$CI_COMMIT_SHA" \
+        --language en \
+        --review-checks bugs,performance,best-practices \
         --gate
   artifacts:
     reports:
@@ -78,10 +82,12 @@ steps:
   - task: NodeTool@0
     inputs:
       versionSpec: "20.x"
-  - script: npm install --global @diffpal/diffpal@1.2.3
+  - script: npm install --global @diffpal/diffpal@latest
     displayName: Install DiffPal CLI
   - task: DiffPalReview@1
     inputs:
+      language: en
+      reviewChecks: bugs,performance,best-practices
       gate: true
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)

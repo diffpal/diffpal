@@ -5,7 +5,7 @@
 ### Local
 
 ```bash
-npm install @diffpal/diffpal@1.2.3
+npm install @diffpal/diffpal@latest
 npx diffpal version
 npx diffpal doctor
 ```
@@ -13,7 +13,7 @@ npx diffpal doctor
 Go source installs remain available for development:
 
 ```bash
-go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
+go install github.com/diffpal/diffpal/cmd/diffpal@latest
 diffpal version
 diffpal doctor
 ```
@@ -24,7 +24,7 @@ diffpal doctor
 - uses: actions/setup-go@v6
   with:
     go-version-file: go.mod
-- run: go install github.com/diffpal/diffpal/cmd/diffpal@v1.2.3
+- run: npm install --global @diffpal/diffpal@latest
 - run: diffpal review github --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
   env:
     BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -48,6 +48,8 @@ diffpal review local \
   --head HEAD \
   --context-lines 20 \
   --max-files 200 \
+  --language en \
+  --review-checks bugs,performance,best-practices \
   --out .artifacts/diffpal/findings.json
 ```
 
@@ -70,6 +72,8 @@ diffpal review github \
   --base "${BASE_SHA}" \
   --head "${HEAD_SHA}" \
   --block-on high \
+  --language en \
+  --review-checks bugs,performance,best-practices \
   --gate
 ```
 
@@ -93,6 +97,8 @@ diffpal review ado --base "${BASE_SHA}" --head "${HEAD_SHA}" --gate
 - `--head`: head commit SHA or ref
 - `--max-files`: hard diff file limit
 - `--context-lines`: changed-line neighborhood context
+- `--language`: language for generated review findings
+- `--review-checks`: comma-separated checks to run (`bugs`, `performance`, `best-practices`)
 - `--block-on`: mark findings at this severity and above as blocking
 - `--gate`: exit 1 with `review blocked` when blocking findings are present
 
