@@ -83,22 +83,46 @@ func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 	}
 }
 
-func TestRenderPublishSummaryShowsFeedbackAndSurfaces(t *testing.T) {
+func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 	t.Parallel()
 
 	got := renderPublishSummary(findings.FindingsBundle{
 		ReviewID: "github-pr-2",
+		ChangeSummary: []string{
+			"Updated README documentation.",
+		},
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"})
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true)
 
-	for _, want := range []string{
+	for _, unwanted := range []string{
 		"- Feedback profile: balanced",
 		"- Publish surfaces: check-run, comments, sarif, summary",
 	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("summary missing %q:\n%s", want, got)
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("summary contains hidden metadata %q:\n%s", unwanted, got)
 		}
+	}
+	if !strings.Contains(got, "- Updated README documentation.") {
+		t.Fatalf("summary missing change overview:\n%s", got)
+	}
+}
+
+func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
+	t.Parallel()
+
+	got := renderPublishSummary(findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+		ChangeSummary: []string{
+			"Updated README documentation.",
+		},
+		Files: []findings.ReviewedFile{
+			{Path: "README.md"},
+		},
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false)
+
+	if strings.Contains(got, "## Summary of Changes") {
+		t.Fatalf("summary contains hidden overview:\n%s", got)
 	}
 }

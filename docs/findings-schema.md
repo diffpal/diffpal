@@ -10,6 +10,7 @@ Required fields:
 - `head_sha`
 - `language` (optional)
 - `review_checks[]` (optional)
+- `change_summary[]` (optional human-readable overview bullets)
 - `files[]` (optional reviewed file list)
 - `findings[]` with per-item fields:
   - `rule_id`

@@ -111,6 +111,7 @@ jobs:
           language: en
           review-checks: bugs,performance,best-practices
           feedback: balanced
+          summary-overview: true
           gate: true
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
@@ -130,6 +131,7 @@ jobs:
 - No summary comment: confirm `pull-requests: write`.
 - No check run: confirm `checks: write`.
 - To pin the CLI, set `diffpal-version: 0.1.x` on `diffpal/action@v1`.
+- To hide the change overview section, set `summary-overview: false`.
 - Fork PRs do not run: this is intentional when using secrets.
 
 ## GitLab CI
@@ -277,6 +279,10 @@ Use `feedback` for normal setup:
 
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
+
+The change overview is shown by default in summary comments/checks. Turn it off
+with `summary-overview: false` in GitHub Actions or
+`--summary-overview=false` on the CLI.
 
 Default balanced publish modes:
 

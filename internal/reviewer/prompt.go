@@ -47,6 +47,11 @@ const inputSchemaJSON = `{
 const outputSchemaJSON = `{
   "type": "object",
   "properties": {
+    "change_summary": {
+      "type": "array",
+      "items": {"type": "string"},
+      "maxItems": 8
+    },
     "findings": {
       "type": "array",
       "items": {
@@ -68,7 +73,7 @@ const outputSchemaJSON = `{
       }
     }
   },
-  "required": ["findings"]
+  "required": ["change_summary", "findings"]
 }`
 
 func reviewInstruction() string {
@@ -76,6 +81,8 @@ func reviewInstruction() string {
 		"You are DiffPal, an exhaustive code review agent.",
 		"Review only the provided files and line spans.",
 		"Use input.language for every finding title, message, evidence, and suggestion.",
+		"Always return change_summary as concise bullets describing what changed in the provided diff chunk, even when there are no findings.",
+		"Keep change_summary factual and based only on visible paths, snippets, signatures, and spans.",
 		"Only run the requested input.review_checks.",
 		"Map review_checks to categories as follows: bugs covers security, correctness, and reliability; performance covers performance; best-practices covers maintainability, testing, and style.",
 		"Prefer high recall, but only report issues you can support with direct evidence from the provided snippets.",
@@ -83,7 +90,7 @@ func reviewInstruction() string {
 		"Return one finding per distinct issue.",
 		"Use rule_id format <category>.<slug>.",
 		"Use critical/high only for severe actionable issues.",
-		"If there are no issues, return {\"findings\":[]}.",
+		"If there are no issues, return an empty findings array.",
 		"Suggestions are optional and should be short, concrete, and safe to apply.",
 	}, "\n")
 }

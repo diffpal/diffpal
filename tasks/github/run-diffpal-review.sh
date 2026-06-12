@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-diffpal_bin="${DIFFPAL_ACTION_BIN:-${INPUT_DIFFPAL_PATH:-diffpal}}"
+diffpal_bin="${DIFFPAL_BIN:-diffpal}"
 
 if ! command -v "$diffpal_bin" >/dev/null 2>&1; then
   echo "diffpal binary was not found: $diffpal_bin" >&2
@@ -53,6 +53,9 @@ if [[ -n "${INPUT_MODE:-}" ]]; then
 fi
 if [[ -z "${INPUT_MODE:-}" && -n "${INPUT_FEEDBACK:-}" ]]; then
   argv+=(--feedback "$INPUT_FEEDBACK")
+fi
+if ! truthy "${INPUT_SUMMARY_OVERVIEW:-true}"; then
+  argv+=(--summary-overview=false)
 fi
 if [[ -n "${INPUT_OUT:-}" ]]; then
   argv+=(--out "$INPUT_OUT")

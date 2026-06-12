@@ -24,6 +24,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 
 	runtime := &fakeRuntime{
 		outputs: []ChunkOutput{{
+			ChangeSummary: []string{
+				"Updated `main.go` to print a different value.",
+			},
 			Findings: []ChunkFinding{{
 				RuleID:     "correctness.behavior-change",
 				Category:   "correctness",
@@ -73,6 +76,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if len(result.Bundle.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
 	}
+	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Updated `main.go` to print a different value." {
+		t.Fatalf("ChangeSummary = %v", result.Bundle.ChangeSummary)
+	}
 	got := result.Bundle.Findings[0]
 	if !got.Blocking {
 		t.Fatal("Blocking = false, want true")
@@ -91,6 +97,33 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
 		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
+	}
+}
+
+func TestRunWithRuntimeFallsBackToFileChangeSummary(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-a",
+		ReviewID:         "review-a",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+	}, &fakeRuntime{
+		outputs: []ChunkOutput{{Findings: nil}},
+	})
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Updated `main.go`." {
+		t.Fatalf("ChangeSummary = %v, want fallback file summary", result.Bundle.ChangeSummary)
 	}
 }
 

@@ -101,6 +101,7 @@ These flags work with `review local`, `review github`, `review gitlab`, and
 --language en
 --review-checks bugs,performance,best-practices
 --feedback balanced
+--summary-overview=true
 --block-on high
 --gate
 ```
@@ -108,6 +109,7 @@ These flags work with `review local`, `review github`, `review gitlab`, and
 - `--language`: language for generated review text.
 - `--review-checks`: checks to run.
 - `--feedback`: review output shape, either `summary`, `balanced`, or `inline`.
+- `--summary-overview`: include or hide the change overview in summary reports.
 - `--block-on`: severity threshold that marks findings as blocking.
 - `--gate`: exits non-zero when blocking findings exist.
 

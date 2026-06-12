@@ -16,6 +16,9 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 		HeadSHA:      "head-1",
 		Language:     "en",
 		ReviewChecks: []string{"bugs", "performance", "best-practices"},
+		ChangeSummary: []string{
+			"Updated service behavior and database query handling.",
+		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
 			{Path: "internal/db/query.go"},
@@ -71,12 +74,15 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	got := RenderSummary(bundle)
 
 	assertContains(t, got, "# DiffPal Review Summary")
-	assertContains(t, got, "review_id: review-123")
 	assertContains(t, got, "## Summary of Changes")
-	assertContains(t, got, "- Reviewed files: 3")
-	assertContains(t, got, "- Findings: 4")
-	assertContains(t, got, "- Blocking findings: 3")
-	assertContains(t, got, "- Review checks: bugs, performance, best-practices")
+	assertContains(t, got, "- Updated service behavior and database query handling.")
+	assertContains(t, got, "## Review Result")
+	assertContains(t, got, "DiffPal found 4 actionable finding(s), including 3 blocking finding(s).")
+	assertNotContains(t, got, "review_id: review-123")
+	assertNotContains(t, got, "- Reviewed files: 3")
+	assertNotContains(t, got, "- Findings: 4")
+	assertNotContains(t, got, "- Blocking findings: 3")
+	assertNotContains(t, got, "- Review checks: bugs, performance, best-practices")
 	assertContains(t, got, "## Feedback on Files")
 	assertContains(t, got, "| `internal/app/service.go` | Blocked | critical: 1, low: 1 |")
 	assertContains(t, got, "| `internal/db/query.go` | Blocked | high: 2 |")
@@ -94,13 +100,17 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 
 	got := RenderSummary(findings.FindingsBundle{
 		ReviewID: "review-empty",
+		ChangeSummary: []string{
+			"Updated application service code.",
+		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
 		},
 	})
 
 	assertContains(t, got, "# DiffPal Review Summary")
-	assertContains(t, got, "review_id: review-empty")
+	assertContains(t, got, "- Updated application service code.")
+	assertNotContains(t, got, "review_id: review-empty")
 	assertContains(t, got, "DiffPal found no actionable issues in the reviewed diff.")
 	assertContains(t, got, "| `internal/app/service.go` | Passed | No actionable findings. |")
 	if strings.Contains(got, "## Detailed Comments") {
@@ -108,11 +118,42 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	}
 }
 
-func TestRenderSummaryWithOptionsShowsFeedbackProvenance(t *testing.T) {
+func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
 	t.Parallel()
 
 	got := RenderSummaryWithOptions(findings.FindingsBundle{
 		ReviewID: "review-feedback",
+		ChangeSummary: []string{
+			"Updated application service code.",
+		},
+		Files: []findings.ReviewedFile{
+			{Path: "internal/app/service.go"},
+		},
+	}, SummaryOptions{
+		HideOverview: true,
+	})
+
+	assertNotContains(t, got, "## Summary of Changes")
+	assertNotContains(t, got, "Updated application service code.")
+	assertContains(t, got, "## Review Result")
+}
+
+func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-feedback",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Language: "en",
+		ReviewChecks: []string{
+			"bugs",
+			"performance",
+			"best-practices",
+		},
+		ChangeSummary: []string{
+			"Updated application service code.",
+		},
 		Files: []findings.ReviewedFile{
 			{Path: "internal/app/service.go"},
 		},
@@ -124,8 +165,12 @@ func TestRenderSummaryWithOptionsShowsFeedbackProvenance(t *testing.T) {
 			"sarif",
 			"summary",
 		},
+		ShowMetadata: true,
 	})
 
+	assertContains(t, got, "## Review Metadata")
+	assertContains(t, got, "- Review ID: review-feedback")
+	assertContains(t, got, "- Reviewed files: 1")
 	assertContains(t, got, "- Feedback profile: balanced")
 	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
 }
@@ -134,5 +179,12 @@ func assertContains(t *testing.T, got string, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {
 		t.Fatalf("summary missing %q:\n%s", want, got)
+	}
+}
+
+func assertNotContains(t *testing.T, got string, unwanted string) {
+	t.Helper()
+	if strings.Contains(got, unwanted) {
+		t.Fatalf("summary contains %q:\n%s", unwanted, got)
 	}
 }

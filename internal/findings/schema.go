@@ -17,14 +17,15 @@ var validSeverities = map[string]struct{}{
 }
 
 type FindingsBundle struct {
-	Version      string         `json:"version"`
-	ReviewID     string         `json:"review_id"`
-	BaseSHA      string         `json:"base_sha"`
-	HeadSHA      string         `json:"head_sha"`
-	Language     string         `json:"language,omitempty"`
-	ReviewChecks []string       `json:"review_checks,omitempty"`
-	Files        []ReviewedFile `json:"files,omitempty"`
-	Findings     []Finding      `json:"findings"`
+	Version       string         `json:"version"`
+	ReviewID      string         `json:"review_id"`
+	BaseSHA       string         `json:"base_sha"`
+	HeadSHA       string         `json:"head_sha"`
+	Language      string         `json:"language,omitempty"`
+	ReviewChecks  []string       `json:"review_checks,omitempty"`
+	ChangeSummary []string       `json:"change_summary,omitempty"`
+	Files         []ReviewedFile `json:"files,omitempty"`
+	Findings      []Finding      `json:"findings"`
 }
 
 type ReviewedFile struct {

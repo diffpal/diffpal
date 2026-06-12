@@ -76,10 +76,10 @@ SCRIPT
     "$repo_root/tasks/github/install-diffpal.sh"
 
   assert_contains "$npm_args" "@diffpal/diffpal@0.1.2"
-  assert_contains "$github_env" "DIFFPAL_ACTION_BIN=$runner_temp/diffpal-action/bin/diffpal"
+  assert_contains "$github_env" "DIFFPAL_BIN=$runner_temp/diffpal-action/bin/diffpal"
 }
 
-test_installer_skips_custom_path() {
+test_installer_selects_custom_path() {
   local dir="$1"
   local github_env="$dir/github-env-custom"
   mkdir -p "$dir"
@@ -91,11 +91,22 @@ test_installer_skips_custom_path() {
     INPUT_DIFFPAL_PATH=/opt/diffpal/bin/diffpal \
     "$repo_root/tasks/github/install-diffpal.sh"
 
-  if [[ -s "$github_env" ]]; then
-    echo "expected custom diffpal-path to skip installer output" >&2
-    cat "$github_env" >&2
-    exit 1
-  fi
+  assert_contains "$github_env" "DIFFPAL_BIN=/opt/diffpal/bin/diffpal"
+}
+
+test_installer_selects_path_when_install_disabled() {
+  local dir="$1"
+  local github_env="$dir/github-env-disabled"
+  mkdir -p "$dir"
+  : > "$github_env"
+
+  GITHUB_ENV="$github_env" \
+    INPUT_INSTALL=false \
+    INPUT_DIFFPAL_VERSION=latest \
+    INPUT_DIFFPAL_PATH=diffpal \
+    "$repo_root/tasks/github/install-diffpal.sh"
+
+  assert_contains "$github_env" "DIFFPAL_BIN=diffpal"
 }
 
 test_wrapper_uses_installed_binary_and_feedback() {
@@ -106,8 +117,7 @@ test_wrapper_uses_installed_binary_and_feedback() {
   make_fake_diffpal "$bin_dir"
 
   DIFFPAL_ARGV_FILE="$argv" \
-    DIFFPAL_ACTION_BIN="$bin_dir/diffpal" \
-    INPUT_DIFFPAL_PATH=diffpal \
+    DIFFPAL_BIN="$bin_dir/diffpal" \
     INPUT_BASE=base-sha \
     INPUT_HEAD=head-sha \
     INPUT_FEEDBACK=summary \
@@ -128,7 +138,7 @@ test_wrapper_mode_overrides_feedback() {
 
   PATH="$bin_dir:$PATH" \
     DIFFPAL_ARGV_FILE="$argv" \
-    INPUT_DIFFPAL_PATH=diffpal \
+    DIFFPAL_BIN=diffpal \
     INPUT_BASE=base-sha \
     INPUT_HEAD=head-sha \
     INPUT_MODE=check-run \
@@ -141,12 +151,32 @@ test_wrapper_mode_overrides_feedback() {
   assert_not_contains "$argv" "summary"
 }
 
+test_wrapper_can_disable_summary_overview() {
+  local dir="$1"
+  local bin_dir="$dir/overview-bin"
+  local argv="$dir/argv-overview"
+  mkdir -p "$bin_dir"
+  make_fake_diffpal "$bin_dir"
+
+  PATH="$bin_dir:$PATH" \
+    DIFFPAL_ARGV_FILE="$argv" \
+    DIFFPAL_BIN=diffpal \
+    INPUT_BASE=base-sha \
+    INPUT_HEAD=head-sha \
+    INPUT_SUMMARY_OVERVIEW=false \
+    "$repo_root/tasks/github/run-diffpal-review.sh"
+
+  assert_contains "$argv" "--summary-overview=false"
+}
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 test_installer_installs_requested_version "$tmpdir/install"
-test_installer_skips_custom_path "$tmpdir/custom"
+test_installer_selects_custom_path "$tmpdir/custom"
+test_installer_selects_path_when_install_disabled "$tmpdir/disabled"
 test_wrapper_uses_installed_binary_and_feedback "$tmpdir/wrapper-installed"
 test_wrapper_mode_overrides_feedback "$tmpdir/wrapper-mode"
+test_wrapper_can_disable_summary_overview "$tmpdir/wrapper-overview"
 
 echo "github action smoke tests passed"

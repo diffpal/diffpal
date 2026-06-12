@@ -19,6 +19,8 @@ var severityOrder = map[string]int{
 type SummaryOptions struct {
 	FeedbackProfile string
 	PublishSurfaces []string
+	ShowMetadata    bool
+	HideOverview    bool
 }
 
 func RenderSummary(bundle findings.FindingsBundle) string {
@@ -32,28 +34,23 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 
 	out := strings.Builder{}
 	out.WriteString("# DiffPal Review Summary\n\n")
-	fmt.Fprintf(&out, "review_id: %s\n", bundle.ReviewID)
-	fmt.Fprintf(&out, "base: %s\nhead: %s\n\n", bundle.BaseSHA, bundle.HeadSHA)
-	out.WriteString("## Summary of Changes\n\n")
-	fmt.Fprintf(&out, "- Reviewed files: %d\n", len(rows))
-	fmt.Fprintf(&out, "- Findings: %d\n", len(sortedFindings))
-	fmt.Fprintf(&out, "- Blocking findings: %d\n", blocking)
-	if strings.TrimSpace(opts.FeedbackProfile) != "" {
-		fmt.Fprintf(&out, "- Feedback profile: %s\n", strings.TrimSpace(opts.FeedbackProfile))
+	if !opts.HideOverview {
+		writeChangeOverview(&out, bundle)
 	}
-	if len(opts.PublishSurfaces) > 0 {
-		fmt.Fprintf(&out, "- Publish surfaces: %s\n", strings.Join(opts.PublishSurfaces, ", "))
-	}
-	if bundle.Language != "" {
-		fmt.Fprintf(&out, "- Language: %s\n", bundle.Language)
-	}
-	if len(bundle.ReviewChecks) > 0 {
-		fmt.Fprintf(&out, "- Review checks: %s\n", strings.Join(bundle.ReviewChecks, ", "))
-	}
+
+	out.WriteString("## Review Result\n\n")
 	if len(sortedFindings) == 0 {
-		out.WriteString("\nDiffPal found no actionable issues in the reviewed diff.\n\n")
+		out.WriteString("DiffPal found no actionable issues in the reviewed diff.\n\n")
 	} else {
-		out.WriteString("\nDiffPal found actionable feedback in the reviewed diff.\n\n")
+		fmt.Fprintf(&out, "DiffPal found %d actionable finding(s)", len(sortedFindings))
+		if blocking > 0 {
+			fmt.Fprintf(&out, ", including %d blocking finding(s)", blocking)
+		}
+		out.WriteString(".\n\n")
+	}
+
+	if opts.ShowMetadata {
+		writeMetadata(&out, bundle, rows, sortedFindings, blocking, opts)
 	}
 
 	out.WriteString("## Feedback on Files\n\n")
@@ -93,6 +90,62 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 		out.WriteString("\n")
 	}
 	return out.String()
+}
+
+func writeChangeOverview(out *strings.Builder, bundle findings.FindingsBundle) {
+	out.WriteString("## Summary of Changes\n\n")
+	items := changeSummaryItems(bundle)
+	if len(items) == 0 {
+		out.WriteString("No reviewable file changes were recorded.\n\n")
+		return
+	}
+	for _, item := range items {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	out.WriteString("\n")
+}
+
+func writeMetadata(out *strings.Builder, bundle findings.FindingsBundle, rows []feedbackRow, sortedFindings []findings.Finding, blocking int, opts SummaryOptions) {
+	out.WriteString("## Review Metadata\n\n")
+	fmt.Fprintf(out, "- Review ID: %s\n", bundle.ReviewID)
+	fmt.Fprintf(out, "- Base: %s\n", bundle.BaseSHA)
+	fmt.Fprintf(out, "- Head: %s\n", bundle.HeadSHA)
+	fmt.Fprintf(out, "- Reviewed files: %d\n", len(rows))
+	fmt.Fprintf(out, "- Findings: %d\n", len(sortedFindings))
+	fmt.Fprintf(out, "- Blocking findings: %d\n", blocking)
+	if strings.TrimSpace(opts.FeedbackProfile) != "" {
+		fmt.Fprintf(out, "- Feedback profile: %s\n", strings.TrimSpace(opts.FeedbackProfile))
+	}
+	if len(opts.PublishSurfaces) > 0 {
+		fmt.Fprintf(out, "- Publish surfaces: %s\n", strings.Join(opts.PublishSurfaces, ", "))
+	}
+	if bundle.Language != "" {
+		fmt.Fprintf(out, "- Language: %s\n", bundle.Language)
+	}
+	if len(bundle.ReviewChecks) > 0 {
+		fmt.Fprintf(out, "- Review checks: %s\n", strings.Join(bundle.ReviewChecks, ", "))
+	}
+	out.WriteString("\n")
+}
+
+func changeSummaryItems(bundle findings.FindingsBundle) []string {
+	out := make([]string, 0, len(bundle.ChangeSummary))
+	for _, item := range bundle.ChangeSummary {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	if len(out) > 0 {
+		return out
+	}
+	files := reviewedPaths(bundle, nil)
+	out = make([]string, 0, len(files))
+	for _, path := range files {
+		out = append(out, "Updated `"+path+"`.")
+	}
+	return out
 }
 
 type feedbackRow struct {

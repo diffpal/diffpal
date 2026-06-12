@@ -30,7 +30,7 @@ const (
 	FeedbackInline   FeedbackProfile = "inline"
 )
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, out string) ([]publishOutput, int, error) {
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -43,7 +43,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if err != nil {
 		return nil, 0, err
 	}
-	summary := renderPublishSummary(bundle, profile, modes)
+	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
 
 	for _, mode := range modes {
 		normalized := normalizePublishMode(platform, mode)
@@ -188,10 +188,11 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(bundle findings.FindingsBundle, profile FeedbackProfile, modes []string) string {
+func renderPublishSummary(bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
 	opts := markdown.SummaryOptions{
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
+		HideOverview:    !summaryOverview,
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts)
 }

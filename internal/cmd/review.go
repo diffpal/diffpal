@@ -91,6 +91,7 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
 	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
+	cmd.Flags().Bool("summary-overview", true, "Include a change overview in review summaries")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -120,6 +121,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	modeSpec, _ := cmd.Flags().GetString("mode")
 	modes := parseModeList(modeSpec)
 	feedback, _ := cmd.Flags().GetString("feedback")
+	summaryOverview, _ := cmd.Flags().GetBool("summary-overview")
 	if len(modes) == 0 {
 		if _, err := normalizeFeedback(feedback); err != nil {
 			return withExitCode(2, err)
@@ -149,7 +151,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return nil
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, "")
+	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "")
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -157,7 +159,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback, summaryOverview); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -330,7 +332,7 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -339,7 +341,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary := renderPublishSummary(bundle, profile, modes)
+	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
 
 	switch platform {
 	case "github":

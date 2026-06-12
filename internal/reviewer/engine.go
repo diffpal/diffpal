@@ -83,7 +83,8 @@ type ChunkFinding struct {
 }
 
 type ChunkOutput struct {
-	Findings []ChunkFinding `json:"findings"`
+	ChangeSummary []string       `json:"change_summary,omitempty"`
+	Findings      []ChunkFinding `json:"findings"`
 }
 
 type RuntimeUsage struct {
@@ -173,15 +174,17 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		return Result{}, wrapError(KindInternal, fmt.Errorf("enrich diff context: %w", err))
 	}
 	chunks := diffc.ChunkByLimits(enriched, opts.MaxPatchChars, opts.MaxFilesPerChunk)
+	reviewed := reviewedFiles(filtered)
 	bundle := findings.FindingsBundle{
-		Version:      findings.VersionV1,
-		ReviewID:     reviewID,
-		BaseSHA:      result.BaseSHA,
-		HeadSHA:      result.HeadSHA,
-		Language:     language,
-		ReviewChecks: append([]string(nil), reviewChecks...),
-		Files:        reviewedFiles(filtered),
-		Findings:     []findings.Finding{},
+		Version:       findings.VersionV1,
+		ReviewID:      reviewID,
+		BaseSHA:       result.BaseSHA,
+		HeadSHA:       result.HeadSHA,
+		Language:      language,
+		ReviewChecks:  append([]string(nil), reviewChecks...),
+		ChangeSummary: fallbackChangeSummary(reviewed),
+		Files:         reviewed,
+		Findings:      []findings.Finding{},
 	}
 	if len(chunks) == 0 {
 		return Result{
@@ -203,6 +206,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	collected := make([]findings.Finding, 0)
+	summaries := make([]string, 0, len(chunks))
 	for i, chunk := range chunks {
 		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, testSummary, i, len(chunks), chunk)
 		var output ChunkOutput
@@ -231,9 +235,11 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			}
 			return Result{}, err
 		}
+		summaries = append(summaries, output.ChangeSummary...)
 		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID(), allowedCategories)...)
 	}
 
+	bundle.ChangeSummary = normalizeChangeSummary(summaries, bundle.Files)
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
@@ -279,6 +285,63 @@ func reviewedFiles(files []diff.FileChange) []findings.ReviewedFile {
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Path < out[j].Path
 	})
+	return out
+}
+
+func normalizeChangeSummary(items []string, files []findings.ReviewedFile) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		item = strings.TrimPrefix(item, "- ")
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		key := strings.ToLower(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+	}
+	if len(out) == 0 {
+		return fallbackChangeSummary(files)
+	}
+	const maxSummaryItems = 8
+	if len(out) > maxSummaryItems {
+		return out[:maxSummaryItems]
+	}
+	return out
+}
+
+func fallbackChangeSummary(files []findings.ReviewedFile) []string {
+	if len(files) == 0 {
+		return nil
+	}
+	const maxSummaryItems = 8
+	out := make([]string, 0, min(len(files), maxSummaryItems))
+	for _, file := range files {
+		path := strings.TrimSpace(file.Path)
+		if path == "" {
+			continue
+		}
+		verb := "Updated"
+		switch strings.ToUpper(strings.TrimSpace(file.Status)) {
+		case "A":
+			verb = "Added"
+		case "D":
+			verb = "Deleted"
+		case "R":
+			verb = "Renamed"
+		case "C":
+			verb = "Copied"
+		}
+		out = append(out, fmt.Sprintf("%s `%s`.", verb, path))
+		if len(out) == maxSummaryItems {
+			break
+		}
+	}
 	return out
 }
 

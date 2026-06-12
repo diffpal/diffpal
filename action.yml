@@ -47,6 +47,10 @@ inputs:
     description: Review feedback shape. Use summary, balanced, or inline.
     required: false
     default: balanced
+  summary-overview:
+    description: Include a change overview in review summaries.
+    required: false
+    default: "true"
   out:
     description: Output findings bundle path.
     required: false
@@ -97,7 +101,6 @@ runs:
     - name: Run DiffPal review
       shell: bash
       env:
-        INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
         INPUT_BASE: ${{ inputs.base }}
         INPUT_HEAD: ${{ inputs.head }}
         INPUT_CONFIG_DIR: ${{ inputs.config-dir }}
@@ -106,6 +109,7 @@ runs:
         INPUT_GATE: ${{ inputs.gate }}
         INPUT_MODE: ${{ inputs.mode }}
         INPUT_FEEDBACK: ${{ inputs.feedback }}
+        INPUT_SUMMARY_OVERVIEW: ${{ inputs.summary-overview }}
         INPUT_OUT: ${{ inputs.out }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_REVIEW_ID: ${{ inputs.review-id }}

@@ -18,11 +18,13 @@ version="${INPUT_DIFFPAL_VERSION:-latest}"
 
 if [[ "$diffpal_path" != "diffpal" ]]; then
   echo "Using custom diffpal-path: $diffpal_path"
+  echo "DIFFPAL_BIN=$diffpal_path" >> "$GITHUB_ENV"
   exit 0
 fi
 
 if ! truthy "$install_requested"; then
   echo "DiffPal installation disabled; using diffpal from PATH"
+  echo "DIFFPAL_BIN=diffpal" >> "$GITHUB_ENV"
   exit 0
 fi
 
@@ -42,5 +44,5 @@ if [[ ! -x "$diffpal_bin" ]]; then
   exit 127
 fi
 
-echo "DIFFPAL_ACTION_BIN=$diffpal_bin" >> "$GITHUB_ENV"
+echo "DIFFPAL_BIN=$diffpal_bin" >> "$GITHUB_ENV"
 echo "Installed DiffPal: $diffpal_bin"
