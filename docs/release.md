@@ -131,7 +131,8 @@ separate explicit step.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
-- `azure-devops-task` runs `npm ci`, runtime dependency audit, TypeScript build, and prod/dev VSIX packaging.
+- `azure-devops-task` runs `npm ci`, runtime dependency audit, and TypeScript build.
+- Azure DevOps VSIX packaging is a release/manual packaging step via `npm --prefix tasks/azure-devops run package:prod` and `package:dev`.
 - `omnidist-release` runs only on SemVer tags and handles build, npm publish, and GitHub release assets.
 
 ## Self-review gate
