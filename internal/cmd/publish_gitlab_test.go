@@ -118,9 +118,12 @@ func TestPublishBundleToFilesGitHubEmbedsCodeSnippets(t *testing.T) {
 		},
 	}
 
-	outputs, _, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "")
+	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
+	}
+	if blocking != 1 {
+		t.Fatalf("blocking = %d, want 1", blocking)
 	}
 	if len(outputs) != 2 {
 		t.Fatalf("outputs = %d, want 2", len(outputs))
@@ -134,11 +137,21 @@ func TestPublishBundleToFilesGitHubEmbedsCodeSnippets(t *testing.T) {
 			t.Fatalf("ReadFile(%q) error = %v", path, err)
 		}
 		text := string(raw)
-		if !strings.Contains(text, "```go\\nfunc deleteSessions(user string)") && !strings.Contains(text, "```go\nfunc deleteSessions(user string)") {
+		if !strings.Contains(text, "```go") || !strings.Contains(text, "func deleteSessions(user string)") {
 			t.Fatalf("%s missing Go code block:\n%s", path, text)
 		}
 		if !strings.Contains(text, "Use a parameterized statement.") {
 			t.Fatalf("%s missing suggestion:\n%s", path, text)
 		}
+	}
+}
+
+func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
+	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"check-run", "summary"}, "", true, "review.out")
+	if err == nil {
+		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-mode error")
+	}
+	if !strings.Contains(err.Error(), "--out cannot be used with multiple publish modes") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

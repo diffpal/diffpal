@@ -50,7 +50,11 @@ func (p WorktreeSnippetProvider) Snippet(finding findings.Finding) (CodeSnippet,
 	if !ok {
 		return CodeSnippet{}, false
 	}
-	raw, err := os.ReadFile(filepath.Join(p.Root, cleanPath))
+	target, ok := safeSnippetPath(p.Root, cleanPath)
+	if !ok {
+		return CodeSnippet{}, false
+	}
+	raw, err := os.ReadFile(target)
 	if err != nil {
 		return CodeSnippet{}, false
 	}
@@ -85,6 +89,26 @@ func cleanRelativePath(path string) (string, bool) {
 		return "", false
 	}
 	return path, true
+}
+
+func safeSnippetPath(root, cleanPath string) (string, bool) {
+	cleanRoot := filepath.Clean(root)
+	rootReal, err := filepath.EvalSymlinks(cleanRoot)
+	if err != nil {
+		return "", false
+	}
+	targetReal, err := filepath.EvalSymlinks(filepath.Join(cleanRoot, cleanPath))
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(rootReal, targetReal)
+	if err != nil {
+		return "", false
+	}
+	if rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." || filepath.IsAbs(rel) {
+		return "", false
+	}
+	return targetReal, true
 }
 
 func splitSourceLines(raw string) []string {

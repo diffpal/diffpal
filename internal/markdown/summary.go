@@ -301,11 +301,21 @@ func snippetForFinding(provider SnippetProvider, finding findings.Finding) CodeS
 func writeCodeFence(out *strings.Builder, snippet CodeSnippet, indent string) {
 	fence := codeFence(snippet.Code)
 	fmt.Fprintf(out, "%s%s%s\n", indent, fence, snippet.Language)
-	out.WriteString(snippet.Code)
-	if !strings.HasSuffix(snippet.Code, "\n") {
+	writeIndentedCode(out, snippet.Code, indent)
+	fmt.Fprintf(out, "%s%s\n", indent, fence)
+}
+
+func writeIndentedCode(out *strings.Builder, code string, indent string) {
+	for _, line := range strings.SplitAfter(code, "\n") {
+		if line == "" {
+			continue
+		}
+		out.WriteString(indent)
+		out.WriteString(line)
+	}
+	if !strings.HasSuffix(code, "\n") {
 		out.WriteString("\n")
 	}
-	fmt.Fprintf(out, "%s%s\n", indent, fence)
 }
 
 func codeFence(code string) string {

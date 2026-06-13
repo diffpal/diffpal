@@ -228,7 +228,7 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 	})
 
 	assertContains(t, got, "- **[high][security.sql-injection]** `L12-L17`: query concatenates untrusted input")
-	assertContains(t, got, "  ```go\nuser := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
+	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
 	assertContains(t, got, "  - Evidence: Line 17 builds SQL by concatenating user input.")
 	assertContains(t, got, "  - Suggestion: Use a parameterized statement.")
 }
@@ -282,7 +282,7 @@ func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "  ````markdown\n```go\nfmt.Println(\"x\")\n```\n  ````")
+	assertContains(t, got, "  ````markdown\n  ```go\n  fmt.Println(\"x\")\n  ```\n  ````")
 }
 
 func assertContains(t *testing.T, got string, want string) {
