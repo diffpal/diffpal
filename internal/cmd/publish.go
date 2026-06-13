@@ -43,7 +43,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if err != nil {
 		return nil, 0, err
 	}
-	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
 
 	for _, mode := range modes {
 		normalized := normalizePublishMode(platform, mode)
@@ -77,7 +77,10 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err != nil {
 				return nil, 0, err
 			}
-			plan := github.PlanInlineCommentsWithProfile(existing, bundle.Findings, string(profile))
+			plan := github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
+				Profile:  string(profile),
+				Snippets: githubSnippetProvider(platform),
+			})
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
 				return nil, 0, err
@@ -188,13 +191,21 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
 	opts := markdown.SummaryOptions{
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
+		Snippets:        githubSnippetProvider(platform),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts)
+}
+
+func githubSnippetProvider(platform string) markdown.SnippetProvider {
+	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
+		return nil
+	}
+	return markdown.NewWorktreeSnippetProvider(".")
 }
 
 func publishSurfaceLabels(modes []string) []string {

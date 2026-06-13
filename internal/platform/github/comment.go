@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/diffpal/diffpal/internal/markdown"
 )
 
 const MinInlineConfidence = 0.8
@@ -42,10 +43,19 @@ func PlanInlineComments(existing map[string]string, findings []findings.Finding)
 }
 
 func PlanInlineCommentsWithProfile(existing map[string]string, findings []findings.Finding, profile string) CommentPlan {
-	return planInlineComments(existing, findings, inlineConfidenceThreshold(profile))
+	return PlanInlineCommentsWithOptions(existing, findings, CommentOptions{Profile: profile})
 }
 
-func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64) CommentPlan {
+type CommentOptions struct {
+	Profile  string
+	Snippets markdown.SnippetProvider
+}
+
+func PlanInlineCommentsWithOptions(existing map[string]string, findings []findings.Finding, opts CommentOptions) CommentPlan {
+	return planInlineComments(existing, findings, inlineConfidenceThreshold(opts.Profile), opts.Snippets)
+}
+
+func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64, snippets markdown.SnippetProvider) CommentPlan {
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
@@ -56,7 +66,7 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			continue
 		}
 		key := commentKey(f.Path, f.StartLine, f.RuleID)
-		body := formatBody(f)
+		body := formatBody(f, snippets)
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
 			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
@@ -111,6 +121,19 @@ func commentKey(path string, line int, ruleID string) string {
 	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
 }
 
-func formatBody(f findings.Finding) string {
-	return fmt.Sprintf("**[%s][%s]**\n\n%s", f.Severity, f.RuleID, f.Message)
+func formatBody(f findings.Finding, snippets markdown.SnippetProvider) string {
+	return markdown.RenderFindingDetail(f, markdown.FindingDetailOptions{
+		Snippet: snippetForFinding(snippets, f),
+	})
+}
+
+func snippetForFinding(provider markdown.SnippetProvider, finding findings.Finding) markdown.CodeSnippet {
+	if provider == nil {
+		return markdown.CodeSnippet{}
+	}
+	snippet, ok := provider.Snippet(finding)
+	if !ok {
+		return markdown.CodeSnippet{}
+	}
+	return snippet
 }

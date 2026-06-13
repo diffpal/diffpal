@@ -86,7 +86,7 @@ func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary(findings.FindingsBundle{
+	got := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",
@@ -112,7 +112,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary(findings.FindingsBundle{
+	got := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",

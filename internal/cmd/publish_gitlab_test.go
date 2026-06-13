@@ -72,3 +72,73 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		}
 	}
 }
+
+func TestPublishBundleToFilesGitHubEmbedsCodeSnippets(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	sourcePath := filepath.Join(dir, "internal", "db", "query.go")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	source := strings.Join([]string{
+		"package db",
+		"",
+		"func deleteSessions(user string) {",
+		"    _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")",
+		"}",
+	}, "\n")
+	if err := os.WriteFile(sourcePath, []byte(source), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	bundle := findings.FindingsBundle{
+		Version:  findings.VersionV1,
+		ReviewID: "github-pr-1",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/db/query.go"},
+		},
+		Findings: []findings.Finding{
+			{
+				ID:         "fp-sec",
+				ReviewID:   "github-pr-1",
+				RuleID:     "security.sql",
+				Category:   "security",
+				Severity:   "high",
+				Confidence: 0.96,
+				Path:       "internal/db/query.go",
+				StartLine:  3,
+				EndLine:    5,
+				Title:      "unsafe SQL construction",
+				Message:    "query concatenates user input",
+				Evidence:   "user is appended into SQL",
+				Suggestion: "Use a parameterized statement.",
+				Blocking:   true,
+			},
+		},
+	}
+
+	outputs, _, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "")
+	if err != nil {
+		t.Fatalf("publishBundleToFiles() error = %v", err)
+	}
+	if len(outputs) != 2 {
+		t.Fatalf("outputs = %d, want 2", len(outputs))
+	}
+	for _, path := range []string{
+		filepath.Join(".artifacts", "diffpal", "github-checkrun.json"),
+		filepath.Join(".artifacts", "diffpal", "github-comments.json"),
+	} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", path, err)
+		}
+		text := string(raw)
+		if !strings.Contains(text, "```go\\nfunc deleteSessions(user string)") && !strings.Contains(text, "```go\nfunc deleteSessions(user string)") {
+			t.Fatalf("%s missing Go code block:\n%s", path, text)
+		}
+		if !strings.Contains(text, "Use a parameterized statement.") {
+			t.Fatalf("%s missing suggestion:\n%s", path, text)
+		}
+	}
+}

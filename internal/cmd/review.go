@@ -380,7 +380,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
 
 	switch platform {
 	case "github":
@@ -392,7 +392,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		commentPlan := github.PlanInlineCommentsWithProfile(existingComments, bundle.Findings, string(profile))
+		commentPlan := github.PlanInlineCommentsWithOptions(existingComments, bundle.Findings, github.CommentOptions{
+			Profile:  string(profile),
+			Snippets: githubSnippetProvider(platform),
+		})
 		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {

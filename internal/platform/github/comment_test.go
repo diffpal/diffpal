@@ -3,9 +3,11 @@ package github
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/diffpal/diffpal/internal/markdown"
 )
 
 func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
@@ -118,5 +120,45 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 	}
 	if got := PlanInlineCommentsWithProfile(nil, items, "inline"); len(got.Actions) != 1 {
 		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	}
+}
+
+func TestPlanInlineCommentsCanIncludeCodeSnippet(t *testing.T) {
+	t.Parallel()
+
+	plan := PlanInlineCommentsWithOptions(nil, []findings.Finding{{
+		ID:         "fp-sql",
+		RuleID:     "security.sql",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "internal/db/query.go",
+		StartLine:  12,
+		EndLine:    17,
+		Message:    "query concatenates untrusted input",
+		Evidence:   "Line 17 builds SQL by concatenating user input.",
+		Suggestion: "Use a parameterized statement.",
+	}}, CommentOptions{
+		Profile: "balanced",
+		Snippets: markdown.SnippetFunc(func(findings.Finding) (markdown.CodeSnippet, bool) {
+			return markdown.CodeSnippet{
+				Language: "go",
+				Code:     "user := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")",
+			}, true
+		}),
+	})
+
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	body := plan.Actions[0].Body
+	for _, want := range []string{
+		"**[high][security.sql]** `L12-L17`: query concatenates untrusted input",
+		"```go\nuser := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n```",
+		"- Evidence: Line 17 builds SQL by concatenating user input.",
+		"- Suggestion: Use a parameterized statement.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("comment body missing %q:\n%s", want, body)
+		}
 	}
 }
