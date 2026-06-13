@@ -1,6 +1,6 @@
 # DiffPal Quickstart
 
-This guide gets DiffPal reviewing GitHub pull requests with the Copilot ACP
+This guide gets DiffPal reviewing GitHub pull requests with the Codex ACP
 provider. The GitHub Action installs the DiffPal CLI for you; you only install
 the provider command in the workflow.
 
@@ -16,13 +16,13 @@ version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:
@@ -45,7 +45,7 @@ Add this repository secret:
 
 | Secret | Purpose |
 | --- | --- |
-| `COPILOT_GITHUB_TOKEN` | Lets the Copilot CLI act as the review provider. |
+| `OPENAI_API_KEY` | Lets the Codex CLI act as the review provider. |
 
 GitHub provides `GITHUB_TOKEN` automatically. The workflow below grants it the
 permissions DiffPal needs to publish PR feedback.
@@ -82,8 +82,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Copilot provider
-        run: npm install --global @github/copilot@latest
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+
+      - name: Authenticate Codex
+        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Review pull request
         uses: diffpal/diffpal@v0.1.2
@@ -96,7 +101,7 @@ jobs:
           feedback: balanced
           gate: true
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -123,7 +128,8 @@ Local commands are useful for setup checks and debugging, but they are not the
 main quickstart path.
 
 ```bash
-npm install --global @diffpal/diffpal@latest @github/copilot@latest
+npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
+printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 diffpal init
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD
@@ -135,4 +141,4 @@ diffpal review local --base origin/main --head HEAD
 - [Azure Pipelines](ci-examples.md#azure-pipelines)
 
 For production, pin `diffpal-version`, `@diffpal/diffpal`, and
-`@github/copilot` to versions you have tested.
+`@openai/codex`, and `@normahq/codex-acp-bridge` to versions you have tested.

@@ -2,13 +2,13 @@ version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:

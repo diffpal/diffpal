@@ -16,8 +16,8 @@ Add a DiffPal config, add a provider secret, then choose the CI example for your
 platform.
 
 The examples use npm `@latest` for quick onboarding. For production, pin
-`@diffpal/diffpal`, `diffpal-version`, and `@github/copilot` to versions you
-have tested.
+`@diffpal/diffpal`, `diffpal-version`, `@openai/codex`, and
+`@normahq/codex-acp-bridge` to versions you have tested.
 
 ## Config
 
@@ -28,13 +28,13 @@ version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:
@@ -48,7 +48,7 @@ diffpal:
       # - best-practices
 ```
 
-Add `COPILOT_GITHUB_TOKEN` as a CI secret so the Copilot CLI can act as the
+Add `OPENAI_API_KEY` as a CI secret so the Codex CLI can act as the
 review provider. Platform publish tokens are CI-specific:
 
 | Platform | Publish token |
@@ -61,7 +61,7 @@ review provider. Platform publish tokens are CI-specific:
 
 Create `.github/workflows/diffpal-review.yml`.
 
-The action installs the DiffPal CLI. The workflow installs only the Copilot
+The action installs the DiffPal CLI. The workflow installs only the Codex
 provider command.
 
 ```yaml
@@ -92,8 +92,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Copilot provider
-        run: npm install --global @github/copilot@latest
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+
+      - name: Authenticate Codex
+        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Review pull request
         uses: diffpal/diffpal@v0.1.2
@@ -106,7 +111,7 @@ jobs:
           feedback: balanced
           gate: true
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -129,7 +134,8 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
-    - npm install --global @diffpal/diffpal@latest @github/copilot@latest
+    - npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
+    - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-
       diffpal review gitlab
@@ -152,7 +158,7 @@ diffpal-review:
       sarif: .artifacts/diffpal/diffpal.sarif
 ```
 
-Set `COPILOT_GITHUB_TOKEN` as a protected/masked CI variable. Use the built-in
+Set `OPENAI_API_KEY` as a protected/masked CI variable. Use the built-in
 `CI_JOB_TOKEN` when your GitLab instance allows it, or set `GITLAB_TOKEN` for a
 dedicated API token.
 
@@ -177,8 +183,13 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @github/copilot@latest
-    displayName: Install Copilot provider
+  - script: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+    displayName: Install Codex provider
+
+  - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+    displayName: Authenticate Codex
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
 
   - task: DiffPalReview@1
     displayName: DiffPal review
@@ -189,7 +200,7 @@ steps:
       feedback: balanced
       gate: true
     env:
-      COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
@@ -217,7 +228,8 @@ Local commands are useful for setup checks and debugging, but they are not the
 main CI setup path.
 
 ```bash
-npm install --global @diffpal/diffpal@latest @github/copilot@latest
+npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
+printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 diffpal init
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD
