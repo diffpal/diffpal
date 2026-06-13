@@ -1,0 +1,29 @@
+trigger: none
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "22.x"
+
+  - script: npm install --global @github/copilot@latest
+    displayName: Install Copilot provider
+
+  - task: DiffPalReview@1
+    displayName: DiffPal review
+    inputs:
+      diffpalVersion: latest
+      profile: ci
+      feedback: balanced
+      gate: true
+    env:
+      COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+

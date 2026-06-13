@@ -1,63 +1,35 @@
 # CI Setup Guide
 
-This is the main setup guide for running DiffPal in pull request pipelines.
-The default provider path is Codex ACP.
-
-The examples use npm `@latest` for quick onboarding. For production, pin
-`@diffpal/diffpal`, `diffpal-version`, `@openai/codex`, and
-`@normahq/codex-acp-bridge` to versions you have tested.
+This guide explains how DiffPal behaves in CI. Copy-paste files live in
+[`examples/`](../examples/README.md).
 
 ## Common Setup
 
 Every CI system needs:
 
 1. A full git checkout, so DiffPal can compare base and head commits.
-2. Node.js, because the Codex provider is installed with npm.
+2. Node.js, because the public provider CLIs are installed with npm.
 3. A DiffPal config committed at `.config/diffpal/config.yaml`.
-4. `OPENAI_API_KEY` as a secret for the Codex provider.
+4. A provider auth secret.
 5. A platform token so DiffPal can publish PR feedback.
 
-Commit `.config/diffpal/config.yaml` with the provider and review gate:
+Choose one provider setup:
 
-```yaml
-version: v1
-
-runtime:
-  providers:
-    codex-acp:
-      type: codex_acp
-      codex_acp:
-        reasoning_effort: low
-
-diffpal:
-  provider: codex-acp
-  gate:
-    block_on: high
-  review:
-    language: en
-    instructions: |
-      Prefer actionable findings that are directly supported by the diff.
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices
-```
-
-You can generate a starting config locally with `diffpal init`, then commit the
-reviewed file. `diffpal doctor --mode <host>` is useful as a preflight or
-troubleshooting command, but it is not required in the normal PR workflow.
+| Setup | Config | Required secret |
+| --- | --- | --- |
+| Codex API key | [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
+| Codex subscription auth | [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
+| Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 
 ## GitHub Actions
 
-### Required Secrets and Permissions
+Examples:
 
-| Name | Required | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
-| `GITHUB_TOKEN` | built in | Publishes check runs, summary comments, and inline comments. |
+- [Codex API key](../examples/ci/github-actions/codex-api-key.yml)
+- [Codex subscription auth](../examples/ci/github-actions/codex-subscription.yml)
+- [Copilot token](../examples/ci/github-actions/copilot-github-token.yml)
 
-Workflow permissions:
+Required permissions:
 
 ```yaml
 permissions:
@@ -66,144 +38,52 @@ permissions:
   checks: write
 ```
 
-Use a same-repository PR guard before exposing `OPENAI_API_KEY`.
-
-### Workflow
-
-Create `.github/workflows/diffpal-review.yml`:
+Use a same-repository PR guard before exposing provider secrets:
 
 ```yaml
-name: diffpal-review
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-
-concurrency:
-  group: diffpal-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-jobs:
-  review:
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Codex provider
-        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
-
-      - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Review pull request
-        uses: diffpal/diffpal@v0.1.2
-        with:
-          diffpal-version: latest
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          repo: ${{ github.repository }}
-          review-id: github-pr-${{ github.event.pull_request.number }}
-          language: en
-          review-checks: security,bugs,performance,best-practices
-          instructions-file: .config/diffpal/review-instructions.md
-          feedback: balanced
-          summary-overview: true
-          gate: true
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
 ```
 
-### What You Should See
+What you should see:
 
 - `diffpal-checks` check run on the PR head commit.
 - A PR summary comment headed `DiffPal Review Summary`.
 - Inline comments when DiffPal finds actionable issues.
-- Job failure only when `--gate` is set and blocking findings exist, or when setup/publish fails.
+- Job failure only when `gate` is set and blocking findings exist, or when setup/publish fails.
 
-### Common GitHub Fixes
+Common fixes:
 
-- `GITHUB_TOKEN is required`: keep the `env` block on the review step.
+- `GITHUB_TOKEN is required`: keep `GITHUB_TOKEN` on the review step.
 - No summary comment: confirm `pull-requests: write`.
 - No check run: confirm `checks: write`.
-- To change the CLI version, set `diffpal-version` on the action step.
-- To hide the change overview section, set `summary-overview: false`.
 - Fork PRs do not run: this is intentional when using secrets.
 
 ## GitLab CI
 
-### Required Variables
+Examples:
 
-| Name | Required | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
-| `CI_JOB_TOKEN` | usually | Publishes from GitLab CI when allowed by your instance. |
-| `GITLAB_TOKEN` | optional | Dedicated API token when `CI_JOB_TOKEN` is not enough. |
+- [Codex API key](../examples/ci/gitlab/codex-api-key.yml)
+- [Codex subscription auth](../examples/ci/gitlab/codex-subscription.yml)
+- [Copilot token](../examples/ci/gitlab/copilot-github-token.yml)
 
-Use protected/masked variables for tokens. If your project accepts fork merge
-requests, keep provider tokens available only to trusted pipelines.
+Required variables:
 
-### Pipeline
+| Name | Purpose |
+| --- | --- |
+| `CI_JOB_TOKEN` | Built-in token, when your instance allows MR API publishing. |
+| `GITLAB_TOKEN` | Optional dedicated token when `CI_JOB_TOKEN` is not enough. |
 
-Add this to `.gitlab-ci.yml`:
+Use protected/masked variables for provider tokens. If your project accepts fork
+merge requests, keep provider tokens available only to trusted pipelines.
 
-```yaml
-stages:
-  - review
-
-diffpal-review:
-  stage: review
-  image: node:22
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
-  before_script:
-    - npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
-    - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-  script:
-    - >-
-      diffpal review gitlab
-      --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
-      --head "$CI_COMMIT_SHA"
-      --repo "$CI_PROJECT_PATH"
-      --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
-      --language en
-      --review-checks security,bugs,performance,best-practices
-      --instructions-file .config/diffpal/review-instructions.md
-      --feedback balanced
-      --gate
-  variables:
-    GIT_DEPTH: "0"
-  artifacts:
-    when: always
-    paths:
-      - .artifacts/diffpal/
-    reports:
-      codequality: .artifacts/diffpal/codequality.json
-      sarif: .artifacts/diffpal/diffpal.sarif
-```
-
-### What You Should See
+What you should see:
 
 - GitLab discussions for actionable findings.
 - Code Quality and SARIF artifacts.
 - `.artifacts/diffpal/summary.md` in job artifacts.
 - Failed job when `--gate` is set and blocking findings exist.
 
-### Common GitLab Fixes
+Common fixes:
 
 - Missing base SHA: run only on merge request pipelines.
 - Publish denied: use `GITLAB_TOKEN` instead of `CI_JOB_TOKEN`.
@@ -211,68 +91,26 @@ diffpal-review:
 
 ## Azure Pipelines
 
-### Required Setup
+Examples:
 
-| Name | Required | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
-| `SYSTEM_ACCESSTOKEN` | yes | Publishes Azure PR threads and status. |
+- [Codex API key](../examples/ci/azure-pipelines/codex-api-key.yml)
+- [Codex subscription auth](../examples/ci/azure-pipelines/codex-subscription.yml)
+- [Copilot token](../examples/ci/azure-pipelines/copilot-github-token.yml)
 
-In Azure Pipelines, enable **Allow scripts to access the OAuth token** so
-`$(System.AccessToken)` is available to the task.
+Required setup:
 
-The `DiffPalReview@1` task installs the DiffPal CLI by default.
+- Enable **Allow scripts to access the OAuth token**.
+- Pass `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` to the `DiffPalReview@1` task.
+- Keep `fetchDepth: 0` on checkout.
 
-### Pipeline
-
-Add this to `azure-pipelines.yml`:
-
-```yaml
-trigger: none
-pr:
-  - main
-
-pool:
-  vmImage: ubuntu-latest
-
-steps:
-  - checkout: self
-    fetchDepth: 0
-
-  - task: NodeTool@0
-    inputs:
-      versionSpec: "22.x"
-
-  - script: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
-    displayName: Install Codex provider
-
-  - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-    displayName: Authenticate Codex
-    env:
-      OPENAI_API_KEY: $(OPENAI_API_KEY)
-
-  - task: DiffPalReview@1
-    displayName: DiffPal review
-    inputs:
-      diffpalVersion: latest
-      language: en
-      reviewChecks: security,bugs,performance,best-practices
-      instructionsFile: .config/diffpal/review-instructions.md
-      feedback: balanced
-      gate: true
-    env:
-      OPENAI_API_KEY: $(OPENAI_API_KEY)
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
-
-### What You Should See
+What you should see:
 
 - Azure PR threads for actionable findings.
 - An Azure PR summary thread headed `DiffPal Review Summary`.
 - Azure PR status named `DiffPal Review`.
 - Failed task when `gate` is true and blocking findings exist.
 
-### Common Azure Fixes
+Common fixes:
 
 - `SYSTEM_ACCESSTOKEN` is empty: enable OAuth token access for scripts.
 - Task cannot find `diffpal`: keep `install: true`, or set `install: false`
@@ -293,8 +131,8 @@ Use `feedback` for normal setup:
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
 
-The semantic change overview is shown by default in summary comments/checks. Turn it off
-with `summary-overview: false` in GitHub Actions or
+The semantic change overview is shown by default in summary comments/checks.
+Turn it off with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
 
 Default balanced publish modes:
@@ -317,7 +155,7 @@ Common artifacts:
 ## Production Hardening
 
 - Pin npm package versions after the first successful setup.
-- Keep `OPENAI_API_KEY` out of untrusted fork pipelines.
-- Start with `--block-on high`; lower the threshold only after tuning policy.
+- Keep provider secrets out of untrusted fork pipelines.
+- Start with `block_on: high`; lower the threshold only after tuning policy.
 - Keep `fetch-depth: 0`, `GIT_DEPTH: "0"`, or `fetchDepth: 0` in CI.
 - Run `diffpal doctor --mode <host>` before enabling a blocking gate.

@@ -1,0 +1,36 @@
+trigger: none
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "22.x"
+
+  - script: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+    displayName: Install Codex provider
+
+  - script: |
+      mkdir -p "$HOME/.codex"
+      printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
+      chmod 600 "$HOME/.codex/auth.json"
+    displayName: Restore Codex auth
+    env:
+      CODEX_AUTH_JSON_B64: $(CODEX_AUTH_JSON_B64)
+
+  - task: DiffPalReview@1
+    displayName: DiffPal review
+    inputs:
+      diffpalVersion: latest
+      profile: ci
+      feedback: balanced
+      gate: true
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
