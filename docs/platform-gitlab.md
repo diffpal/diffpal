@@ -40,7 +40,7 @@ Severity to discussion policy:
 
 Each finding maps to a stable thread key:
 
-- `path + ":" + start_line + ":" + end_line + ":" + ruleID`
+- `path + ":" + start_line + ":" + category`
 
 Re-publishing uses key + finding ID for idempotent update/skip.
 

@@ -1,0 +1,33 @@
+version: v1
+
+runtime:
+  providers:
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
+
+diffpal:
+  provider: codex-acp
+  gate:
+    block_on: high
+  review:
+    language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
+    checks:
+      - security
+      - bugs
+      - performance
+      - best-practices
+  platforms:
+    github: {}
+    gitlab: {}
+    azure: {}
+
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high
+

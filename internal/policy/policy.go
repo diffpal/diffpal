@@ -16,7 +16,6 @@ const (
 )
 
 type Finding struct {
-	RuleID     string
 	Severity   Severity
 	Confidence float64
 	Path       string
@@ -24,7 +23,6 @@ type Finding struct {
 
 type FindingDecision struct {
 	Path       string
-	RuleID     string
 	Action     string
 	Reason     string
 	Severity   Severity
@@ -33,7 +31,6 @@ type FindingDecision struct {
 
 type Suppression struct {
 	Path string
-	Rule string
 }
 
 type Policy struct {
@@ -54,7 +51,6 @@ func ApplyPolicy(policy Policy, findings []Finding) []FindingDecision {
 	for _, item := range findings {
 		dec := FindingDecision{
 			Path:       item.Path,
-			RuleID:     item.RuleID,
 			Severity:   item.Severity,
 			Confidence: item.Confidence,
 			Action:     "report",
@@ -82,9 +78,6 @@ func ApplyPolicy(policy Policy, findings []Finding) []FindingDecision {
 
 func isSuppressed(f Finding, suppressions []Suppression) bool {
 	for _, suppression := range suppressions {
-		if suppression.Rule != "" && suppression.Rule != f.RuleID {
-			continue
-		}
 		if suppression.Path != "" {
 			if matchPathGlob(suppression.Path, f.Path) {
 				return true

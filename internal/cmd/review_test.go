@@ -205,6 +205,59 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	}
 }
 
+func TestReviewGitHubDryRunPrintsMarkdownWithoutPublishing(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.Error(w, "unexpected request", http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--dry-run",
+		"--out", filepath.Join(dir, "findings.json"),
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("requests = %d, want 0", got)
+	}
+	text := out.String()
+	for _, want := range []string{
+		"# DiffPal Review Summary",
+		"https://github.com/acme/diffpal/blob/head-a/main.go#L4",
+		"example evidence",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, text)
+		}
+	}
+	for _, forbidden := range []string{"findings=", "bundle=", "```"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("dry-run output contains %q:\n%s", forbidden, text)
+		}
+	}
+}
+
 func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -219,6 +272,44 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
   }
 }`)
 	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_EVENT_PATH", eventPath)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.BaseSHA = "base-a"
+		result.Bundle.HeadSHA = "head-a"
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json")})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "publish=skipped-fork") {
+		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+}
+
+func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	eventPath := writeGitHubEvent(t, `{
+  "number": 10,
+  "repository": {"full_name": "acme/diffpal"},
+  "pull_request": {
+    "base": {"sha": "base-a", "repo": {"full_name": "acme/diffpal"}},
+    "head": {"sha": "head-a", "repo": {"full_name": "fork/diffpal"}}
+  }
+}`)
+	t.Setenv("GITHUB_EVENT_NAME", "pull_request_target")
+	t.Setenv("GITHUB_TOKEN", "token")
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
@@ -529,7 +620,6 @@ func testReviewResult(reviewID string) reviewer.Result {
 			HeadSHA:  "head-a",
 			Findings: []findings.Finding{{
 				ReviewID:   reviewID,
-				RuleID:     "correctness.example",
 				Category:   "correctness",
 				Severity:   "high",
 				Confidence: 0.9,

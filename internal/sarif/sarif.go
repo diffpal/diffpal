@@ -41,7 +41,7 @@ type RuleProperties struct {
 }
 
 type Result struct {
-	RuleID              string            `json:"ruleId"`
+	Rule                string            `json:"ruleId"`
 	Level               string            `json:"level"`
 	Message             Message           `json:"message"`
 	Locations           []Location        `json:"locations"`
@@ -97,9 +97,9 @@ func ToReport(bundle findings.FindingsBundle) Report {
 	r.Runs[0].Results = make([]Result, 0, len(bundle.Findings))
 	for _, f := range bundle.Findings {
 		r.Runs[0].Results = append(r.Runs[0].Results, Result{
-			RuleID:  f.RuleID,
+			Rule:    f.Category,
 			Level:   sarifLevel(f.Severity),
-			Message: Message{Text: f.Message},
+			Message: Message{Text: resultMessage(f)},
 			Locations: []Location{
 				{
 					PhysicalLocation: PhysicalLocation{
@@ -142,13 +142,13 @@ func buildRules(findingsList []findings.Finding) []Rule {
 	}
 	byID := make(map[string]Rule, len(findingsList))
 	for _, finding := range findingsList {
-		if _, ok := byID[finding.RuleID]; ok {
+		if _, ok := byID[finding.Category]; ok {
 			continue
 		}
-		byID[finding.RuleID] = Rule{
-			ID:               finding.RuleID,
-			Name:             finding.RuleID,
-			ShortDescription: Message{Text: finding.Title},
+		byID[finding.Category] = Rule{
+			ID:               finding.Category,
+			Name:             finding.Category,
+			ShortDescription: Message{Text: "DiffPal " + finding.Category + " finding"},
 			Properties: RuleProperties{
 				Category: finding.Category,
 			},
@@ -164,4 +164,14 @@ func buildRules(findingsList []findings.Finding) []Rule {
 		rules = append(rules, byID[id])
 	}
 	return rules
+}
+
+func resultMessage(f findings.Finding) string {
+	if f.Title == "" {
+		return f.Message
+	}
+	if f.Message == "" || f.Message == f.Title {
+		return f.Title
+	}
+	return f.Title + ": " + f.Message
 }

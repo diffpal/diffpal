@@ -13,7 +13,6 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 		Findings: []findings.Finding{
 			{
 				ID:         "fp-1",
-				RuleID:     "security.sql",
 				Category:   "security",
 				Severity:   "critical",
 				Confidence: 0.9,
@@ -26,7 +25,6 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 			},
 			{
 				ID:         "fp-2",
-				RuleID:     "correctness.nil",
 				Category:   "correctness",
 				Severity:   "medium",
 				Confidence: 0.6,
@@ -38,7 +36,6 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 			},
 			{
 				ID:         "fp-3",
-				RuleID:     "security.sql",
 				Category:   "security",
 				Severity:   "high",
 				Confidence: 0.8,
@@ -62,20 +59,26 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 	}
 	run := report.Runs[0]
 	if len(run.Tool.Driver.Rules) != 2 {
-		t.Fatalf("Rules = %d, want 2 unique rules", len(run.Tool.Driver.Rules))
+		t.Fatalf("Rules = %d, want 2 unique categories", len(run.Tool.Driver.Rules))
 	}
-	if run.Tool.Driver.Rules[0].ID != "correctness.nil" || run.Tool.Driver.Rules[1].ID != "security.sql" {
-		t.Fatalf("unexpected rule ordering: %+v", run.Tool.Driver.Rules)
+	if run.Tool.Driver.Rules[0].ID != "correctness" || run.Tool.Driver.Rules[1].ID != "security" {
+		t.Fatalf("unexpected category rule ordering: %+v", run.Tool.Driver.Rules)
+	}
+	if run.Tool.Driver.Rules[1].ShortDescription.Text != "DiffPal security finding" {
+		t.Fatalf("security rule description = %q", run.Tool.Driver.Rules[1].ShortDescription.Text)
 	}
 	if len(run.Results) != 3 {
 		t.Fatalf("Results = %d, want 3", len(run.Results))
 	}
 	first := run.Results[0]
-	if first.RuleID != "security.sql" {
-		t.Fatalf("first RuleID = %q, want security.sql", first.RuleID)
+	if first.Rule != "security" {
+		t.Fatalf("first Rule = %q, want security", first.Rule)
 	}
 	if first.Level != "error" {
 		t.Fatalf("first Level = %q, want error", first.Level)
+	}
+	if first.Message.Text != "unsafe SQL construction: query concatenates user input" {
+		t.Fatalf("first message = %q", first.Message.Text)
 	}
 	if first.Locations[0].PhysicalLocation.ArtifactLocation.URI != "internal/db/query.go" {
 		t.Fatalf("first location URI = %q", first.Locations[0].PhysicalLocation.ArtifactLocation.URI)

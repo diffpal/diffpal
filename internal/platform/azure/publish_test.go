@@ -14,7 +14,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-create",
-			RuleID:     "correctness.nil",
 			Category:   "correctness",
 			Severity:   "high",
 			Confidence: 0.9,
@@ -25,7 +24,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
 			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.91,
@@ -36,7 +34,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-low",
-			RuleID:     "style.nit",
 			Category:   "style",
 			Severity:   "low",
 			Confidence: 0.4,
@@ -46,7 +43,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 	}
 	existing := map[string]string{
-		threadKey("internal/db/query.go", 20, "security.sql"): "old-fp",
+		threadKey("internal/db/query.go", 20, "security", "fp-update"): "old-fp",
 	}
 
 	plan := PlanThreads(existing, findingsList, Context{
@@ -69,6 +66,71 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 	}
 	if len(plan.State) != 2 {
 		t.Fatalf("len(State) = %d, want 2 actionable states", len(plan.State))
+	}
+}
+
+func TestPlanThreadsKeepsSameLineFindingsDistinct(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{
+			ID:         "fp-a",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "first issue",
+		},
+		{
+			ID:         "fp-b",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "second issue",
+		},
+	}
+
+	plan := PlanThreads(nil, items, Context{})
+	if len(plan.State) != 2 {
+		t.Fatalf("state = %d, want 2", len(plan.State))
+	}
+	if plan.State[0].ThreadID == plan.State[1].ThreadID {
+		t.Fatalf("same-line findings share thread id %q", plan.State[0].ThreadID)
+	}
+}
+
+func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+		Evidence:   "same location",
+	}}
+	existing := map[string]string{
+		threadKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanThreads(existing, items, Context{})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+	if plan.Actions[0].ThreadID != threadKey("main.go", 12, "security", "fp-old") {
+		t.Fatalf("ThreadID = %q, want prior thread id", plan.Actions[0].ThreadID)
+	}
+	if plan.State[0].ThreadID != plan.Actions[0].ThreadID {
+		t.Fatalf("state ThreadID = %q, want action ThreadID %q", plan.State[0].ThreadID, plan.Actions[0].ThreadID)
 	}
 }
 
@@ -101,7 +163,6 @@ func TestPlanThreadsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
 
 	items := []findings.Finding{{
 		ID:         "fp-inline",
-		RuleID:     "correctness.edge",
 		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.7,

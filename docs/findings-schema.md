@@ -2,18 +2,13 @@
 
 Canonical output is `internal/findings.FindingsBundle` serialized to JSON.
 
-Required fields:
+Required top-level fields:
 
 - `version`
 - `review_id`
 - `base_sha`
 - `head_sha`
-- `language` (optional)
-- `review_checks[]` (optional)
-- `change_summary[]` (optional human-readable overview bullets)
-- `files[]` (optional reviewed file list)
 - `findings[]` with per-item fields:
-  - `rule_id`
   - `category`
   - `severity`
   - `path`
@@ -23,6 +18,13 @@ Required fields:
   - `message`
   - `evidence`
 
+Optional top-level fields:
+
+- `language`
+- `review_checks[]`
+- `change_summary[]` human-readable overview bullets
+- `files[]` reviewed file list
+
 Stable fingerprint input:
 
 - repository id
@@ -30,6 +32,7 @@ Stable fingerprint input:
 - `review_id`
 - `head_sha`
 - normalized path and line range
+- category
 - normalized message
 - evidence hash
 

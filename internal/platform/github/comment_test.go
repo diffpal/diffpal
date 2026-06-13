@@ -3,9 +3,11 @@ package github
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/diffpal/diffpal/internal/markdown"
 )
 
 func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
@@ -14,7 +16,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-create",
-			RuleID:     "correctness.nil",
+			Category:   "correctness",
 			Severity:   "high",
 			Confidence: 0.95,
 			Path:       "internal/app/service.go",
@@ -23,7 +25,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
+			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.91,
 			Path:       "internal/db/query.go",
@@ -32,7 +34,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-skip",
-			RuleID:     "maintainability.deadcode",
+			Category:   "maintainability",
 			Severity:   "medium",
 			Confidence: 0.88,
 			Path:       "internal/app/service.go",
@@ -41,7 +43,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-low-confidence",
-			RuleID:     "style.nit",
+			Category:   "style",
 			Severity:   "low",
 			Confidence: 0.4,
 			Path:       "internal/app/service.go",
@@ -51,8 +53,8 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	}
 
 	existing := map[string]string{
-		commentKey("internal/db/query.go", 22, "security.sql"):                "fp-old",
-		commentKey("internal/app/service.go", 31, "maintainability.deadcode"): "fp-skip",
+		commentKey("internal/db/query.go", 22, "security", "fp-update"):         "fp-old",
+		commentKey("internal/app/service.go", 31, "maintainability", "fp-skip"): "fp-skip",
 	}
 	plan := PlanInlineComments(existing, findingsList)
 
@@ -70,6 +72,90 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	}
 	if len(plan.State) != 3 {
 		t.Fatalf("len(State) = %d, want 3 high-confidence findings", len(plan.State))
+	}
+}
+
+func TestPlanInlineCommentsKeepsSameLineFindingsDistinct(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{
+			ID:         "fp-a",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "first issue",
+		},
+		{
+			ID:         "fp-b",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "second issue",
+		},
+	}
+
+	plan := PlanInlineComments(nil, items)
+	if len(plan.State) != 2 {
+		t.Fatalf("state = %d, want 2", len(plan.State))
+	}
+	if plan.State[0].Key == plan.State[1].Key {
+		t.Fatalf("same-line findings share key %q", plan.State[0].Key)
+	}
+}
+
+func TestPlanInlineCommentsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+	}}
+	existing := map[string]string{
+		commentKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanInlineComments(existing, items)
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+}
+
+func TestPlanInlineCommentsCreatesWhenPriorLocationIsAmbiguous(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "third issue",
+	}}
+	existing := map[string]string{
+		commentKey("main.go", 12, "security", "fp-old-a"): "fp-old-a",
+		commentKey("main.go", 12, "security", "fp-old-b"): "fp-old-b",
+	}
+
+	plan := PlanInlineComments(existing, items)
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionCreate {
+		t.Fatalf("action = %q, want create", plan.Actions[0].Type)
 	}
 }
 
@@ -106,7 +192,7 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 
 	items := []findings.Finding{{
 		ID:         "fp-inline",
-		RuleID:     "correctness.edge",
+		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.7,
 		Path:       "main.go",
@@ -118,5 +204,48 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 	}
 	if got := PlanInlineCommentsWithProfile(nil, items, "inline"); len(got.Actions) != 1 {
 		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	}
+}
+
+func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
+	t.Parallel()
+
+	plan := PlanInlineCommentsWithOptions(nil, []findings.Finding{{
+		ID:         "fp-sql",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "internal/db/query.go",
+		StartLine:  12,
+		EndLine:    17,
+		Message:    "query concatenates untrusted input",
+		Evidence:   "Line 17 builds SQL by concatenating user input.",
+		Suggestion: "Use a parameterized statement.",
+	}}, CommentOptions{
+		Profile: "balanced",
+		Links: markdown.FindingLinkFunc(func(findings.Finding) (string, bool) {
+			return "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17", true
+		}),
+	})
+
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	body := plan.Actions[0].Body
+	for _, want := range []string{
+		"**High security**: query concatenates untrusted input",
+		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
+		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
+		"- **Suggestion**: Use a parameterized statement.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("comment body missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "```") {
+		t.Fatalf("comment body contains fenced code block:\n%s", body)
+	}
+	if strings.Contains(body, "`L12-L17`") {
+		t.Fatalf("comment body repeats linked line range in header:\n%s", body)
 	}
 }

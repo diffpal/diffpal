@@ -71,7 +71,7 @@ environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
 
 The default public onboarding provider is `codex-acp`. Install it with
-`npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest`
+`npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`
 and authenticate Codex with `OPENAI_API_KEY` in CI.
 
 `diffpal.platforms.github.summary_comment.enabled` defaults to `true`. When

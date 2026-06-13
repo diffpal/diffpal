@@ -1,0 +1,30 @@
+stages:
+  - review
+
+diffpal-review:
+  stage: review
+  image: node:22
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH'
+  resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
+  before_script:
+    - npm install --global @diffpal/diffpal@0.1.2 @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+  script:
+    - >-
+      diffpal --profile ci review gitlab
+      --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+      --head "$CI_COMMIT_SHA"
+      --repo "$CI_PROJECT_PATH"
+      --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
+      --feedback balanced
+      --gate
+  variables:
+    GIT_DEPTH: "0"
+  artifacts:
+    when: always
+    paths:
+      - .artifacts/diffpal/
+    reports:
+      codequality: .artifacts/diffpal/codequality.json
+      sarif: .artifacts/diffpal/diffpal.sarif

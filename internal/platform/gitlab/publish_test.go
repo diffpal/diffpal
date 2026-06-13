@@ -15,7 +15,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
 			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.9,
@@ -25,7 +24,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 		},
 		{
 			ID:         "fp-skip",
-			RuleID:     "correctness.nil",
 			Category:   "correctness",
 			Severity:   "critical",
 			Confidence: 0.95,
@@ -36,7 +34,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 		},
 		{
 			ID:         "fp-advisory",
-			RuleID:     "maintainability.deadcode",
 			Category:   "maintainability",
 			Severity:   "medium",
 			Confidence: 0.7,
@@ -47,8 +44,8 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	}
 
 	existing := map[string]string{
-		discussionKey("internal/db/query.go", 12, "security.sql"):      "old-fp",
-		discussionKey("internal/app/service.go", 8, "correctness.nil"): "fp-skip",
+		discussionKey("internal/db/query.go", 12, "security", "fp-update"):    "old-fp",
+		discussionKey("internal/app/service.go", 8, "correctness", "fp-skip"): "fp-skip",
 	}
 	plan := PlanDiscussions(existing, findingsList, []string{"high"})
 
@@ -64,8 +61,73 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	if len(plan.State) != 2 {
 		t.Fatalf("len(State) = %d, want 2 blocking states", len(plan.State))
 	}
-	if !strings.Contains(plan.AdvisorySummary, "maintainability.deadcode") {
+	if !strings.Contains(plan.AdvisorySummary, "Medium maintainability") {
 		t.Fatalf("advisory summary missing advisory finding:\n%s", plan.AdvisorySummary)
+	}
+}
+
+func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
+	t.Parallel()
+
+	body := discussionBody(findings.Finding{
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.9,
+		Message:    "unsafe markdown",
+		Evidence:   "```go\nfmt.Println(\"x\")\n```",
+		Suggestion: "````suggestion\nx\n````",
+	})
+
+	if !strings.Contains(body, "`````\n````suggestion\nx\n````\n`````") {
+		t.Fatalf("suggestion fence was not lengthened safely:\n%s", body)
+	}
+	if strings.Contains(body, "**Evidence:**\n```\n```go") {
+		t.Fatalf("evidence used unsafe triple fence:\n%s", body)
+	}
+}
+
+func TestDiscussionBodyFallsBackToTitle(t *testing.T) {
+	t.Parallel()
+
+	body := discussionBody(findings.Finding{
+		Category:   "correctness",
+		Severity:   "medium",
+		Confidence: 0.9,
+		Title:      "title only finding",
+	})
+	if !strings.Contains(body, "title only finding") {
+		t.Fatalf("body missing title fallback:\n%s", body)
+	}
+}
+
+func TestPlanDiscussionsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+	}}
+	existing := map[string]string{
+		discussionKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanDiscussions(existing, items, []string{"high"})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+	if plan.Actions[0].ThreadHash != discussionKey("main.go", 12, "security", "fp-old") {
+		t.Fatalf("ThreadHash = %q, want prior thread hash", plan.Actions[0].ThreadHash)
+	}
+	if plan.State[0].ThreadHash != plan.Actions[0].ThreadHash {
+		t.Fatalf("state ThreadHash = %q, want action ThreadHash %q", plan.State[0].ThreadHash, plan.Actions[0].ThreadHash)
 	}
 }
 
@@ -99,14 +161,12 @@ func TestSummarizeDecisionAndApprovalPolicy(t *testing.T) {
 		HeadSHA: "head-a",
 		Findings: []findings.Finding{
 			{
-				RuleID:   "security.sql",
 				Category: "security",
 				Severity: "high",
 				Path:     "internal/db/query.go",
 				Message:  "unsafe SQL concatenation",
 			},
 			{
-				RuleID:   "maintainability.deadcode",
 				Category: "maintainability",
 				Severity: "medium",
 				Path:     "internal/app/service.go",
@@ -138,5 +198,22 @@ func TestSummarizeDecisionAndApprovalPolicy(t *testing.T) {
 		ApproveOnPass: true,
 	}, findings.FindingsBundle{HeadSHA: "head-b"}, "head-b") {
 		t.Fatal("CanAutoApprove() = false, want true for clean pass on matching SHA")
+	}
+}
+
+func TestSummarizeDecisionIgnoresUnknownBlockOnSeverity(t *testing.T) {
+	t.Parallel()
+
+	result := SummarizeDecision(findings.FindingsBundle{Findings: []findings.Finding{{
+		Category: "maintainability",
+		Severity: "medium",
+		Path:     "main.go",
+		Message:  "advisory",
+	}}}, []string{"unknown"})
+	if result.Decision != MergeDecisionWarn {
+		t.Fatalf("Decision = %q, want warn", result.Decision)
+	}
+	if result.BlockCount != 0 || result.AdvisoryCount != 1 {
+		t.Fatalf("unexpected counts: %+v", result)
 	}
 }

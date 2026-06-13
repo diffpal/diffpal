@@ -96,6 +96,7 @@ func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
 	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
 	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
+	cmd.Flags().Bool("dry-run", false, "Print the host review markdown without publishing")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -126,6 +127,10 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	modes := parseModeList(modeSpec)
 	feedback, _ := cmd.Flags().GetString("feedback")
 	summaryOverview, _ := cmd.Flags().GetBool("summary-overview")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	if dryRun && platform != "github" {
+		return withExitCode(2, fmt.Errorf("--dry-run is only supported for github review"))
+	}
 	if len(modes) == 0 {
 		if _, err := normalizeFeedback(feedback); err != nil {
 			return withExitCode(2, err)
@@ -138,6 +143,21 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	}
 
 	blocking := countBlockingFindings(execution.Result.Bundle)
+
+	if dryRun {
+		resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
+		if err != nil {
+			return withExitCode(2, err)
+		}
+		summary := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview)
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(summary)); err != nil {
+			return withExitCode(5, err)
+		}
+		if execution.Gate && blocking > 0 {
+			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+		}
+		return nil
+	}
 
 	if platform == "github" && shouldSkipGitHubPublish(execution.Config, execution.Result.Bundle) {
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
@@ -278,8 +298,10 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if err := findings.WriteBundle(outPath, result.Bundle, repo); err != nil {
 		return reviewExecution{}, withExitCode(5, err)
 	}
-	if err := emitReviewSummary(cmd, result, contextLines, outPath); err != nil {
-		return reviewExecution{}, err
+	if !reviewDryRun(cmd) {
+		if err := emitReviewSummary(cmd, result, contextLines, outPath); err != nil {
+			return reviewExecution{}, err
+		}
 	}
 
 	return reviewExecution{
@@ -290,6 +312,14 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		Gate:    gate,
 		Result:  result,
 	}, nil
+}
+
+func reviewDryRun(cmd *cobra.Command) bool {
+	if cmd.Flags().Lookup("dry-run") == nil {
+		return false
+	}
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	return dryRun
 }
 
 func readReviewInstructionsFile(path string) (string, error) {
@@ -364,10 +394,6 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	if !ctx.IsFork {
 		return false
 	}
-	if ctx.EventName == "pull_request_target" {
-		_, authErr := platformauth.Resolve(cfg, "github")
-		return authErr != nil
-	}
 	return true
 }
 
@@ -380,7 +406,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
 
 	switch platform {
 	case "github":
@@ -392,7 +418,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		commentPlan := github.PlanInlineCommentsWithProfile(existingComments, bundle.Findings, string(profile))
+		commentPlan := github.PlanInlineCommentsWithOptions(existingComments, bundle.Findings, github.CommentOptions{
+			Profile: string(profile),
+			Links:   github.NewPermanentLinkProvider(reviewCtx),
+		})
 		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {

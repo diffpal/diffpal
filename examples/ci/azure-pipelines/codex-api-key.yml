@@ -1,0 +1,35 @@
+trigger: none
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "22.x"
+
+  - script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    displayName: Install Codex provider
+
+  - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+    displayName: Authenticate Codex
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
+
+  - task: DiffPalReview@1
+    displayName: DiffPal review
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
+    inputs:
+      diffpalVersion: 0.1.2
+      profile: ci
+      feedback: balanced
+      gate: true
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
