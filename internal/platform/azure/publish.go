@@ -79,7 +79,7 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 				action = ActionUpdate
 			}
 		}
-		state = append(state, ThreadState{ThreadID: key, FindingID: f.ID})
+		state = append(state, ThreadState{ThreadID: actionThreadID, FindingID: f.ID})
 		out = append(out, ThreadAction{
 			Type:      action,
 			FindingID: f.ID,

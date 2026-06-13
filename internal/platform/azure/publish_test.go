@@ -129,6 +129,9 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 	if plan.Actions[0].ThreadID != threadKey("main.go", 12, "security", "fp-old") {
 		t.Fatalf("ThreadID = %q, want prior thread id", plan.Actions[0].ThreadID)
 	}
+	if plan.State[0].ThreadID != plan.Actions[0].ThreadID {
+		t.Fatalf("state ThreadID = %q, want action ThreadID %q", plan.State[0].ThreadID, plan.Actions[0].ThreadID)
+	}
 }
 
 func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
