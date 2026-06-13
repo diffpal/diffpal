@@ -86,6 +86,20 @@ func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
 	}
 }
 
+func TestDiscussionBodyFallsBackToTitle(t *testing.T) {
+	t.Parallel()
+
+	body := discussionBody(findings.Finding{
+		Category:   "correctness",
+		Severity:   "medium",
+		Confidence: 0.9,
+		Title:      "title only finding",
+	})
+	if !strings.Contains(body, "title only finding") {
+		t.Fatalf("body missing title fallback:\n%s", body)
+	}
+}
+
 func TestPlanDiscussionsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
 	t.Parallel()
 

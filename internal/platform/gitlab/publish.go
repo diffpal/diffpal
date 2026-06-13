@@ -116,7 +116,7 @@ func discussionBody(f findings.Finding) string {
 	lines := []string{
 		fmt.Sprintf("**%s %s**", strings.ToUpper(f.Severity), f.Category),
 		"",
-		f.Message,
+		findingText(f),
 		"",
 		"**Confidence**: " + formatConfidence(f.Confidence),
 		"**Provider**: " + f.Provider,
@@ -130,6 +130,13 @@ func discussionBody(f findings.Finding) string {
 		lines = append(lines, "", "**Suggestion:**", fence, f.Suggestion, fence)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func findingText(f findings.Finding) string {
+	if strings.TrimSpace(f.Message) != "" {
+		return f.Message
+	}
+	return f.Title
 }
 
 func markdownFence(content string) string {

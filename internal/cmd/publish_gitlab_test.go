@@ -10,8 +10,6 @@ import (
 )
 
 func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
-	t.Parallel()
-
 	bundle := findings.FindingsBundle{
 		Version:  findings.VersionV1,
 		ReviewID: "mr-1",
