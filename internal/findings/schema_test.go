@@ -11,7 +11,6 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 		HeadSHA:  "head-a",
 		Findings: []Finding{
 			{
-				RuleID:     "correctness.nil",
 				Category:   "correctness",
 				Severity:   "HIGH",
 				Confidence: 0.9,
@@ -36,7 +35,6 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 
 	secondBundle := bundle
 	secondBundle.Findings = []Finding{{
-		RuleID:     "correctness.nil",
 		Category:   "correctness",
 		Severity:   "high",
 		Confidence: 0.9,
@@ -68,7 +66,6 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:    "r",
 				Category:  "c",
 				Severity:  "urgent",
 				Path:      "x.go",
@@ -83,7 +80,34 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:     "r",
+				Category:  "c",
+				Severity:  "high",
+				Path:      "   ",
+				StartLine: 4,
+				EndLine:   4,
+				Title:     "t",
+				Message:   "m",
+				Evidence:  "e",
+			}},
+		},
+		{
+			Version:  VersionV1,
+			ReviewID: "review",
+			Findings: []Finding{{
+				Category:  "c",
+				Severity:  "high",
+				Path:      "x.go",
+				StartLine: 0,
+				EndLine:   4,
+				Title:     "t",
+				Message:   "m",
+				Evidence:  "e",
+			}},
+		},
+		{
+			Version:  VersionV1,
+			ReviewID: "review",
+			Findings: []Finding{{
 				Category:   "c",
 				Severity:   "high",
 				Confidence: 1.5,
@@ -99,7 +123,6 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:    "r",
 				Category:  "c",
 				Severity:  "high",
 				Path:      "x.go",
@@ -128,7 +151,6 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 		ReviewID: "review-a",
 		HeadSHA:  "head-a",
 		Findings: []Finding{{
-			RuleID:     "security.xss",
 			Category:   "security",
 			Severity:   "HIGH",
 			Confidence: 0.8,
@@ -155,5 +177,24 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	}
 	if readBack.Findings[0].ReviewID != "review-a" {
 		t.Fatalf("ReviewID = %q, want review-a", readBack.Findings[0].ReviewID)
+	}
+}
+
+func TestFingerprintPreservesPathCase(t *testing.T) {
+	t.Parallel()
+
+	base := Finding{
+		ReviewID:  "review-a",
+		Category:  "correctness",
+		Path:      "internal/app/service.go",
+		StartLine: 12,
+		EndLine:   12,
+		Message:   "same message",
+		Evidence:  "same evidence",
+	}
+	upper := base
+	upper.Path = "internal/app/Service.go"
+	if Fingerprint("repo", "head-a", base) == Fingerprint("repo", "head-a", upper) {
+		t.Fatal("Fingerprint() matched paths that differ by case")
 	}
 }

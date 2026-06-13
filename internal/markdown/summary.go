@@ -208,8 +208,8 @@ func sortFindings(items []findings.Finding) []findings.Finding {
 		if leftKnown && rightKnown && leftSeverity != rightSeverity {
 			return leftSeverity < rightSeverity
 		}
-		if left.RuleID != right.RuleID {
-			return left.RuleID < right.RuleID
+		if left.Category != right.Category {
+			return left.Category < right.Category
 		}
 		return left.Message < right.Message
 	})
@@ -266,13 +266,18 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 		prefix = "- "
 		detailPrefix = "  - "
 	}
-	fmt.Fprintf(&out, "%s**[%s][%s]**", prefix, strings.ToLower(finding.Severity), finding.RuleID)
-	if finding.StartLine > 0 {
+	link := strings.TrimSpace(opts.Link)
+	hasLink := link != ""
+	fmt.Fprintf(&out, "%s**%s**", prefix, findingHeading(finding, hasLink))
+	if finding.StartLine > 0 && !hasLink {
 		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
 	}
 	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
-	if strings.TrimSpace(opts.Link) != "" {
-		fmt.Fprintf(&out, "\n%s%s\n\n", detailPrefix, strings.TrimSpace(opts.Link))
+	if finding.Evidence != "" {
+		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, finding.Evidence)
+	}
+	if hasLink {
+		fmt.Fprintf(&out, "%s**Source**:\n%s%s\n", detailPrefix, detailPrefix, link)
 	}
 	if opts.Snippet.Code != "" {
 		out.WriteString("\n")
@@ -283,14 +288,24 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 		writeCodeFence(&out, opts.Snippet, indent)
 		out.WriteString("\n")
 	}
-	if finding.Evidence != "" {
-		fmt.Fprintf(&out, "%sEvidence: %s\n", detailPrefix, finding.Evidence)
-	}
 	if finding.Suggestion != "" {
-		fmt.Fprintf(&out, "%sSuggestion: %s\n", detailPrefix, finding.Suggestion)
+		fmt.Fprintf(&out, "%s**Suggestion**: %s\n", detailPrefix, finding.Suggestion)
 	}
-	fmt.Fprintf(&out, "%sConfidence: %.2f\n", detailPrefix, finding.Confidence)
+	fmt.Fprintf(&out, "%s**Confidence**: %.2f\n", detailPrefix, finding.Confidence)
 	return out.String()
+}
+
+func findingHeading(finding findings.Finding, linked bool) string {
+	severity := strings.ToLower(strings.TrimSpace(finding.Severity))
+	category := strings.ToLower(strings.TrimSpace(finding.Category))
+	return titleWord(severity) + " " + category
+}
+
+func titleWord(value string) string {
+	if value == "" {
+		return ""
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
 }
 
 func snippetForFinding(provider SnippetProvider, finding findings.Finding) CodeSnippet {

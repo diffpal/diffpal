@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/markdown"
@@ -59,24 +60,28 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
-		if f.RuleID == "" || f.Path == "" {
+		if f.Category == "" || f.Path == "" {
 			continue
 		}
 		if f.StartLine <= 0 || f.Confidence < minConfidence {
 			continue
 		}
-		key := commentKey(f.Path, f.StartLine, f.RuleID)
+		key := commentKey(f.Path, f.StartLine, f.Category, f.ID)
 		body := formatBody(f, links)
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
 			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
-		if prior, ok := existing[key]; ok && prior == f.ID {
+		prior, ok := existing[key]
+		if !ok {
+			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
+		}
+		if ok && prior == f.ID {
 			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
-		if _, ok := existing[key]; ok {
+		if ok {
 			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
@@ -117,8 +122,29 @@ func LoadExistingState(path string) (map[string]string, error) {
 	return out, nil
 }
 
-func commentKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func commentKey(path string, line int, category string, findingID string) string {
+	return commentLocationKey(path, line, category) + ":" + findingID
+}
+
+func commentLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", false
+		}
+		prior = findingID
+		found = true
+	}
+	return prior, found
 }
 
 func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {

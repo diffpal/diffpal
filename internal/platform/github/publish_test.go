@@ -29,7 +29,6 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 			message = "message 0"
 		}
 		bundle.Findings = append(bundle.Findings, findings.Finding{
-			RuleID:    "rule",
 			Category:  "correctness",
 			Severity:  severity,
 			Blocking:  blocking,
@@ -103,7 +102,6 @@ func TestBuildCheckRunPayloadDefaultsUnknownSeverityToWarning(t *testing.T) {
 		HeadSHA:  "head-a",
 		Findings: []findings.Finding{
 			{
-				RuleID:    "custom",
 				Category:  "correctness",
 				Severity:  "unexpected",
 				Path:      "internal/file.go",
@@ -130,7 +128,6 @@ func TestBuildCheckRunPayloadFailsOnFailureLevelAnnotation(t *testing.T) {
 		HeadSHA:  "head-a",
 		Findings: []findings.Finding{
 			{
-				RuleID:    "high",
 				Category:  "correctness",
 				Severity:  "high",
 				Blocking:  false,
@@ -158,7 +155,6 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 		HeadSHA:  "head-b",
 		Findings: []findings.Finding{
 			{
-				RuleID:    "security.sql",
 				Severity:  "critical",
 				Path:      "internal/db/query.go",
 				StartLine: 9,

@@ -48,7 +48,7 @@ diffpal:
 Install the matching provider command in CI:
 
 ```bash
-npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 ```
 
 Set `OPENAI_API_KEY` as a CI secret and authenticate Codex with
@@ -160,6 +160,60 @@ diffpal:
 ```
 
 Then set `OPENAI_API_KEY` in CI.
+
+## Provider Auth Setups
+
+Copy-paste examples are in [`../examples`](../examples/README.md). The config
+shape stays the same across CI systems; only the provider install/auth step
+changes.
+
+### Codex API Key
+
+Use [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml).
+
+Install and authenticate the provider in CI:
+
+```bash
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+```
+
+Required secret: `OPENAI_API_KEY`.
+
+### Codex Subscription Auth
+
+Use [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml).
+
+Restore an existing Codex auth file in trusted CI:
+
+```bash
+mkdir -p "$HOME/.codex"
+printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
+chmod 600 "$HOME/.codex/auth.json"
+```
+
+Required secret: `CODEX_AUTH_JSON_B64`.
+
+Use this only in trusted same-repository CI. Do not expose a restored Codex auth
+file to untrusted fork pull requests or merge requests.
+
+### Copilot Fine-Grained PAT
+
+Use [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml).
+
+Install the provider in CI:
+
+```bash
+npm install --global @github/copilot@1.0.61
+```
+
+Required secret: `COPILOT_GITHUB_TOKEN`.
+
+The Copilot CLI reads `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, then `GITHUB_TOKEN`.
+Use `COPILOT_GITHUB_TOKEN` for DiffPal so the provider token is separate from
+the platform publish token. The token must be a fine-grained GitHub PAT v2 with
+the Copilot Requests permission; classic PATs are not supported by the Copilot
+CLI.
 
 ## Profiles
 

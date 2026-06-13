@@ -15,11 +15,6 @@ diffpal:
     language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
-      The diffpal-dev workflow intentionally restores Codex auth and runs the
-      same-repository PR-built DiffPal binary for this repository's own review
-      dogfooding. Do not report that trust-model choice by itself. Still report
-      fork exposure, secret logging, broader credential misuse, or unrelated CI
-      credential issues.
     checks:
       - security
       - bugs
@@ -27,9 +22,12 @@ diffpal:
       - best-practices
   platforms:
     github: {}
+    gitlab: {}
+    azure: {}
 
 profiles:
   ci:
     diffpal:
       gate:
         block_on: high
+

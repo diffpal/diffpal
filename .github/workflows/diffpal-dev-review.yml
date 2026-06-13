@@ -1,0 +1,59 @@
+name: diffpal-dev
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: diffpal-dev-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: diffpal-dev/review
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build DiffPal
+        run: go build -o .artifacts/bin/diffpal ./cmd/diffpal
+
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+
+      - name: Restore Codex auth
+        run: |
+          mkdir -p "$HOME/.codex"
+          printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
+          chmod 600 "$HOME/.codex/auth.json"
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+
+      - name: Run DiffPal review
+        run: >-
+          .artifacts/bin/diffpal --profile ci review github
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --repo ${{ github.repository }}
+          --review-id github-pr-${{ github.event.pull_request.number }}
+          --feedback balanced
+          --mode summary
+          --gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

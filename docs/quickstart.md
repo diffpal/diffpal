@@ -1,109 +1,48 @@
 # DiffPal Quickstart
 
-This guide gets DiffPal reviewing GitHub pull requests with the Codex ACP
-provider. The GitHub Action installs the DiffPal CLI for you; you only install
-the provider command in the workflow.
-
-For GitLab CI and Azure Pipelines, use the full
-[CI setup guide](ci-examples.md).
+This guide gets DiffPal reviewing GitHub pull requests with Codex API-key auth.
+For other providers or CI systems, use the examples matrix:
+[`examples/README.md`](../examples/README.md).
 
 ## 1. Add Config
 
-Commit `.config/diffpal/config.yaml`:
+Copy the Codex API-key config:
 
-```yaml
-version: v1
-
-runtime:
-  providers:
-    codex-acp:
-      type: codex_acp
-      codex_acp:
-        reasoning_effort: low
-
-diffpal:
-  provider: codex-acp
-  gate:
-    block_on: high
-  review:
-    language: en
-    instructions: |
-      Prefer actionable findings that are directly supported by the diff.
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices
+```bash
+mkdir -p .config/diffpal
+cp examples/configs/codex-api-key/config.yaml .config/diffpal/config.yaml
 ```
 
-You can generate a starter config locally with `diffpal init`, but the important
-part is committing the reviewed config file before CI runs.
+Or generate a starter config locally with `diffpal init` and compare it with
+[`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml).
 
 ## 2. Add Secret
 
-Add this repository secret:
+Add this GitHub repository secret:
 
 | Secret | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Lets the Codex CLI act as the review provider. |
 
-GitHub provides `GITHUB_TOKEN` automatically. The workflow below grants it the
+GitHub provides `GITHUB_TOKEN` automatically. The workflow grants it the
 permissions DiffPal needs to publish PR feedback.
 
 ## 3. Add Workflow
 
-Create `.github/workflows/diffpal-review.yml`:
+Copy the GitHub Actions example:
 
-```yaml
-name: diffpal-review
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-
-concurrency:
-  group: diffpal-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-jobs:
-  review:
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Codex provider
-        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
-
-      - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Review pull request
-        uses: diffpal/diffpal@v0.1.2
-        with:
-          diffpal-version: latest
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          repo: ${{ github.repository }}
-          review-id: github-pr-${{ github.event.pull_request.number }}
-          feedback: balanced
-          gate: true
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```bash
+mkdir -p .github/workflows
+cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal-review.yml
 ```
+
+The example:
+
+- performs a full checkout with `fetch-depth: 0`
+- installs the Codex provider command
+- authenticates Codex with `OPENAI_API_KEY`
+- uses the DiffPal action, which installs the DiffPal CLI
+- runs only on trusted same-repository PRs when secrets are required
 
 ## What Success Looks Like
 
@@ -114,7 +53,7 @@ After a PR run, expect:
 - inline comments only when actionable findings exist
 - `.artifacts/diffpal/findings.json` in the workflow workspace
 - a failed job only when `gate: true` and blocking findings exist, or when
-  setup fails
+  setup/publish fails
 
 The summary includes a semantic overview of the PR by default. Hide it with:
 
@@ -122,23 +61,9 @@ The summary includes a semantic overview of the PR by default. Hide it with:
 summary-overview: false
 ```
 
-## Local Commands
+## Other Setups
 
-Local commands are useful for setup checks and debugging, but they are not the
-main quickstart path.
-
-```bash
-npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
-printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-diffpal init
-diffpal doctor --mode github
-diffpal review local --base origin/main --head HEAD
-```
-
-## Other CI Systems
-
-- [GitLab CI](ci-examples.md#gitlab-ci)
-- [Azure Pipelines](ci-examples.md#azure-pipelines)
-
-For production, pin `diffpal-version`, `@diffpal/diffpal`, and
-`@openai/codex`, and `@normahq/codex-acp-bridge` to versions you have tested.
+- GitHub Actions: [`examples/ci/github-actions`](../examples/ci/github-actions)
+- GitLab CI: [`examples/ci/gitlab`](../examples/ci/gitlab)
+- Azure Pipelines: [`examples/ci/azure-pipelines`](../examples/ci/azure-pipelines)
+- Provider configs: [`examples/configs`](../examples/configs)

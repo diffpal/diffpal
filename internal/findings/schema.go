@@ -36,7 +36,6 @@ type ReviewedFile struct {
 type Finding struct {
 	ID         string  `json:"id"`
 	ReviewID   string  `json:"review_id"`
-	RuleID     string  `json:"rule_id"`
 	Category   string  `json:"category"`
 	Severity   string  `json:"severity"`
 	Confidence float64 `json:"confidence"`
@@ -73,11 +72,8 @@ func Validate(bundle FindingsBundle) error {
 		}
 	}
 	for _, f := range bundle.Findings {
-		if f.Path == "" {
+		if strings.TrimSpace(f.Path) == "" {
 			return ValidationError{Field: "finding.path", Msg: "path is required"}
-		}
-		if f.RuleID == "" {
-			return ValidationError{Field: "finding.rule_id", Msg: "rule_id is required"}
 		}
 		if f.Category == "" {
 			return ValidationError{Field: "finding.category", Msg: "category is required"}
@@ -97,10 +93,10 @@ func Validate(bundle FindingsBundle) error {
 		if f.Evidence == "" {
 			return ValidationError{Field: "finding.evidence", Msg: "evidence is required"}
 		}
-		if f.StartLine < 0 || f.EndLine < 0 {
-			return ValidationError{Field: "finding.line", Msg: "line numbers must be non-negative"}
+		if f.StartLine <= 0 || f.EndLine <= 0 {
+			return ValidationError{Field: "finding.line", Msg: "line numbers must be positive"}
 		}
-		if f.EndLine > 0 && f.StartLine > f.EndLine {
+		if f.StartLine > f.EndLine {
 			return ValidationError{Field: "finding.line", Msg: "start_line must be <= end_line"}
 		}
 		if f.Confidence < 0 || f.Confidence > 1 {
@@ -130,7 +126,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Path        string `json:"path"`
 		LineStart   int    `json:"line_start"`
 		LineEnd     int    `json:"line_end"`
-		RuleID      string `json:"rule_id"`
+		Category    string `json:"category"`
 		MessageNorm string `json:"message_norm"`
 		Evidence    string `json:"evidence"`
 	}
@@ -142,7 +138,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Path:        normalizePath(f.Path),
 		LineStart:   f.StartLine,
 		LineEnd:     f.EndLine,
-		RuleID:      f.RuleID,
+		Category:    strings.TrimSpace(strings.ToLower(f.Category)),
 		MessageNorm: normalizeMessage(f.Message),
 		Evidence:    shaText(f.Evidence),
 	}
@@ -152,7 +148,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 }
 
 func normalizePath(v string) string {
-	return strings.TrimSpace(strings.ToLower(v))
+	return strings.TrimSpace(v)
 }
 
 func normalizeMessage(msg string) string {

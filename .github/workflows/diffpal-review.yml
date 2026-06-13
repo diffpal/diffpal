@@ -1,47 +1,10 @@
-name: diffpal-review
+name: diffpal
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-
-concurrency:
-  group: diffpal-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
-  review:
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+  disabled:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Install DiffPal and Codex provider
-        run: npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
-
-      - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Run DiffPal review
-        run: >-
-          diffpal --profile ci review github
-          --base ${{ github.event.pull_request.base.sha }}
-          --head ${{ github.event.pull_request.head.sha }}
-          --repo ${{ github.repository }}
-          --review-id github-pr-${{ github.event.pull_request.number }}
-          --feedback balanced
-          --gate
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "The released-package DiffPal PR workflow is disabled."

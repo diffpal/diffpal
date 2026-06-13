@@ -44,7 +44,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 	state := make([]DiscussionState, 0, len(findingsList))
 	advisory := make([]findings.Finding, 0, len(findingsList))
 	for _, finding := range findingsList {
-		if finding.Path == "" || finding.StartLine <= 0 || finding.RuleID == "" {
+		if finding.Path == "" || finding.StartLine <= 0 || finding.Category == "" {
 			continue
 		}
 		blocking := finding.Blocking || isLevelOrAbove(finding.Severity, blockOn)
@@ -52,16 +52,25 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			advisory = append(advisory, finding)
 			continue
 		}
-		thread := discussionKey(finding.Path, finding.StartLine, finding.RuleID)
+		thread := discussionKey(finding.Path, finding.StartLine, finding.Category, finding.ID)
+		actionThread := thread
 		actionType := ActionCreate
-		if prior, ok := existing[thread]; ok {
+		prior, ok := existing[thread]
+		if !ok {
+			var priorThread string
+			priorThread, prior, ok = singleExistingForLocation(existing, discussionLocationKey(finding.Path, finding.StartLine, finding.Category))
+			if ok {
+				actionThread = priorThread
+			}
+		}
+		if ok {
 			if prior == finding.ID {
 				actionType = ActionSkip
 			} else {
 				actionType = ActionUpdate
 			}
 		}
-		state = append(state, DiscussionState{ThreadHash: thread, FindingID: finding.ID})
+		state = append(state, DiscussionState{ThreadHash: actionThread, FindingID: finding.ID})
 		out = append(out, DiscussionAction{
 			Type:       actionType,
 			FindingID:  finding.ID,
@@ -69,7 +78,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			Path:       finding.Path,
 			Line:       finding.StartLine,
 			Blocking:   blocking,
-			ThreadHash: thread,
+			ThreadHash: actionThread,
 		})
 	}
 	var advisorySummary string
@@ -83,26 +92,77 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 	}
 }
 
-func discussionKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func discussionKey(path string, line int, category string, findingID string) string {
+	return discussionLocationKey(path, line, category) + ":" + findingID
+}
+
+func discussionLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, string, bool) {
+	var priorKey string
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", "", false
+		}
+		priorKey = key
+		prior = findingID
+		found = true
+	}
+	return priorKey, prior, found
 }
 
 func discussionBody(f findings.Finding) string {
 	lines := []string{
-		fmt.Sprintf("**[%s][%s]**", strings.ToUpper(f.Category), f.RuleID),
+		fmt.Sprintf("**%s %s**", strings.ToUpper(f.Severity), f.Category),
 		"",
-		f.Message,
+		findingText(f),
 		"",
 		"**Confidence**: " + formatConfidence(f.Confidence),
 		"**Provider**: " + f.Provider,
 	}
 	if f.Evidence != "" {
-		lines = append(lines, "", "**Evidence:**", "```", f.Evidence, "```")
+		fence := markdownFence(f.Evidence)
+		lines = append(lines, "", "**Evidence:**", fence, f.Evidence, fence)
 	}
 	if f.Suggestion != "" {
-		lines = append(lines, "", "**Suggestion:**", "```", f.Suggestion, "```")
+		fence := markdownFence(f.Suggestion)
+		lines = append(lines, "", "**Suggestion:**", fence, f.Suggestion, fence)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func findingText(f findings.Finding) string {
+	if strings.TrimSpace(f.Message) != "" {
+		return f.Message
+	}
+	return f.Title
+}
+
+func markdownFence(content string) string {
+	maxRun := 0
+	current := 0
+	for _, r := range content {
+		if r == '`' {
+			current++
+			if current > maxRun {
+				maxRun = current
+			}
+			continue
+		}
+		current = 0
+	}
+	if maxRun < 3 {
+		return "```"
+	}
+	return strings.Repeat("`", maxRun+1)
 }
 
 func formatConfidence(v float64) string {
@@ -119,9 +179,15 @@ func isLevelOrAbove(level string, blockOn []string) bool {
 		"high":     3,
 		"critical": 4,
 	}
-	current := severityRank[strings.ToLower(level)]
+	current, ok := severityRank[strings.ToLower(level)]
+	if !ok {
+		return false
+	}
 	for _, candidate := range blockOn {
-		target := severityRank[strings.ToLower(candidate)]
+		target, ok := severityRank[strings.ToLower(candidate)]
+		if !ok {
+			continue
+		}
 		if current >= target {
 			return true
 		}

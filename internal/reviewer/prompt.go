@@ -59,7 +59,6 @@ const outputSchemaJSON = `{
       "items": {
         "type": "object",
         "properties": {
-          "rule_id": {"type": "string"},
           "category": {"type": "string", "enum": ["security", "correctness", "reliability", "performance", "maintainability", "testing", "style"]},
           "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
           "confidence": {"type": "number", "minimum": 0, "maximum": 1},
@@ -71,11 +70,13 @@ const outputSchemaJSON = `{
           "evidence": {"type": "string"},
           "suggestion": {"type": "string"}
         },
-        "required": ["rule_id", "category", "severity", "confidence", "path", "start_line", "end_line", "title", "message", "evidence"]
+        "required": ["category", "severity", "confidence", "path", "start_line", "end_line", "title", "message", "evidence"],
+        "additionalProperties": false
       }
     }
   },
-  "required": ["change_summary", "findings"]
+  "required": ["change_summary", "findings"],
+  "additionalProperties": false
 }`
 
 func reviewInstruction(custom string) string {
@@ -99,7 +100,6 @@ func reviewInstruction(custom string) string {
 		"Do not suppress severe findings because a file looks like debug, test, sample, or newly added code unless the snippet proves it is unreachable in production.",
 		"Do not invent paths, line numbers, APIs, or behavior that are not visible in the input.",
 		"Return one finding per distinct issue.",
-		"Use rule_id format <category>.<slug>.",
 		"Use critical/high only for severe actionable issues.",
 		"If there are no issues, return an empty findings array.",
 		"Suggestions are optional and should be short, concrete, and safe to apply.",

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
 )
@@ -20,12 +21,12 @@ const (
 )
 
 type ThreadAction struct {
-	Type      ThreadActionType
-	FindingID string
-	Path      string
-	Line      int
-	Body      string
-	ThreadID  string
+	Type      ThreadActionType `json:"type"`
+	FindingID string           `json:"finding_id"`
+	Path      string           `json:"path"`
+	Line      int              `json:"line"`
+	Body      string           `json:"body"`
+	ThreadID  string           `json:"thread_id"`
 }
 
 type ThreadState struct {
@@ -57,26 +58,35 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 	out := make([]ThreadAction, 0, len(findingsList))
 	state := make([]ThreadState, 0, len(findingsList))
 	for _, f := range findingsList {
-		if f.Path == "" || f.StartLine <= 0 || f.RuleID == "" || f.Confidence < minConfidence {
+		if f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
 			continue
 		}
-		key := threadKey(f.Path, f.StartLine, f.RuleID)
+		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
+		actionThreadID := key
 		action := ActionCreate
-		if prior, ok := existing[key]; ok {
+		prior, ok := existing[key]
+		if !ok {
+			var priorThreadID string
+			priorThreadID, prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
+			if ok {
+				actionThreadID = priorThreadID
+			}
+		}
+		if ok {
 			if prior == f.ID {
 				action = ActionSkip
 			} else {
 				action = ActionUpdate
 			}
 		}
-		state = append(state, ThreadState{ThreadID: key, FindingID: f.ID})
+		state = append(state, ThreadState{ThreadID: actionThreadID, FindingID: f.ID})
 		out = append(out, ThreadAction{
 			Type:      action,
 			FindingID: f.ID,
 			Path:      f.Path,
 			Line:      f.StartLine,
 			Body:      threadBody(f),
-			ThreadID:  key,
+			ThreadID:  actionThreadID,
 		})
 	}
 	return ThreadPlan{
@@ -97,12 +107,35 @@ func threadConfidenceThreshold(profile string) float64 {
 	return MinThreadConfidence
 }
 
-func threadKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func threadKey(path string, line int, category string, findingID string) string {
+	return threadLocationKey(path, line, category) + ":" + findingID
+}
+
+func threadLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, string, bool) {
+	var priorKey string
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", "", false
+		}
+		priorKey = key
+		prior = findingID
+		found = true
+	}
+	return priorKey, prior, found
 }
 
 func threadBody(f findings.Finding) string {
-	return "### " + f.RuleID + "\n\n" +
+	return "### " + strings.ToUpper(f.Severity) + " " + f.Category + "\n\n" +
 		"Category: **" + f.Category + "**\n\n" +
 		"Severity: **" + f.Severity + "**\n\n" +
 		f.Message + "\n\n" +

@@ -26,7 +26,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 		},
 		Findings: []findings.Finding{
 			{
-				RuleID:    "security.sql",
+				Category:  "security",
 				Severity:  "high",
 				Blocking:  true,
 				Path:      "internal/db/query.go",
@@ -37,7 +37,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				Evidence:  "db.Query(\"select \" + input)",
 			},
 			{
-				RuleID:    "security.sql",
+				Category:  "security",
 				Severity:  "high",
 				Blocking:  true,
 				Path:      "internal/db/query.go",
@@ -48,7 +48,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				Evidence:  "db.Query(raw)",
 			},
 			{
-				RuleID:    "correctness.nil",
+				Category:  "correctness",
 				Severity:  "critical",
 				Blocking:  true,
 				Path:      "internal/app/service.go",
@@ -59,7 +59,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				Evidence:  "cfg.Client.Do(req)",
 			},
 			{
-				RuleID:    "maintainability.deadcode",
+				Category:  "maintainability",
 				Severity:  "low",
 				Path:      "internal/app/service.go",
 				StartLine: 41,
@@ -89,10 +89,10 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertContains(t, got, "| `internal/web/handler.go` | Passed | No actionable findings. |")
 	assertContains(t, got, "## Detailed Comments")
 	assertContains(t, got, "### internal/app/service.go")
-	assertContains(t, got, "- **[critical][correctness.nil]** `L8`: possible nil dereference")
-	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
+	assertContains(t, got, "- **Critical correctness** `L8`: possible nil dereference")
+	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
 	assertContains(t, got, "### internal/db/query.go")
-	assertContains(t, got, "- **[high][security.sql]** `L20`: query concatenates untrusted input")
+	assertContains(t, got, "- **High security** `L20`: query concatenates untrusted input")
 }
 
 func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
@@ -203,7 +203,7 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 		},
 		Findings: []findings.Finding{
 			{
-				RuleID:     "security.sql-injection",
+				Category:   "security",
 				Severity:   "high",
 				Confidence: 0.98,
 				Path:       "internal/platformapi/admin_debug.go",
@@ -227,10 +227,10 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "- **[high][security.sql-injection]** `L12-L17`: query concatenates untrusted input")
+	assertContains(t, got, "- **High security** `L12-L17`: query concatenates untrusted input")
 	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
-	assertContains(t, got, "  - Evidence: Line 17 builds SQL by concatenating user input.")
-	assertContains(t, got, "  - Suggestion: Use a parameterized statement.")
+	assertContains(t, got, "  - **Evidence**: Line 17 builds SQL by concatenating user input.")
+	assertContains(t, got, "  - **Suggestion**: Use a parameterized statement.")
 }
 
 func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
@@ -240,7 +240,7 @@ func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
 		ReviewID: "review-no-snippet",
 		Findings: []findings.Finding{
 			{
-				RuleID:     "correctness.nil",
+				Category:   "correctness",
 				Severity:   "medium",
 				Confidence: 0.8,
 				Path:       "internal/app/service.go",
@@ -255,9 +255,39 @@ func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "- **[medium][correctness.nil]** `L4`: possible nil dereference")
-	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
+	assertContains(t, got, "- **Medium correctness** `L4`: possible nil dereference")
+	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
 	assertNotContains(t, got, "```")
+}
+
+func TestRenderSummaryUsesReadableLinkedFindingHeader(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-link",
+		Findings: []findings.Finding{
+			{
+				Category:   "security",
+				Severity:   "high",
+				Confidence: 0.98,
+				Path:       "internal/platformapi/admin_debug.go",
+				StartLine:  12,
+				EndLine:    17,
+				Message:    "query concatenates untrusted input",
+				Evidence:   "line 17 concatenates the user query parameter into SQL",
+			},
+		},
+	}, SummaryOptions{
+		Links: FindingLinkFunc(func(findings.Finding) (string, bool) {
+			return "https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17", true
+		}),
+	})
+
+	assertContains(t, got, "- **High security**: query concatenates untrusted input")
+	assertContains(t, got, "  - **Evidence**: line 17 concatenates the user query parameter into SQL")
+	assertContains(t, got, "  - **Source**:")
+	assertContains(t, got, "  - https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17")
+	assertNotContains(t, got, "**[high][")
 }
 
 func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
@@ -267,7 +297,6 @@ func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
 		ReviewID: "review-backticks",
 		Findings: []findings.Finding{
 			{
-				RuleID:     "docs.fence",
 				Severity:   "low",
 				Confidence: 0.7,
 				Path:       "README.md",

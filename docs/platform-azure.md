@@ -39,7 +39,7 @@ Required:
 
 - Only actionable findings with canonical `start_line > 0` and high confidence produce inline thread actions.
 - Key model:
-  - `path + ":" + start_line + ":" + end_line + ":" + ruleID`
+  - `path + ":" + start_line + ":" + category`
 - Re-runs are idempotent via stored key + finding ID:
   - same key + same finding ID → skip
   - same key + different finding ID → update
@@ -60,7 +60,7 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - The `DiffPalReview@1` task installs `@diffpal/diffpal` by default. Set
   `diffpalVersion` to pin a version or dist-tag.
 - Install the provider command separately, for example
-  `npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest`.
+  `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`.
 - Set `install: false` to use `diffpal` from `PATH`, or set `diffpalPath` to a
   custom binary path. Custom paths skip automatic installation.
 - Optional task inputs `language`, `reviewChecks`, and `feedback` map to the
