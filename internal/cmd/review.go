@@ -364,10 +364,6 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	if !ctx.IsFork {
 		return false
 	}
-	if ctx.EventName == "pull_request_target" {
-		_, authErr := platformauth.Resolve(cfg, "github")
-		return authErr != nil
-	}
 	return true
 }
 

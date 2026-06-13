@@ -184,12 +184,12 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 }
 
 func resolvePublishModes(platform string, modes []string, feedback string) ([]string, FeedbackProfile, error) {
-	if len(modes) > 0 {
-		return modes, FeedbackProfile(""), nil
-	}
 	profile, err := normalizeFeedback(feedback)
 	if err != nil {
 		return nil, "", err
+	}
+	if len(modes) > 0 {
+		return modes, profile, nil
 	}
 	return modesForFeedback(platform, profile), profile, nil
 }

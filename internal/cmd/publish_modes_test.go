@@ -67,8 +67,8 @@ func TestResolvePublishModesExplicitModesOverrideFeedback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolvePublishModes() error = %v", err)
 	}
-	if profile != "" {
-		t.Fatalf("profile = %q, want empty for explicit modes", profile)
+	if profile != FeedbackProfile("summary") {
+		t.Fatalf("profile = %q, want summary", profile)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("modes = %v, want %v", got, want)

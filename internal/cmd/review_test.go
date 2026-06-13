@@ -242,6 +242,44 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	}
 }
 
+func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	eventPath := writeGitHubEvent(t, `{
+  "number": 10,
+  "repository": {"full_name": "acme/diffpal"},
+  "pull_request": {
+    "base": {"sha": "base-a", "repo": {"full_name": "acme/diffpal"}},
+    "head": {"sha": "head-a", "repo": {"full_name": "fork/diffpal"}}
+  }
+}`)
+	t.Setenv("GITHUB_EVENT_NAME", "pull_request_target")
+	t.Setenv("GITHUB_TOKEN", "token")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_EVENT_PATH", eventPath)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.BaseSHA = "base-a"
+		result.Bundle.HeadSHA = "head-a"
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json")})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "publish=skipped-fork") {
+		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+}
+
 func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
