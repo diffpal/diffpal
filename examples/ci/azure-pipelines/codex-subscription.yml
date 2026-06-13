@@ -29,7 +29,7 @@ steps:
     displayName: DiffPal review
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     inputs:
-      diffpalVersion: latest
+      diffpalVersion: 0.1.2
       profile: ci
       feedback: balanced
       gate: true
