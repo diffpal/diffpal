@@ -35,8 +35,8 @@ jobs:
       - name: Install DiffPal CLI
         run: go install ./cmd/diffpal
 
-      - name: Install Codex CLI
-        run: npm install --global @openai/codex@latest
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 
       - name: Authenticate Codex
         run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key

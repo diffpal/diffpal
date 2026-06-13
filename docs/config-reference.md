@@ -48,7 +48,7 @@ diffpal:
 Install the matching provider command in CI:
 
 ```bash
-npm install --global @openai/codex@latest
+npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 ```
 
 Set `OPENAI_API_KEY` as a CI secret and authenticate Codex with

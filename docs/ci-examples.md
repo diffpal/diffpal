@@ -4,8 +4,8 @@ This is the main setup guide for running DiffPal in pull request pipelines.
 The default provider path is Codex ACP.
 
 The examples use npm `@latest` for quick onboarding. For production, pin
-`@diffpal/diffpal`, `diffpal-version`, and `@openai/codex` to versions you
-have tested.
+`@diffpal/diffpal`, `diffpal-version`, `@openai/codex`, and
+`@normahq/codex-acp-bridge` to versions you have tested.
 
 ## Common Setup
 
@@ -101,7 +101,7 @@ jobs:
           node-version: 22
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@latest
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 
       - name: Authenticate Codex
         run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
@@ -171,7 +171,7 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
-    - npm install --global @diffpal/diffpal@latest @openai/codex@latest
+    - npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
     - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-
@@ -243,7 +243,7 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @openai/codex@latest
+  - script: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
     displayName: Install Codex provider
 
   - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key

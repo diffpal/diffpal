@@ -116,8 +116,8 @@ Open a same-repository pull request and confirm the `diffpal-review` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
 present. The GitHub Action smoke path should use the released root action tag
-with default `install: true`; provider setup such as `@openai/codex` remains a
-separate explicit step.
+with default `install: true`; provider setup such as `@openai/codex` and
+`@normahq/codex-acp-bridge` remains a separate explicit step.
 
 ## Branch policy expectations
 

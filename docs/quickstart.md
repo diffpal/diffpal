@@ -83,7 +83,7 @@ jobs:
           node-version: 22
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@latest
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 
       - name: Authenticate Codex
         run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
@@ -128,7 +128,7 @@ Local commands are useful for setup checks and debugging, but they are not the
 main quickstart path.
 
 ```bash
-npm install --global @diffpal/diffpal@latest @openai/codex@latest
+npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 diffpal init
 diffpal doctor --mode github
@@ -141,4 +141,4 @@ diffpal review local --base origin/main --head HEAD
 - [Azure Pipelines](ci-examples.md#azure-pipelines)
 
 For production, pin `diffpal-version`, `@diffpal/diffpal`, and
-`@openai/codex` to versions you have tested.
+`@openai/codex`, and `@normahq/codex-acp-bridge` to versions you have tested.
