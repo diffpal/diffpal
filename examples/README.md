@@ -33,3 +33,6 @@ Copy the selected config to `.config/diffpal/config.yaml`.
 - Copilot token auth uses `COPILOT_GITHUB_TOKEN`. It must be a fine-grained
   GitHub PAT v2 with the Copilot Requests permission. Classic PATs are not
   supported by the Copilot CLI.
+- The GitLab examples restrict secret-backed jobs to same-project merge
+  requests. The Azure examples skip credentialed review steps when
+  `System.PullRequest.IsFork` is `True`.

@@ -115,6 +115,7 @@ func TestConvertFingerprintDoesNotDependOnHeadSHA(t *testing.T) {
 	t.Parallel()
 
 	finding := findings.Finding{
+		ID:        "stable-maintainability-finding",
 		Category:  "maintainability",
 		Severity:  "medium",
 		Path:      "internal/app/service.go",
@@ -141,6 +142,7 @@ func TestConvertFingerprintDoesNotDependOnFindingWording(t *testing.T) {
 	t.Parallel()
 
 	firstFinding := findings.Finding{
+		ID:        "stable-maintainability-finding",
 		Category:  "maintainability",
 		Severity:  "medium",
 		Path:      "internal/app/service.go",
@@ -173,6 +175,7 @@ func TestConvertFingerprintDistinguishesSameLineFindings(t *testing.T) {
 
 	items, err := Convert(findings.FindingsBundle{Findings: []findings.Finding{
 		{
+			ID:        "maintainability-a",
 			Category:  "maintainability",
 			Severity:  "medium",
 			Path:      "internal/app/service.go",
@@ -181,6 +184,7 @@ func TestConvertFingerprintDistinguishesSameLineFindings(t *testing.T) {
 			Message:   "first issue",
 		},
 		{
+			ID:        "maintainability-b",
 			Category:  "maintainability",
 			Severity:  "medium",
 			Path:      "internal/app/service.go",

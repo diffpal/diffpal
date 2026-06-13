@@ -18,11 +18,13 @@ steps:
 
   - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
     displayName: Authenticate Codex
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     env:
       OPENAI_API_KEY: $(OPENAI_API_KEY)
 
   - task: DiffPalReview@1
     displayName: DiffPal review
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     inputs:
       diffpalVersion: latest
       profile: ci
@@ -31,4 +33,3 @@ steps:
     env:
       OPENAI_API_KEY: $(OPENAI_API_KEY)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-

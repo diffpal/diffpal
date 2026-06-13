@@ -75,6 +75,8 @@ Required variables:
 
 Use protected/masked variables for provider tokens. If your project accepts fork
 merge requests, keep provider tokens available only to trusted pipelines.
+The examples restrict secret-backed review jobs to same-project merge requests
+with `$CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH`.
 
 What you should see:
 
@@ -102,6 +104,8 @@ Required setup:
 - Enable **Allow scripts to access the OAuth token**.
 - Pass `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` to the `DiffPalReview@1` task.
 - Keep `fetchDepth: 0` on checkout.
+- Keep credentialed steps behind `ne(variables['System.PullRequest.IsFork'], 'True')`
+  or a stricter organization-specific trusted-source condition.
 
 What you should see:
 

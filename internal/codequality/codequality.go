@@ -54,6 +54,7 @@ func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 func codeQualityFingerprint(repo string, f findings.Finding, occurrence int) string {
 	type payload struct {
 		Repo      string `json:"repo"`
+		FindingID string `json:"finding_id,omitempty"`
 		Path      string `json:"path"`
 		LineStart int    `json:"line_start"`
 		LineEnd   int    `json:"line_end"`
@@ -62,6 +63,7 @@ func codeQualityFingerprint(repo string, f findings.Finding, occurrence int) str
 	}
 	canonical := payload{
 		Repo:      repo,
+		FindingID: strings.TrimSpace(f.ID),
 		Path:      strings.TrimSpace(f.Path),
 		LineStart: f.StartLine,
 		LineEnd:   f.EndLine,
@@ -74,6 +76,9 @@ func codeQualityFingerprint(repo string, f findings.Finding, occurrence int) str
 }
 
 func codeQualityIdentity(f findings.Finding) string {
+	if strings.TrimSpace(f.ID) != "" {
+		return strings.TrimSpace(f.ID)
+	}
 	return fmt.Sprintf("%s:%d:%d:%s",
 		strings.TrimSpace(f.Path),
 		f.StartLine,

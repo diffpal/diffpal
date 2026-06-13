@@ -5,7 +5,7 @@ diffpal-review:
   stage: review
   image: node:22
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
     - npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
@@ -28,4 +28,3 @@ diffpal-review:
     reports:
       codequality: .artifacts/diffpal/codequality.json
       sarif: .artifacts/diffpal/diffpal.sarif
-
