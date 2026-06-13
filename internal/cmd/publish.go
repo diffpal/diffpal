@@ -43,7 +43,11 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if err != nil {
 		return nil, 0, err
 	}
-	summary := renderPublishSummary(bundle, profile, modes, summaryOverview)
+	if strings.TrimSpace(out) != "" && len(modes) > 1 {
+		return nil, 0, fmt.Errorf("--out cannot be used with multiple publish modes")
+	}
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
+	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 
 	for _, mode := range modes {
 		normalized := normalizePublishMode(platform, mode)
@@ -58,6 +62,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
 		case "check_run":
+			blocking = max(blocking, decision.BlockCount)
 			ctx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
 			if err != nil {
 				ctx = github.Context{}
@@ -77,7 +82,10 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err != nil {
 				return nil, 0, err
 			}
-			plan := github.PlanInlineCommentsWithProfile(existing, bundle.Findings, string(profile))
+			plan := github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
+				Profile:  string(profile),
+				Snippets: githubSnippetProvider(platform),
+			})
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
 				return nil, 0, err
@@ -87,17 +95,16 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
 		case "discussions":
-			dec := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 			existing, err := gitlabpub.LoadExistingState(targetOut)
 			if err != nil {
 				return nil, 0, err
 			}
 			plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
-			blocking += dec.BlockCount
+			blocking = max(blocking, decision.BlockCount)
 			payload := map[string]interface{}{
-				"decision":       string(dec.Decision),
-				"blocking_count": dec.BlockCount,
-				"advisory_count": dec.AdvisoryCount,
+				"decision":       string(decision.Decision),
+				"blocking_count": decision.BlockCount,
+				"advisory_count": decision.AdvisoryCount,
 				"plan":           plan,
 			}
 			raw, err := json.MarshalIndent(payload, "", "  ")
@@ -107,7 +114,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: string(dec.Decision)})
+			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: string(decision.Decision)})
 		case "code_quality", "code-quality":
 			report, err := codequality.ToJSON(bundle, repo)
 			if err != nil {
@@ -152,14 +159,13 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
 		case "status":
-			dec := gitlabpub.SummarizeDecision(bundle, blockThresholds)
-			blocking += dec.BlockCount
-			payload := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, dec.BlockCount, dec.AdvisoryCount, false)
+			blocking = max(blocking, decision.BlockCount)
+			payload := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, decision.BlockCount, decision.AdvisoryCount, false)
 			decisions := map[string]interface{}{
-				"decision": dec.Decision,
+				"decision": decision.Decision,
 				"status":   payload,
-				"blocking": dec.BlockCount,
-				"advisory": dec.AdvisoryCount,
+				"blocking": decision.BlockCount,
+				"advisory": decision.AdvisoryCount,
 			}
 			raw, err := json.MarshalIndent(decisions, "", "  ")
 			if err != nil {
@@ -178,23 +184,31 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 }
 
 func resolvePublishModes(platform string, modes []string, feedback string) ([]string, FeedbackProfile, error) {
-	if len(modes) > 0 {
-		return modes, FeedbackProfile(""), nil
-	}
 	profile, err := normalizeFeedback(feedback)
 	if err != nil {
 		return nil, "", err
 	}
+	if len(modes) > 0 {
+		return modes, profile, nil
+	}
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
 	opts := markdown.SummaryOptions{
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
+		Snippets:        githubSnippetProvider(platform),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts)
+}
+
+func githubSnippetProvider(platform string) markdown.SnippetProvider {
+	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
+		return nil
+	}
+	return markdown.NewWorktreeSnippetProvider(".")
 }
 
 func publishSurfaceLabels(modes []string) []string {

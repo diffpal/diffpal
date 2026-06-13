@@ -67,8 +67,8 @@ func TestResolvePublishModesExplicitModesOverrideFeedback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolvePublishModes() error = %v", err)
 	}
-	if profile != "" {
-		t.Fatalf("profile = %q, want empty for explicit modes", profile)
+	if profile != FeedbackProfile("summary") {
+		t.Fatalf("profile = %q, want summary", profile)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("modes = %v, want %v", got, want)
@@ -86,7 +86,7 @@ func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary(findings.FindingsBundle{
+	got := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",
@@ -112,7 +112,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary(findings.FindingsBundle{
+	got := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",

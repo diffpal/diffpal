@@ -193,6 +193,98 @@ func TestRenderSummaryFallsBackToSemanticChangeOverview(t *testing.T) {
 	assertNotContains(t, got, "Updated `internal/app/service.go`.")
 }
 
+func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
+	t.Parallel()
+
+	bundle := findings.FindingsBundle{
+		ReviewID: "review-snippet",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/platformapi/admin_debug.go"},
+		},
+		Findings: []findings.Finding{
+			{
+				RuleID:     "security.sql-injection",
+				Severity:   "high",
+				Confidence: 0.98,
+				Path:       "internal/platformapi/admin_debug.go",
+				StartLine:  12,
+				EndLine:    17,
+				Message:    "query concatenates untrusted input",
+				Evidence:   "Line 17 builds SQL by concatenating user input.",
+				Suggestion: "Use a parameterized statement.",
+			},
+		},
+	}
+	got := RenderSummaryWithOptions(bundle, SummaryOptions{
+		Snippets: SnippetFunc(func(finding findings.Finding) (CodeSnippet, bool) {
+			if finding.Path != "internal/platformapi/admin_debug.go" {
+				return CodeSnippet{}, false
+			}
+			return CodeSnippet{
+				Language: "go",
+				Code:     "user := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")",
+			}, true
+		}),
+	})
+
+	assertContains(t, got, "- **[high][security.sql-injection]** `L12-L17`: query concatenates untrusted input")
+	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
+	assertContains(t, got, "  - Evidence: Line 17 builds SQL by concatenating user input.")
+	assertContains(t, got, "  - Suggestion: Use a parameterized statement.")
+}
+
+func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-no-snippet",
+		Findings: []findings.Finding{
+			{
+				RuleID:     "correctness.nil",
+				Severity:   "medium",
+				Confidence: 0.8,
+				Path:       "internal/app/service.go",
+				StartLine:  4,
+				Message:    "possible nil dereference",
+				Evidence:   "cfg.Client.Do(req)",
+			},
+		},
+	}, SummaryOptions{
+		Snippets: SnippetFunc(func(findings.Finding) (CodeSnippet, bool) {
+			return CodeSnippet{}, false
+		}),
+	})
+
+	assertContains(t, got, "- **[medium][correctness.nil]** `L4`: possible nil dereference")
+	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
+	assertNotContains(t, got, "```")
+}
+
+func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-backticks",
+		Findings: []findings.Finding{
+			{
+				RuleID:     "docs.fence",
+				Severity:   "low",
+				Confidence: 0.7,
+				Path:       "README.md",
+				StartLine:  3,
+				Message:    "example contains a fence",
+				Evidence:   "nested fence",
+			},
+		},
+	}, SummaryOptions{
+		Snippets: SnippetFunc(func(findings.Finding) (CodeSnippet, bool) {
+			return CodeSnippet{Language: "markdown", Code: "```go\nfmt.Println(\"x\")\n```"}, true
+		}),
+	})
+
+	assertContains(t, got, "  ````markdown\n  ```go\n  fmt.Println(\"x\")\n  ```\n  ````")
+}
+
 func assertContains(t *testing.T, got string, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {

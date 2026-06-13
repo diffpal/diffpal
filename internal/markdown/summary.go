@@ -21,6 +21,7 @@ type SummaryOptions struct {
 	PublishSurfaces []string
 	ShowMetadata    bool
 	HideOverview    bool
+	Snippets        SnippetProvider
 }
 
 func RenderSummary(bundle findings.FindingsBundle) string {
@@ -74,18 +75,10 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	for _, path := range sortedKeys(byPath) {
 		fmt.Fprintf(&out, "### %s\n\n", path)
 		for _, finding := range byPath[path] {
-			fmt.Fprintf(&out, "- **[%s][%s]**", strings.ToLower(finding.Severity), finding.RuleID)
-			if finding.StartLine > 0 {
-				fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
-			}
-			fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
-			if finding.Evidence != "" {
-				fmt.Fprintf(&out, "  - Evidence: %s\n", finding.Evidence)
-			}
-			if finding.Suggestion != "" {
-				fmt.Fprintf(&out, "  - Suggestion: %s\n", finding.Suggestion)
-			}
-			fmt.Fprintf(&out, "  - Confidence: %.2f\n", finding.Confidence)
+			out.WriteString(RenderFindingDetail(finding, FindingDetailOptions{
+				ListItem: true,
+				Snippet:  snippetForFinding(opts.Snippets, finding),
+			}))
 		}
 		out.WriteString("\n")
 	}
@@ -255,6 +248,93 @@ func lineRange(start, end int) string {
 		return fmt.Sprintf("L%d", start)
 	}
 	return fmt.Sprintf("L%d-L%d", start, end)
+}
+
+type FindingDetailOptions struct {
+	ListItem bool
+	Snippet  CodeSnippet
+}
+
+func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) string {
+	out := strings.Builder{}
+	prefix := ""
+	detailPrefix := "- "
+	if opts.ListItem {
+		prefix = "- "
+		detailPrefix = "  - "
+	}
+	fmt.Fprintf(&out, "%s**[%s][%s]**", prefix, strings.ToLower(finding.Severity), finding.RuleID)
+	if finding.StartLine > 0 {
+		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
+	}
+	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
+	if opts.Snippet.Code != "" {
+		out.WriteString("\n")
+		indent := ""
+		if opts.ListItem {
+			indent = "  "
+		}
+		writeCodeFence(&out, opts.Snippet, indent)
+		out.WriteString("\n")
+	}
+	if finding.Evidence != "" {
+		fmt.Fprintf(&out, "%sEvidence: %s\n", detailPrefix, finding.Evidence)
+	}
+	if finding.Suggestion != "" {
+		fmt.Fprintf(&out, "%sSuggestion: %s\n", detailPrefix, finding.Suggestion)
+	}
+	fmt.Fprintf(&out, "%sConfidence: %.2f\n", detailPrefix, finding.Confidence)
+	return out.String()
+}
+
+func snippetForFinding(provider SnippetProvider, finding findings.Finding) CodeSnippet {
+	if provider == nil {
+		return CodeSnippet{}
+	}
+	snippet, ok := provider.Snippet(finding)
+	if !ok {
+		return CodeSnippet{}
+	}
+	return snippet
+}
+
+func writeCodeFence(out *strings.Builder, snippet CodeSnippet, indent string) {
+	fence := codeFence(snippet.Code)
+	fmt.Fprintf(out, "%s%s%s\n", indent, fence, snippet.Language)
+	writeIndentedCode(out, snippet.Code, indent)
+	fmt.Fprintf(out, "%s%s\n", indent, fence)
+}
+
+func writeIndentedCode(out *strings.Builder, code string, indent string) {
+	for _, line := range strings.SplitAfter(code, "\n") {
+		if line == "" {
+			continue
+		}
+		out.WriteString(indent)
+		out.WriteString(line)
+	}
+	if !strings.HasSuffix(code, "\n") {
+		out.WriteString("\n")
+	}
+}
+
+func codeFence(code string) string {
+	longest := 0
+	current := 0
+	for _, r := range code {
+		if r == '`' {
+			current++
+			if current > longest {
+				longest = current
+			}
+			continue
+		}
+		current = 0
+	}
+	if longest < 3 {
+		return "```"
+	}
+	return strings.Repeat("`", longest+1)
 }
 
 func firstNonEmpty(values ...string) string {
