@@ -1,16 +1,16 @@
-name: diffpal
+name: diffpal-dev
 
 on:
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: diffpal-${{ github.event.pull_request.number }}
+  group: diffpal-dev-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   review:
+    name: diffpal-dev/review
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
@@ -22,12 +22,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22
 
-      - name: Install DiffPal and Codex provider
-        run: npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
+      - name: Build DiffPal
+        run: go build -o .artifacts/bin/diffpal ./cmd/diffpal
+
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 
       - name: Authenticate Codex
         run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
@@ -36,7 +44,7 @@ jobs:
 
       - name: Run DiffPal review
         run: >-
-          diffpal --profile ci review github
+          .artifacts/bin/diffpal --profile ci review github
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
           --repo ${{ github.repository }}
