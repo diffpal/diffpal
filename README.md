@@ -39,7 +39,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
     checks:
+      - security
       - bugs
       - performance
       # - best-practices
@@ -135,7 +138,7 @@ diffpal-review:
       --repo "$CI_PROJECT_PATH"
       --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
       --language en
-      --review-checks bugs,performance,best-practices
+      --review-checks security,bugs,performance,best-practices
       --feedback balanced
       --gate
   variables:
@@ -182,7 +185,7 @@ steps:
     inputs:
       diffpalVersion: latest
       language: en
-      reviewChecks: bugs,performance,best-practices
+      reviewChecks: security,bugs,performance,best-practices
       feedback: balanced
       gate: true
     env:
@@ -202,9 +205,11 @@ On pull requests, DiffPal can publish:
 - inline comments or threads for actionable findings
 - JSON, SARIF, and CI artifacts for later inspection
 
-The default review checks are `bugs`, `performance`, and `best-practices`. The
-default review language is English. Both are configurable in
-`.config/diffpal/config.yaml` or by CLI flags.
+The default review checks are `security`, `bugs`, `performance`, and
+`best-practices`. The default review language is English. Checks, language, and
+custom review instructions are configurable in `.config/diffpal/config.yaml` or
+by CLI flags such as `--review-checks`, `--instructions`, and
+`--instructions-file`.
 
 ## Local Debugging
 

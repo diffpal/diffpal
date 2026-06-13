@@ -27,7 +27,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
     checks:
+      - security
       - bugs
       - performance
       - best-practices

@@ -84,7 +84,15 @@ inputs:
     required: false
     default: ""
   review-checks:
-    description: Comma-separated checks to run: bugs, performance, best-practices.
+    description: Comma-separated checks to run: security, bugs, performance, best-practices.
+    required: false
+    default: ""
+  instructions:
+    description: Additional review instructions for local prompt tuning.
+    required: false
+    default: ""
+  instructions-file:
+    description: Path to additional review instructions.
     required: false
     default: ""
 runs:
@@ -119,4 +127,6 @@ runs:
         INPUT_MAX_FILES_PER_CHUNK: ${{ inputs.max-files-per-chunk }}
         INPUT_LANGUAGE: ${{ inputs.language }}
         INPUT_REVIEW_CHECKS: ${{ inputs.review-checks }}
+        INPUT_INSTRUCTIONS: ${{ inputs.instructions }}
+        INPUT_INSTRUCTIONS_FILE: ${{ inputs.instructions-file }}
       run: ${{ github.action_path }}/tasks/github/run-diffpal-review.sh

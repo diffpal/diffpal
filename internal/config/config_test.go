@@ -95,7 +95,8 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
 
 	t.Setenv("DIFFPAL_REVIEW_LANGUAGE", "Portuguese")
-	t.Setenv("DIFFPAL_REVIEW_CHECKS", "bugs,best_practices")
+	t.Setenv("DIFFPAL_REVIEW_CHECKS", "security,best_practices")
+	t.Setenv("DIFFPAL_REVIEW_INSTRUCTIONS", "Focus on auth-sensitive paths.")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
 	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
 	cfg, err := LoadConfig(dir, "", "")
@@ -105,8 +106,11 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	if cfg.Review.Language != "Portuguese" {
 		t.Fatalf("Review.Language = %q, want Portuguese", cfg.Review.Language)
 	}
-	if strings.Join(cfg.Review.Checks, ",") != "bugs,best-practices" {
-		t.Fatalf("Review.Checks = %v, want [bugs best-practices]", cfg.Review.Checks)
+	if strings.Join(cfg.Review.Checks, ",") != "security,best-practices" {
+		t.Fatalf("Review.Checks = %v, want [security best-practices]", cfg.Review.Checks)
+	}
+	if cfg.ReviewInstructions() != "Focus on auth-sensitive paths." {
+		t.Fatalf("ReviewInstructions() = %q, want env override", cfg.ReviewInstructions())
 	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
@@ -271,7 +275,7 @@ func TestNormalizeReviewDefaults(t *testing.T) {
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
 	}
-	if strings.Join(cfg.Review.Checks, ",") != "bugs,performance,best-practices" {
+	if strings.Join(cfg.Review.Checks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Review.Checks = %v, want default checks", cfg.Review.Checks)
 	}
 }

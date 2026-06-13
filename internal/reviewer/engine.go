@@ -31,6 +31,7 @@ type Options struct {
 	BlockOn          string
 	Language         string
 	ReviewChecks     []string
+	Instructions     string
 }
 
 type Result struct {
@@ -62,8 +63,10 @@ type ChunkInput struct {
 	HeadSHA      string      `json:"head_sha"`
 	ChunkIndex   int         `json:"chunk_index"`
 	ChunkCount   int         `json:"chunk_count"`
+	ReviewTask   string      `json:"review_task"`
 	Language     string      `json:"language"`
 	ReviewChecks []string    `json:"review_checks"`
+	Instructions string      `json:"instructions,omitempty"`
 	TestSummary  string      `json:"test_summary"`
 	Files        []ChunkFile `json:"files"`
 }
@@ -92,10 +95,11 @@ type RuntimeUsage struct {
 }
 
 type RuntimeConfig struct {
-	ProviderID string
-	Providers  map[string]dpconfig.ProviderConfig
-	MCPServers map[string]agentconfig.MCPServerConfig
-	WorkingDir string
+	ProviderID   string
+	Providers    map[string]dpconfig.ProviderConfig
+	MCPServers   map[string]agentconfig.MCPServerConfig
+	WorkingDir   string
+	Instructions string
 }
 
 type Runtime interface {
@@ -161,6 +165,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if err != nil {
 		return Result{}, wrapError(KindConfig, err)
 	}
+	instructions := strings.TrimSpace(opts.Instructions)
+	if instructions == "" {
+		instructions = cfg.ReviewInstructions()
+	}
 	allowedCategories := categoriesForReviewChecks(reviewChecks)
 	filtered := filterReviewableFiles(result.Files)
 	enriched, testSummary, err := diffc.EnrichWithWorkingDir(diff.DiffResult{
@@ -199,16 +207,17 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	runtimeCfg := RuntimeConfig{
-		ProviderID: cfg.ProviderID(),
-		Providers:  providersWithEnv(cfg.Providers),
-		MCPServers: cfg.MCPServers,
-		WorkingDir: workingDir,
+		ProviderID:   cfg.ProviderID(),
+		Providers:    providersWithEnv(cfg.Providers),
+		MCPServers:   cfg.MCPServers,
+		WorkingDir:   workingDir,
+		Instructions: instructions,
 	}
 
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0, len(chunks))
 	for i, chunk := range chunks {
-		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, testSummary, i, len(chunks), chunk)
+		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, i, len(chunks), chunk)
 		var output ChunkOutput
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
@@ -315,7 +324,7 @@ func normalizeChangeSummary(items []string) []string {
 	return out
 }
 
-func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
+func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, instructions string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
 	files := make([]ChunkFile, 0, len(chunk.Files))
 	for _, file := range chunk.Files {
 		spans := make([]ChunkSpan, 0, len(file.Spans))
@@ -336,11 +345,17 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, re
 		HeadSHA:      headSHA,
 		ChunkIndex:   chunkIndex,
 		ChunkCount:   chunkCount,
+		ReviewTask:   reviewTask(reviewChecks),
 		Language:     language,
 		ReviewChecks: append([]string(nil), reviewChecks...),
+		Instructions: strings.TrimSpace(instructions),
 		TestSummary:  testSummary,
 		Files:        files,
 	}
+}
+
+func reviewTask(checks []string) string {
+	return "Perform a code review of every provided file snippet and changed line span. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after reviewing each snippet for those checks."
 }
 
 func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig.ProviderConfig {
@@ -392,8 +407,9 @@ func categoriesForReviewChecks(checks []string) map[string]struct{} {
 	out := map[string]struct{}{}
 	for _, check := range checks {
 		switch check {
-		case "bugs":
+		case "security":
 			out["security"] = struct{}{}
+		case "bugs":
 			out["correctness"] = struct{}{}
 			out["reliability"] = struct{}{}
 		case "performance":

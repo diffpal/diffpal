@@ -49,8 +49,9 @@ type GateConfig struct {
 }
 
 type ReviewConfig struct {
-	Language string   `json:"language" yaml:"language" mapstructure:"language"`
-	Checks   []string `json:"checks"   yaml:"checks"   mapstructure:"checks"`
+	Language     string   `json:"language"     yaml:"language"     mapstructure:"language"`
+	Checks       []string `json:"checks"       yaml:"checks"       mapstructure:"checks"`
+	Instructions string   `json:"instructions" yaml:"instructions" mapstructure:"instructions"`
 }
 
 type PlatformConfigs struct {
@@ -105,7 +106,7 @@ var validSeverityThresholds = map[string]struct{}{
 	"critical": {},
 }
 
-var defaultReviewChecks = []string{"bugs", "performance", "best-practices"}
+var defaultReviewChecks = []string{"security", "bugs", "performance", "best-practices"}
 
 const (
 	DefaultReviewMaxFiles         = 200
@@ -231,6 +232,7 @@ func (cfg *Config) Normalize() error {
 	}
 	cfg.Review.Language = language
 	cfg.Review.Checks = checks
+	cfg.Review.Instructions = strings.TrimSpace(cfg.Review.Instructions)
 	cfg.Provider = strings.TrimSpace(cfg.Provider)
 	cfg.Gate.BlockOn = strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
 	if cfg.Gate.BlockOn == "" {
@@ -267,6 +269,10 @@ func (cfg Config) ReviewChecks() []string {
 	return checks
 }
 
+func (cfg Config) ReviewInstructions() string {
+	return strings.TrimSpace(cfg.Review.Instructions)
+}
+
 func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_PROVIDER")); value != "" {
 		cfg.Provider = value
@@ -282,6 +288,9 @@ func (cfg *Config) ApplyEnvOverrides() error {
 	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CHECKS")); value != "" {
 		cfg.Review.Checks = splitCommaList(value)
+	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_INSTRUCTIONS")); value != "" {
+		cfg.Review.Instructions = value
 	}
 	return nil
 }
@@ -306,7 +315,7 @@ func NormalizeReviewChecks(values []string) ([]string, error) {
 		for _, part := range splitCommaList(raw) {
 			check, ok := canonicalReviewCheck(part)
 			if !ok {
-				return nil, fmt.Errorf("invalid review.checks value %q; supported values are bugs, performance, best-practices", part)
+				return nil, fmt.Errorf("invalid review.checks value %q; supported values are security, bugs, performance, best-practices", part)
 			}
 			selected[check] = struct{}{}
 		}
@@ -325,6 +334,8 @@ func NormalizeReviewChecks(values []string) ([]string, error) {
 
 func canonicalReviewCheck(value string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "security", "sec", "secure":
+		return "security", true
 	case "bug", "bugs":
 		return "bugs", true
 	case "perf", "performance":

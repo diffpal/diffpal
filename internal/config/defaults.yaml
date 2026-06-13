@@ -10,6 +10,7 @@ diffpal:
   review:
     language: en
     checks:
+      - security
       - bugs
       - performance
       - best-practices

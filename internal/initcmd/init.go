@@ -127,6 +127,7 @@ func composeConfig(detected []string) string {
 	lines = append(lines, "  review:")
 	lines = append(lines, "    language: en")
 	lines = append(lines, "    checks:")
+	lines = append(lines, "      - security")
 	lines = append(lines, "      - bugs")
 	lines = append(lines, "      - performance")
 	lines = append(lines, "      - best-practices")

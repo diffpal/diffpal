@@ -84,5 +84,11 @@ fi
 if [[ -n "${INPUT_REVIEW_CHECKS:-}" ]]; then
   argv+=(--review-checks "$INPUT_REVIEW_CHECKS")
 fi
+if [[ -n "${INPUT_INSTRUCTIONS:-}" ]]; then
+  argv+=(--instructions "$INPUT_INSTRUCTIONS")
+fi
+if [[ -n "${INPUT_INSTRUCTIONS_FILE:-}" ]]; then
+  argv+=(--instructions-file "$INPUT_INSTRUCTIONS_FILE")
+fi
 
 exec "${argv[@]}"

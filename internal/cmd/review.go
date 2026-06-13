@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/findings"
@@ -82,7 +84,9 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 	cmd.Flags().Int("max-patch-chars", 12000, "Maximum context characters per chunk")
 	cmd.Flags().Int("max-files-per-chunk", 20, "Maximum files per context chunk")
 	cmd.Flags().String("language", "", "Language for generated review findings")
-	cmd.Flags().String("review-checks", "", "Comma-separated checks to run: bugs, performance, best-practices")
+	cmd.Flags().String("review-checks", "", "Comma-separated checks to run: security, bugs, performance, best-practices")
+	cmd.Flags().String("instructions", "", "Additional review instructions for local prompt tuning")
+	cmd.Flags().String("instructions-file", "", "Path to additional review instructions")
 	cmd.Flags().String("out", findings.DefaultBundlePath, "Output findings bundle path")
 	cmd.Flags().String("repo", "local", "Repository id for deterministic fingerprints")
 	cmd.Flags().String("review-id", defaultReviewID, "Review identifier for deterministic outputs")
@@ -189,6 +193,8 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	maxFilesPerChunk, _ := cmd.Flags().GetInt("max-files-per-chunk")
 	language, _ := cmd.Flags().GetString("language")
 	reviewChecksSpec, _ := cmd.Flags().GetString("review-checks")
+	instructionsFlag, _ := cmd.Flags().GetString("instructions")
+	instructionsFile, _ := cmd.Flags().GetString("instructions-file")
 	outPath, _ := cmd.Flags().GetString("out")
 	repo, _ := cmd.Flags().GetString("repo")
 	reviewID, _ := cmd.Flags().GetString("review-id")
@@ -222,6 +228,17 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	} else {
 		reviewChecks = cfg.ReviewChecks()
 	}
+	instructions := cfg.ReviewInstructions()
+	if cmd.Flags().Changed("instructions") {
+		instructions = instructionsFlag
+	}
+	if cmd.Flags().Changed("instructions-file") {
+		fileInstructions, err := readReviewInstructionsFile(instructionsFile)
+		if err != nil {
+			return reviewExecution{}, withExitCode(2, err)
+		}
+		instructions = joinReviewInstructions(instructions, fileInstructions)
+	}
 	blockOn := cfg.BlockOn()
 	flagValue, _ := cmd.Flags().GetString("block-on")
 	if cmd.Flags().Changed("block-on") {
@@ -253,6 +270,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		BlockOn:          blockOn,
 		Language:         language,
 		ReviewChecks:     reviewChecks,
+		Instructions:     instructions,
 	})
 	if err != nil {
 		return reviewExecution{}, reviewExitError(err)
@@ -272,6 +290,27 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		Gate:    gate,
 		Result:  result,
 	}, nil
+}
+
+func readReviewInstructionsFile(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("--instructions-file path is required")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read instructions file %q: %w", path, err)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+func joinReviewInstructions(items ...string) string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return strings.Join(out, "\n\n")
 }
 
 func emitReviewSummary(cmd *cobra.Command, result reviewer.Result, contextLines int, outPath string) error {

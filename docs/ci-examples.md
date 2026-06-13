@@ -35,7 +35,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
     checks:
+      - security
       - bugs
       - performance
       - best-practices
@@ -109,7 +112,8 @@ jobs:
           repo: ${{ github.repository }}
           review-id: github-pr-${{ github.event.pull_request.number }}
           language: en
-          review-checks: bugs,performance,best-practices
+          review-checks: security,bugs,performance,best-practices
+          instructions-file: .config/diffpal/review-instructions.md
           feedback: balanced
           summary-overview: true
           gate: true
@@ -171,7 +175,8 @@ diffpal-review:
       --repo "$CI_PROJECT_PATH"
       --review-id "gitlab-mr-$CI_MERGE_REQUEST_IID"
       --language en
-      --review-checks bugs,performance,best-practices
+      --review-checks security,bugs,performance,best-practices
+      --instructions-file .config/diffpal/review-instructions.md
       --feedback balanced
       --gate
   variables:
@@ -240,7 +245,8 @@ steps:
     inputs:
       diffpalVersion: latest
       language: en
-      reviewChecks: bugs,performance,best-practices
+      reviewChecks: security,bugs,performance,best-practices
+      instructionsFile: .config/diffpal/review-instructions.md
       feedback: balanced
       gate: true
     env:

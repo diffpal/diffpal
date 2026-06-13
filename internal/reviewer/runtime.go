@@ -42,7 +42,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		AgentID:           cfg.ProviderID,
 		Name:              "DiffPalReviewerAgent",
 		Description:       "DiffPal provider-backed review agent",
-		GlobalInstruction: reviewInstruction(),
+		GlobalInstruction: reviewInstruction(cfg.Instructions),
 		WorkingDirectory:  cfg.WorkingDir,
 	})
 	if err != nil {
@@ -55,6 +55,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
 		structuredagent.WithInputSchema(inputSchemaJSON),
 		structuredagent.WithOutputSchema(outputSchemaJSON),
+		structuredagent.WithSystemInstruction(reviewInstruction(cfg.Instructions)),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
@@ -166,6 +167,10 @@ func isTransientProviderError(err error) bool {
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	return isStructuredOutputProviderMessage(msg) ||
+		strings.Contains(msg, "authentication required") ||
+		strings.Contains(msg, "exceeded your monthly quota") ||
+		strings.Contains(msg, "payment required") ||
+		strings.Contains(msg, "rate limit") ||
 		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
 }
 

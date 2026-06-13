@@ -43,7 +43,7 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
 	}
-	if strings.Join(cfg.Review.Checks, ",") != "bugs,performance,best-practices" {
+	if strings.Join(cfg.Review.Checks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Review.Checks = %v, want default review checks", cfg.Review.Checks)
 	}
 }
@@ -64,6 +64,7 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	for _, needle := range []string{
 		"      model: gpt-5-mini",
 		"    language: en",
+		"      - security",
 		"      - bugs",
 		"      - performance",
 		"      - best-practices",

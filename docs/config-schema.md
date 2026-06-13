@@ -29,7 +29,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
     checks:
+      - security
       - bugs
       - performance
       - best-practices
@@ -55,6 +58,7 @@ Environment overrides:
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_LANGUAGE`
 - `DIFFPAL_REVIEW_CHECKS`
+- `DIFFPAL_REVIEW_INSTRUCTIONS`
 
 Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
 are used for required values. Missing referenced variables fail config load, so
@@ -78,5 +82,7 @@ Validation requires `version: v1`, a `diffpal.provider` key present in
 `runtime.providers`, and a valid `diffpal.gate.block_on` severity.
 
 `diffpal.review.language` defaults to `en`. `diffpal.review.checks` defaults to
-`bugs`, `performance`, and `best-practices`; those values can be overridden by
-the `--language` and `--review-checks` review flags.
+`security`, `bugs`, `performance`, and `best-practices`; those values can be
+overridden by the `--language` and `--review-checks` review flags. Use
+`diffpal.review.instructions`, `--instructions`, or `--instructions-file` for
+repository-local prompt tuning.
