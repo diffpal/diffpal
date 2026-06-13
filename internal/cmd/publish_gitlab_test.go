@@ -73,9 +73,10 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 	}
 }
 
-func TestPublishBundleToFilesGitHubEmbedsCodeSnippets(t *testing.T) {
+func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	sourcePath := filepath.Join(dir, "internal", "db", "query.go")
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
@@ -137,8 +138,11 @@ func TestPublishBundleToFilesGitHubEmbedsCodeSnippets(t *testing.T) {
 			t.Fatalf("ReadFile(%q) error = %v", path, err)
 		}
 		text := string(raw)
-		if !strings.Contains(text, "```go") || !strings.Contains(text, "func deleteSessions(user string)") {
-			t.Fatalf("%s missing Go code block:\n%s", path, text)
+		if !strings.Contains(text, "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L3-L5") {
+			t.Fatalf("%s missing GitHub permanent link:\n%s", path, text)
+		}
+		if strings.Contains(text, "```") || strings.Contains(text, "func deleteSessions(user string)") {
+			t.Fatalf("%s contains fenced or embedded code snippet:\n%s", path, text)
 		}
 		if !strings.Contains(text, "Use a parameterized statement.") {
 			t.Fatalf("%s missing suggestion:\n%s", path, text)

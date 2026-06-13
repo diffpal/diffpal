@@ -123,7 +123,7 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 	}
 }
 
-func TestPlanInlineCommentsCanIncludeCodeSnippet(t *testing.T) {
+func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	t.Parallel()
 
 	plan := PlanInlineCommentsWithOptions(nil, []findings.Finding{{
@@ -139,11 +139,8 @@ func TestPlanInlineCommentsCanIncludeCodeSnippet(t *testing.T) {
 		Suggestion: "Use a parameterized statement.",
 	}}, CommentOptions{
 		Profile: "balanced",
-		Snippets: markdown.SnippetFunc(func(findings.Finding) (markdown.CodeSnippet, bool) {
-			return markdown.CodeSnippet{
-				Language: "go",
-				Code:     "user := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")",
-			}, true
+		Links: markdown.FindingLinkFunc(func(findings.Finding) (string, bool) {
+			return "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17", true
 		}),
 	})
 
@@ -153,12 +150,15 @@ func TestPlanInlineCommentsCanIncludeCodeSnippet(t *testing.T) {
 	body := plan.Actions[0].Body
 	for _, want := range []string{
 		"**[high][security.sql]** `L12-L17`: query concatenates untrusted input",
-		"```go\nuser := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n```",
+		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
 		"- Evidence: Line 17 builds SQL by concatenating user input.",
 		"- Suggestion: Use a parameterized statement.",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("comment body missing %q:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, "```") {
+		t.Fatalf("comment body contains fenced code block:\n%s", body)
 	}
 }
