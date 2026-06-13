@@ -36,7 +36,6 @@ type ReviewedFile struct {
 type Finding struct {
 	ID         string  `json:"id"`
 	ReviewID   string  `json:"review_id"`
-	RuleID     string  `json:"rule_id"`
 	Category   string  `json:"category"`
 	Severity   string  `json:"severity"`
 	Confidence float64 `json:"confidence"`
@@ -75,9 +74,6 @@ func Validate(bundle FindingsBundle) error {
 	for _, f := range bundle.Findings {
 		if f.Path == "" {
 			return ValidationError{Field: "finding.path", Msg: "path is required"}
-		}
-		if f.RuleID == "" {
-			return ValidationError{Field: "finding.rule_id", Msg: "rule_id is required"}
 		}
 		if f.Category == "" {
 			return ValidationError{Field: "finding.category", Msg: "category is required"}
@@ -130,7 +126,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Path        string `json:"path"`
 		LineStart   int    `json:"line_start"`
 		LineEnd     int    `json:"line_end"`
-		RuleID      string `json:"rule_id"`
+		Category    string `json:"category"`
 		MessageNorm string `json:"message_norm"`
 		Evidence    string `json:"evidence"`
 	}
@@ -142,7 +138,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Path:        normalizePath(f.Path),
 		LineStart:   f.StartLine,
 		LineEnd:     f.EndLine,
-		RuleID:      f.RuleID,
+		Category:    strings.TrimSpace(strings.ToLower(f.Category)),
 		MessageNorm: normalizeMessage(f.Message),
 		Evidence:    shaText(f.Evidence),
 	}

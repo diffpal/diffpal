@@ -14,7 +14,6 @@ func TestConvertExportsOnlyMaintainabilityFindingsWithDeterministicFingerprint(t
 		Findings: []findings.Finding{
 			{
 				ReviewID:  "review-1",
-				RuleID:    "maintainability.deadcode",
 				Category:  "maintainability",
 				Severity:  "medium",
 				Path:      "internal/app/service.go",
@@ -24,7 +23,6 @@ func TestConvertExportsOnlyMaintainabilityFindingsWithDeterministicFingerprint(t
 			},
 			{
 				ReviewID:  "review-1",
-				RuleID:    "security.sql",
 				Category:  "security",
 				Severity:  "high",
 				Path:      "internal/db/query.go",
@@ -42,8 +40,8 @@ func TestConvertExportsOnlyMaintainabilityFindingsWithDeterministicFingerprint(t
 	if len(items) != 1 {
 		t.Fatalf("Convert() items = %d, want 1", len(items))
 	}
-	if items[0].CheckName != "maintainability.deadcode" {
-		t.Fatalf("CheckName = %q, want maintainability.deadcode", items[0].CheckName)
+	if items[0].CheckName != "maintainability" {
+		t.Fatalf("CheckName = %q, want maintainability", items[0].CheckName)
 	}
 	if items[0].Severity != "medium" {
 		t.Fatalf("Severity = %q, want medium", items[0].Severity)

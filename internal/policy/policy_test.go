@@ -6,10 +6,10 @@ func TestApplyPolicySupportsRecursivePathSuppressionsAndThresholds(t *testing.T)
 	t.Parallel()
 
 	findings := []Finding{
-		{RuleID: "snap", Severity: SeverityMedium, Path: "pkg/a/file.snap"},
-		{RuleID: "vendored", Severity: SeverityCritical, Path: "vendor/github.com/x/y.go"},
-		{RuleID: "panic", Severity: SeverityHigh, Path: "internal/app/main.go"},
-		{RuleID: "style", Severity: SeverityLow, Path: "internal/app/style.go"},
+		{Severity: SeverityMedium, Path: "pkg/a/file.snap"},
+		{Severity: SeverityCritical, Path: "vendor/github.com/x/y.go"},
+		{Severity: SeverityHigh, Path: "internal/app/main.go"},
+		{Severity: SeverityLow, Path: "internal/app/style.go"},
 	}
 
 	decisions := ApplyPolicy(Policy{

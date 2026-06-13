@@ -13,7 +13,6 @@ Required fields:
 - `change_summary[]` (optional human-readable overview bullets)
 - `files[]` (optional reviewed file list)
 - `findings[]` with per-item fields:
-  - `rule_id`
   - `category`
   - `severity`
   - `path`
@@ -30,6 +29,7 @@ Stable fingerprint input:
 - `review_id`
 - `head_sha`
 - normalized path and line range
+- category
 - normalized message
 - evidence hash
 

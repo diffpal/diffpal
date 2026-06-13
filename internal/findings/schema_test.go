@@ -11,7 +11,6 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 		HeadSHA:  "head-a",
 		Findings: []Finding{
 			{
-				RuleID:     "correctness.nil",
 				Category:   "correctness",
 				Severity:   "HIGH",
 				Confidence: 0.9,
@@ -36,7 +35,6 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 
 	secondBundle := bundle
 	secondBundle.Findings = []Finding{{
-		RuleID:     "correctness.nil",
 		Category:   "correctness",
 		Severity:   "high",
 		Confidence: 0.9,
@@ -68,7 +66,6 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:    "r",
 				Category:  "c",
 				Severity:  "urgent",
 				Path:      "x.go",
@@ -83,7 +80,6 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:     "r",
 				Category:   "c",
 				Severity:   "high",
 				Confidence: 1.5,
@@ -99,7 +95,6 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 			Version:  VersionV1,
 			ReviewID: "review",
 			Findings: []Finding{{
-				RuleID:    "r",
 				Category:  "c",
 				Severity:  "high",
 				Path:      "x.go",
@@ -128,7 +123,6 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 		ReviewID: "review-a",
 		HeadSHA:  "head-a",
 		Findings: []Finding{{
-			RuleID:     "security.xss",
 			Category:   "security",
 			Severity:   "HIGH",
 			Confidence: 0.8,

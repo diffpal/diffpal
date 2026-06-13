@@ -620,7 +620,6 @@ func testReviewResult(reviewID string) reviewer.Result {
 			HeadSHA:  "head-a",
 			Findings: []findings.Finding{{
 				ReviewID:   reviewID,
-				RuleID:     "correctness.example",
 				Category:   "correctness",
 				Severity:   "high",
 				Confidence: 0.9,

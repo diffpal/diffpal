@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
 )
@@ -57,10 +58,10 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 	out := make([]ThreadAction, 0, len(findingsList))
 	state := make([]ThreadState, 0, len(findingsList))
 	for _, f := range findingsList {
-		if f.Path == "" || f.StartLine <= 0 || f.RuleID == "" || f.Confidence < minConfidence {
+		if f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
 			continue
 		}
-		key := threadKey(f.Path, f.StartLine, f.RuleID)
+		key := threadKey(f.Path, f.StartLine, f.Category)
 		action := ActionCreate
 		if prior, ok := existing[key]; ok {
 			if prior == f.ID {
@@ -97,12 +98,12 @@ func threadConfidenceThreshold(profile string) float64 {
 	return MinThreadConfidence
 }
 
-func threadKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func threadKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
 }
 
 func threadBody(f findings.Finding) string {
-	return "### " + f.RuleID + "\n\n" +
+	return "### " + strings.ToUpper(f.Severity) + " " + f.Category + "\n\n" +
 		"Category: **" + f.Category + "**\n\n" +
 		"Severity: **" + f.Severity + "**\n\n" +
 		f.Message + "\n\n" +

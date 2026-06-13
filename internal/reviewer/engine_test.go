@@ -28,7 +28,6 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 				"Changed the command output behavior used by the sample entrypoint.",
 			},
 			Findings: []ChunkFinding{{
-				RuleID:     "correctness.behavior-change",
 				Category:   "correctness",
 				Severity:   "high",
 				Confidence: 0.94,
@@ -148,7 +147,6 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 		outputs: []ChunkOutput{{
 			Findings: []ChunkFinding{
 				{
-					RuleID:     "correctness.behavior-change",
 					Category:   "correctness",
 					Severity:   "high",
 					Confidence: 0.94,
@@ -160,7 +158,6 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					Evidence:   "line 4 changed",
 				},
 				{
-					RuleID:     "performance.extra-output",
 					Category:   "performance",
 					Severity:   "high",
 					Confidence: 0.9,
@@ -257,7 +254,6 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 		outputs: []ChunkOutput{{
 			ChangeSummary: []string{"Added a debug HTTP handler that executes request-provided commands."},
 			Findings: []ChunkFinding{{
-				RuleID:     "security.command-injection",
 				Category:   "security",
 				Severity:   "critical",
 				Confidence: 0.98,
@@ -300,8 +296,8 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
 	}
 	got := result.Bundle.Findings[0]
-	if got.RuleID != "security.command-injection" || got.Severity != "critical" || !got.Blocking {
-		t.Fatalf("finding = %+v, want blocking critical command injection", got)
+	if got.Category != "security" || got.Severity != "critical" || !got.Blocking {
+		t.Fatalf("finding = %+v, want blocking critical security finding", got)
 	}
 }
 
@@ -321,7 +317,6 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 		outputs: []ChunkOutput{{
 			Findings: []ChunkFinding{
 				{
-					RuleID:     "maintainability.output-change",
 					Category:   "maintainability",
 					Severity:   "medium",
 					Confidence: 0.88,
@@ -333,7 +328,6 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Evidence:   "line 4 was edited",
 				},
 				{
-					RuleID:     "maintainability.output-change",
 					Category:   "maintainability",
 					Severity:   "medium",
 					Confidence: 0.88,
@@ -345,7 +339,6 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Evidence:   "line 4 was edited",
 				},
 				{
-					RuleID:     "security.bad-category",
 					Category:   "unknown",
 					Severity:   "high",
 					Confidence: 0.9,
@@ -357,7 +350,6 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Evidence:   "bad category",
 				},
 				{
-					RuleID:     "security.out-of-range",
 					Category:   "security",
 					Severity:   "high",
 					Confidence: 0.9,
@@ -415,7 +407,6 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 			{},
 			{
 				Findings: []ChunkFinding{{
-					RuleID:     "testing.retry-success",
 					Category:   "testing",
 					Severity:   "low",
 					Confidence: 0.5,
@@ -576,9 +567,9 @@ func runGitCmd(t *testing.T, dir string, args ...string) string {
 
 func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	items := []findings.Finding{
-		{RuleID: "style.beta", Message: "beta", Evidence: "e2", Path: "b.go", StartLine: 3, EndLine: 3},
-		{RuleID: "style.alpha", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
-		{RuleID: "style.alpha", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
+		{Category: "style", Message: "beta", Evidence: "e2", Path: "b.go", StartLine: 3, EndLine: 3},
+		{Category: "style", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
+		{Category: "style", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
 	}
 
 	got := dedupeAndSortFindings(items, "repo", "review", "head")

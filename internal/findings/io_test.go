@@ -26,7 +26,6 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 		ReviewID: "review-default",
 		HeadSHA:  "head-default",
 		Findings: []Finding{{
-			RuleID:     "maintainability.deadcode",
 			Category:   "maintainability",
 			Severity:   "MEDIUM",
 			Confidence: 0.7,
@@ -81,7 +80,6 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 		ReviewID: "review-format",
 		HeadSHA:  "head-format",
 		Findings: []Finding{{
-			RuleID:     "security.sql-injection",
 			Category:   "security",
 			Severity:   "CRITICAL",
 			Confidence: 1,

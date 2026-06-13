@@ -44,7 +44,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 	state := make([]DiscussionState, 0, len(findingsList))
 	advisory := make([]findings.Finding, 0, len(findingsList))
 	for _, finding := range findingsList {
-		if finding.Path == "" || finding.StartLine <= 0 || finding.RuleID == "" {
+		if finding.Path == "" || finding.StartLine <= 0 || finding.Category == "" {
 			continue
 		}
 		blocking := finding.Blocking || isLevelOrAbove(finding.Severity, blockOn)
@@ -52,7 +52,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			advisory = append(advisory, finding)
 			continue
 		}
-		thread := discussionKey(finding.Path, finding.StartLine, finding.RuleID)
+		thread := discussionKey(finding.Path, finding.StartLine, finding.Category)
 		actionType := ActionCreate
 		if prior, ok := existing[thread]; ok {
 			if prior == finding.ID {
@@ -83,13 +83,13 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 	}
 }
 
-func discussionKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func discussionKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
 }
 
 func discussionBody(f findings.Finding) string {
 	lines := []string{
-		fmt.Sprintf("**[%s][%s]**", strings.ToUpper(f.Category), f.RuleID),
+		fmt.Sprintf("**%s %s**", strings.ToUpper(f.Severity), f.Category),
 		"",
 		f.Message,
 		"",

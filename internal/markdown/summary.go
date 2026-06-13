@@ -208,8 +208,8 @@ func sortFindings(items []findings.Finding) []findings.Finding {
 		if leftKnown && rightKnown && leftSeverity != rightSeverity {
 			return leftSeverity < rightSeverity
 		}
-		if left.RuleID != right.RuleID {
-			return left.RuleID < right.RuleID
+		if left.Category != right.Category {
+			return left.Category < right.Category
 		}
 		return left.Message < right.Message
 	})
@@ -297,10 +297,8 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 
 func findingHeading(finding findings.Finding, linked bool) string {
 	severity := strings.ToLower(strings.TrimSpace(finding.Severity))
-	if linked {
-		return titleWord(severity) + " · " + finding.RuleID
-	}
-	return "[" + severity + "][" + finding.RuleID + "]"
+	category := strings.ToLower(strings.TrimSpace(finding.Category))
+	return titleWord(severity) + " " + category
 }
 
 func titleWord(value string) string {

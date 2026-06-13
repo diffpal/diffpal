@@ -14,7 +14,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-create",
-			RuleID:     "correctness.nil",
 			Category:   "correctness",
 			Severity:   "high",
 			Confidence: 0.9,
@@ -25,7 +24,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
 			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.91,
@@ -36,7 +34,6 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-low",
-			RuleID:     "style.nit",
 			Category:   "style",
 			Severity:   "low",
 			Confidence: 0.4,
@@ -46,7 +43,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 	}
 	existing := map[string]string{
-		threadKey("internal/db/query.go", 20, "security.sql"): "old-fp",
+		threadKey("internal/db/query.go", 20, "security"): "old-fp",
 	}
 
 	plan := PlanThreads(existing, findingsList, Context{
@@ -101,7 +98,6 @@ func TestPlanThreadsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
 
 	items := []findings.Finding{{
 		ID:         "fp-inline",
-		RuleID:     "correctness.edge",
 		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.7,

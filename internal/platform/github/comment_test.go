@@ -16,7 +16,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-create",
-			RuleID:     "correctness.nil",
+			Category:   "correctness",
 			Severity:   "high",
 			Confidence: 0.95,
 			Path:       "internal/app/service.go",
@@ -25,7 +25,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
+			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.91,
 			Path:       "internal/db/query.go",
@@ -34,7 +34,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-skip",
-			RuleID:     "maintainability.deadcode",
+			Category:   "maintainability",
 			Severity:   "medium",
 			Confidence: 0.88,
 			Path:       "internal/app/service.go",
@@ -43,7 +43,7 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 		},
 		{
 			ID:         "fp-low-confidence",
-			RuleID:     "style.nit",
+			Category:   "style",
 			Severity:   "low",
 			Confidence: 0.4,
 			Path:       "internal/app/service.go",
@@ -53,8 +53,8 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	}
 
 	existing := map[string]string{
-		commentKey("internal/db/query.go", 22, "security.sql"):                "fp-old",
-		commentKey("internal/app/service.go", 31, "maintainability.deadcode"): "fp-skip",
+		commentKey("internal/db/query.go", 22, "security"):           "fp-old",
+		commentKey("internal/app/service.go", 31, "maintainability"): "fp-skip",
 	}
 	plan := PlanInlineComments(existing, findingsList)
 
@@ -108,7 +108,7 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 
 	items := []findings.Finding{{
 		ID:         "fp-inline",
-		RuleID:     "correctness.edge",
+		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.7,
 		Path:       "main.go",
@@ -128,7 +128,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 
 	plan := PlanInlineCommentsWithOptions(nil, []findings.Finding{{
 		ID:         "fp-sql",
-		RuleID:     "security.sql",
+		Category:   "security",
 		Severity:   "high",
 		Confidence: 0.95,
 		Path:       "internal/db/query.go",
@@ -149,7 +149,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	body := plan.Actions[0].Body
 	for _, want := range []string{
-		"**High · security.sql**: query concatenates untrusted input",
+		"**High security**: query concatenates untrusted input",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
 		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
 		"- **Suggestion**: Use a parameterized statement.",

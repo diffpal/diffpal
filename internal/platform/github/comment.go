@@ -59,13 +59,13 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
-		if f.RuleID == "" || f.Path == "" {
+		if f.Category == "" || f.Path == "" {
 			continue
 		}
 		if f.StartLine <= 0 || f.Confidence < minConfidence {
 			continue
 		}
-		key := commentKey(f.Path, f.StartLine, f.RuleID)
+		key := commentKey(f.Path, f.StartLine, f.Category)
 		body := formatBody(f, links)
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
@@ -117,8 +117,8 @@ func LoadExistingState(path string) (map[string]string, error) {
 	return out, nil
 }
 
-func commentKey(path string, line int, ruleID string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
+func commentKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
 }
 
 func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {

@@ -21,7 +21,6 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 			{
 				ID:         "fp-maint",
 				ReviewID:   "mr-1",
-				RuleID:     "maintainability.deadcode",
 				Category:   "maintainability",
 				Severity:   "medium",
 				Confidence: 0.7,
@@ -35,7 +34,6 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 			{
 				ID:         "fp-sec",
 				ReviewID:   "mr-1",
-				RuleID:     "security.sql",
 				Category:   "security",
 				Severity:   "high",
 				Confidence: 0.92,
@@ -67,7 +65,7 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		if filepath.Ext(item.Path) == ".sarif" && !strings.Contains(string(raw), "\"runs\"") {
 			t.Fatalf("SARIF output missing runs payload:\n%s", string(raw))
 		}
-		if filepath.Base(item.Path) == "gl-code-quality-report.json" && !strings.Contains(string(raw), "maintainability.deadcode") {
+		if filepath.Base(item.Path) == "gl-code-quality-report.json" && !strings.Contains(string(raw), "maintainability") {
 			t.Fatalf("Code Quality output missing maintainability finding:\n%s", string(raw))
 		}
 	}
@@ -103,7 +101,6 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 			{
 				ID:         "fp-sec",
 				ReviewID:   "github-pr-1",
-				RuleID:     "security.sql",
 				Category:   "security",
 				Severity:   "high",
 				Confidence: 0.96,

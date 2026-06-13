@@ -29,7 +29,7 @@ func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 		}
 		out = append(out, Finding{
 			Description: fmt.Sprintf("[%s] %s", f.Category, f.Message),
-			CheckName:   f.RuleID,
+			CheckName:   f.Category,
 			Severity:    mapSeverity(f.Severity),
 			Fingerprint: findings.Fingerprint(repo, bundle.HeadSHA, f),
 			Location: CodeLocation{

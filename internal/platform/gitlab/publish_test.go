@@ -15,7 +15,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	findingsList := []findings.Finding{
 		{
 			ID:         "fp-update",
-			RuleID:     "security.sql",
 			Category:   "security",
 			Severity:   "high",
 			Confidence: 0.9,
@@ -25,7 +24,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 		},
 		{
 			ID:         "fp-skip",
-			RuleID:     "correctness.nil",
 			Category:   "correctness",
 			Severity:   "critical",
 			Confidence: 0.95,
@@ -36,7 +34,6 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 		},
 		{
 			ID:         "fp-advisory",
-			RuleID:     "maintainability.deadcode",
 			Category:   "maintainability",
 			Severity:   "medium",
 			Confidence: 0.7,
@@ -47,8 +44,8 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	}
 
 	existing := map[string]string{
-		discussionKey("internal/db/query.go", 12, "security.sql"):      "old-fp",
-		discussionKey("internal/app/service.go", 8, "correctness.nil"): "fp-skip",
+		discussionKey("internal/db/query.go", 12, "security"):      "old-fp",
+		discussionKey("internal/app/service.go", 8, "correctness"): "fp-skip",
 	}
 	plan := PlanDiscussions(existing, findingsList, []string{"high"})
 
@@ -64,7 +61,7 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	if len(plan.State) != 2 {
 		t.Fatalf("len(State) = %d, want 2 blocking states", len(plan.State))
 	}
-	if !strings.Contains(plan.AdvisorySummary, "maintainability.deadcode") {
+	if !strings.Contains(plan.AdvisorySummary, "Medium maintainability") {
 		t.Fatalf("advisory summary missing advisory finding:\n%s", plan.AdvisorySummary)
 	}
 }
@@ -99,14 +96,12 @@ func TestSummarizeDecisionAndApprovalPolicy(t *testing.T) {
 		HeadSHA: "head-a",
 		Findings: []findings.Finding{
 			{
-				RuleID:   "security.sql",
 				Category: "security",
 				Severity: "high",
 				Path:     "internal/db/query.go",
 				Message:  "unsafe SQL concatenation",
 			},
 			{
-				RuleID:   "maintainability.deadcode",
 				Category: "maintainability",
 				Severity: "medium",
 				Path:     "internal/app/service.go",

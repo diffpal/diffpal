@@ -72,7 +72,6 @@ type ChunkInput struct {
 }
 
 type ChunkFinding struct {
-	RuleID     string  `json:"rule_id"`
 	Category   string  `json:"category"`
 	Severity   string  `json:"severity"`
 	Confidence float64 `json:"confidence"`
@@ -426,7 +425,6 @@ func categoriesForReviewChecks(checks []string) map[string]struct{} {
 func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, providerID string) (findings.Finding, bool) {
 	category := strings.ToLower(strings.TrimSpace(item.Category))
 	severity := strings.ToLower(strings.TrimSpace(item.Severity))
-	ruleID := strings.TrimSpace(item.RuleID)
 	path := strings.TrimSpace(item.Path)
 	title := strings.TrimSpace(item.Title)
 	message := strings.TrimSpace(item.Message)
@@ -434,9 +432,6 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	suggestion := strings.TrimSpace(item.Suggestion)
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
-		return findings.Finding{}, false
-	}
-	if ruleID == "" || !strings.HasPrefix(ruleID, category+".") {
 		return findings.Finding{}, false
 	}
 	if path == "" || title == "" || message == "" || evidence == "" {
@@ -453,7 +448,6 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	}
 
 	return findings.Finding{
-		RuleID:     ruleID,
 		Category:   category,
 		Severity:   severity,
 		Confidence: item.Confidence,
@@ -522,8 +516,8 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 		if left.EndLine != right.EndLine {
 			return left.EndLine < right.EndLine
 		}
-		if left.RuleID != right.RuleID {
-			return left.RuleID < right.RuleID
+		if left.Category != right.Category {
+			return left.Category < right.Category
 		}
 		if left.Message != right.Message {
 			return left.Message < right.Message
@@ -545,7 +539,6 @@ func applyBlockingPolicy(bundle *findings.FindingsBundle, blockOn string) error 
 			return err
 		}
 		items = append(items, policy.Finding{
-			RuleID:     item.RuleID,
 			Severity:   parsed,
 			Confidence: item.Confidence,
 			Path:       item.Path,
