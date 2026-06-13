@@ -21,25 +21,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-
       - uses: actions/setup-node@v6
         with:
           node-version: 22
 
-      - name: Add Go binaries to PATH
-        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Install DiffPal and Codex provider
+        run: npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
 
-      - name: Add Copilot CLI to PATH
-        run: echo "$GITHUB_WORKSPACE/tools/copilot/node_modules/.bin" >> "$GITHUB_PATH"
-
-      - name: Install DiffPal CLI
-        run: go install ./cmd/diffpal
-
-      - name: Install Copilot CLI
-        run: npm ci --prefix tools/copilot --ignore-scripts
+      - name: Authenticate Codex
+        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Run DiffPal review
         run: >-
@@ -51,5 +43,5 @@ jobs:
           --feedback balanced
           --gate
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

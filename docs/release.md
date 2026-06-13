@@ -53,7 +53,7 @@ reviewers for publish credentials.
 Concrete controls:
 
 - Run `diffpal-review` only for same-repository pull requests; do not expose
-  `COPILOT_GITHUB_TOKEN` to forked PRs or `pull_request_target` workflows.
+  `OPENAI_API_KEY` to forked PRs or `pull_request_target` workflows.
 - Keep workflow `permissions` minimal for each job and avoid unpinned
   third-party actions in jobs that can read release or review secrets.
 - Leave `ACTIONS_STEP_DEBUG` and shell tracing disabled for secret-bearing
@@ -62,7 +62,7 @@ Concrete controls:
   that need any marketplace credential.
 
 Required same-repository guard for any review job that reads
-`COPILOT_GITHUB_TOKEN`:
+`OPENAI_API_KEY`:
 
 ```yaml
 jobs:
@@ -74,7 +74,7 @@ jobs:
       checks: write
 ```
 
-Inject `COPILOT_GITHUB_TOKEN` only inside a job with that guard.
+Inject `OPENAI_API_KEY` only inside a job with that guard.
 
 4. Build Azure DevOps extension packages:
 
@@ -94,10 +94,10 @@ Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add `NPM_PUBLISH_TOKEN` for `.github/workflows/omnidist-release.yml`.
-- Add `COPILOT_GITHUB_TOKEN` as a protected Environment secret using a dedicated fine-grained GitHub token with only the Copilot Requests account permission needed by Copilot CLI.
+- Add `OPENAI_API_KEY` as a protected Environment secret for Codex CLI authentication.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
-- Ensure the token can authenticate Copilot CLI for `.github/workflows/diffpal-review.yml`.
+- Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal-review.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
 - Move or create a major action tag, such as `v1`, only after the npm package
@@ -116,8 +116,8 @@ Open a same-repository pull request and confirm the `diffpal-review` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
 present. The GitHub Action smoke path should use the released root action tag
-with default `install: true`; provider setup such as `@github/copilot` remains a
-separate explicit step.
+with default `install: true`; provider setup such as `@openai/codex` and
+`@normahq/codex-acp-bridge` remains a separate explicit step.
 
 ## Branch policy expectations
 

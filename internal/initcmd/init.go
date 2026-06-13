@@ -92,7 +92,7 @@ func writeIfMissing(path, content string, force bool) error {
 
 func composeConfig(detected []string) string {
 	if len(detected) == 0 {
-		detected = []string{"copilot-acp"}
+		detected = []string{"codex-acp"}
 	}
 	defaultProvider := selectedDefaultProvider(detected)
 	lines := []string{
@@ -112,6 +112,10 @@ func composeConfig(detected []string) string {
 			lines = append(lines, "      type: copilot_acp")
 			lines = append(lines, "      copilot_acp:")
 			lines = append(lines, "        model: gpt-5-mini")
+		case "codex-acp":
+			lines = append(lines, "      type: codex_acp")
+			lines = append(lines, "      codex_acp:")
+			lines = append(lines, "        reasoning_effort: low")
 		default:
 			blockName := providerTypeForKey(p)
 			lines = append(lines, "      type: "+blockName)
@@ -137,7 +141,7 @@ func composeConfig(detected []string) string {
 
 func selectedDefaultProvider(detected []string) string {
 	for _, provider := range detected {
-		if provider == "copilot-acp" {
+		if provider == "codex-acp" {
 			return provider
 		}
 	}

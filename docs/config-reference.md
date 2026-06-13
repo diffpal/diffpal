@@ -10,22 +10,22 @@ Generate a starter file with:
 diffpal init
 ```
 
-## Default Copilot Config
+## Default Codex Config
 
-The public onboarding path uses Copilot ACP:
+The public onboarding path uses Codex ACP:
 
 ```yaml
 version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:
@@ -48,10 +48,11 @@ diffpal:
 Install the matching provider command in CI:
 
 ```bash
-npm install --global @github/copilot@latest
+npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 ```
 
-Set `COPILOT_GITHUB_TOKEN` as a CI secret. Do not commit token values into the
+Set `OPENAI_API_KEY` as a CI secret and authenticate Codex with
+`codex login --with-api-key`. Do not commit token values into the
 config file.
 
 ## Root Sections
@@ -142,7 +143,7 @@ omit the config value and let DiffPal read the standard environment variable.
 
 ## Alternate Hosted OpenAI Provider
 
-Copilot ACP is the default onboarding provider. If you prefer hosted OpenAI,
+Codex ACP is the default onboarding provider. If you prefer hosted OpenAI,
 switch the selected provider and add a matching runtime provider:
 
 ```yaml
