@@ -90,7 +90,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertContains(t, got, "## Detailed Comments")
 	assertContains(t, got, "### internal/app/service.go")
 	assertContains(t, got, "- **[critical][correctness.nil]** `L8`: possible nil dereference")
-	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
+	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
 	assertContains(t, got, "### internal/db/query.go")
 	assertContains(t, got, "- **[high][security.sql]** `L20`: query concatenates untrusted input")
 }
@@ -229,8 +229,8 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 
 	assertContains(t, got, "- **[high][security.sql-injection]** `L12-L17`: query concatenates untrusted input")
 	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
-	assertContains(t, got, "  - Evidence: Line 17 builds SQL by concatenating user input.")
-	assertContains(t, got, "  - Suggestion: Use a parameterized statement.")
+	assertContains(t, got, "  - **Evidence**: Line 17 builds SQL by concatenating user input.")
+	assertContains(t, got, "  - **Suggestion**: Use a parameterized statement.")
 }
 
 func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
@@ -256,8 +256,38 @@ func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
 	})
 
 	assertContains(t, got, "- **[medium][correctness.nil]** `L4`: possible nil dereference")
-	assertContains(t, got, "  - Evidence: cfg.Client.Do(req)")
+	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
 	assertNotContains(t, got, "```")
+}
+
+func TestRenderSummaryUsesReadableLinkedFindingHeader(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-link",
+		Findings: []findings.Finding{
+			{
+				RuleID:     "security.sql-injection-session-delete",
+				Severity:   "high",
+				Confidence: 0.98,
+				Path:       "internal/platformapi/admin_debug.go",
+				StartLine:  12,
+				EndLine:    17,
+				Message:    "query concatenates untrusted input",
+				Evidence:   "line 17 concatenates the user query parameter into SQL",
+			},
+		},
+	}, SummaryOptions{
+		Links: FindingLinkFunc(func(findings.Finding) (string, bool) {
+			return "https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17", true
+		}),
+	})
+
+	assertContains(t, got, "- **High · security.sql-injection-session-delete**: query concatenates untrusted input")
+	assertContains(t, got, "  - **Evidence**: line 17 concatenates the user query parameter into SQL")
+	assertContains(t, got, "  - **Source**:")
+	assertContains(t, got, "  - https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17")
+	assertNotContains(t, got, "**[high][security.sql-injection-session-delete]** `L12-L17`")
 }
 
 func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {

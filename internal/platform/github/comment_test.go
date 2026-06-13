@@ -149,10 +149,10 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	body := plan.Actions[0].Body
 	for _, want := range []string{
-		"**[high][security.sql]** `L12-L17`: query concatenates untrusted input",
+		"**High · security.sql**: query concatenates untrusted input",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
-		"- Evidence: Line 17 builds SQL by concatenating user input.",
-		"- Suggestion: Use a parameterized statement.",
+		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
+		"- **Suggestion**: Use a parameterized statement.",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("comment body missing %q:\n%s", want, body)
@@ -160,5 +160,8 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	if strings.Contains(body, "```") {
 		t.Fatalf("comment body contains fenced code block:\n%s", body)
+	}
+	if strings.Contains(body, "`L12-L17`") {
+		t.Fatalf("comment body repeats linked line range in header:\n%s", body)
 	}
 }
