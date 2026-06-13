@@ -54,7 +54,11 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 		}
 		thread := discussionKey(finding.Path, finding.StartLine, finding.Category, finding.ID)
 		actionType := ActionCreate
-		if prior, ok := existing[thread]; ok {
+		prior, ok := existing[thread]
+		if !ok {
+			prior, ok = singleExistingForLocation(existing, discussionLocationKey(finding.Path, finding.StartLine, finding.Category))
+		}
+		if ok {
 			if prior == finding.ID {
 				actionType = ActionSkip
 			} else {
@@ -84,7 +88,28 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 }
 
 func discussionKey(path string, line int, category string, findingID string) string {
-	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
+	return discussionLocationKey(path, line, category) + ":" + findingID
+}
+
+func discussionLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", false
+		}
+		prior = findingID
+		found = true
+	}
+	return prior, found
 }
 
 func discussionBody(f findings.Finding) string {
@@ -140,9 +165,15 @@ func isLevelOrAbove(level string, blockOn []string) bool {
 		"high":     3,
 		"critical": 4,
 	}
-	current := severityRank[strings.ToLower(level)]
+	current, ok := severityRank[strings.ToLower(level)]
+	if !ok {
+		return false
+	}
 	for _, candidate := range blockOn {
-		target := severityRank[strings.ToLower(candidate)]
+		target, ok := severityRank[strings.ToLower(candidate)]
+		if !ok {
+			continue
+		}
 		if current >= target {
 			return true
 		}

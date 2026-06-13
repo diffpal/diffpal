@@ -107,3 +107,29 @@ func TestToJSONUsesGitLabCodeQualityLocationShape(t *testing.T) {
 		t.Fatalf("severity = %v, want major", payload[0]["severity"])
 	}
 }
+
+func TestConvertFingerprintDoesNotDependOnHeadSHA(t *testing.T) {
+	t.Parallel()
+
+	finding := findings.Finding{
+		Category:  "maintainability",
+		Severity:  "medium",
+		Path:      "internal/app/service.go",
+		StartLine: 14,
+		EndLine:   16,
+		Title:     "Long helper",
+		Message:   "helper is difficult to follow",
+		Evidence:  "nested branches",
+	}
+	first, err := Convert(findings.FindingsBundle{HeadSHA: "head-a", Findings: []findings.Finding{finding}}, "repo")
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+	second, err := Convert(findings.FindingsBundle{HeadSHA: "head-b", Findings: []findings.Finding{finding}}, "repo")
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+	if first[0].Fingerprint != second[0].Fingerprint {
+		t.Fatalf("fingerprint changed with head SHA: %q vs %q", first[0].Fingerprint, second[0].Fingerprint)
+	}
+}

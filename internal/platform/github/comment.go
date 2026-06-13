@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/markdown"
@@ -72,11 +73,15 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
-		if prior, ok := existing[key]; ok && prior == f.ID {
+		prior, ok := existing[key]
+		if !ok {
+			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
+		}
+		if ok && prior == f.ID {
 			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
-		if _, ok := existing[key]; ok {
+		if ok {
 			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
 			continue
 		}
@@ -118,7 +123,28 @@ func LoadExistingState(path string) (map[string]string, error) {
 }
 
 func commentKey(path string, line int, category string, findingID string) string {
-	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
+	return commentLocationKey(path, line, category) + ":" + findingID
+}
+
+func commentLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", false
+		}
+		prior = findingID
+		found = true
+	}
+	return prior, found
 }
 
 func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {

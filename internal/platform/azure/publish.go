@@ -63,7 +63,11 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 		}
 		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
 		action := ActionCreate
-		if prior, ok := existing[key]; ok {
+		prior, ok := existing[key]
+		if !ok {
+			prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
+		}
+		if ok {
 			if prior == f.ID {
 				action = ActionSkip
 			} else {
@@ -99,7 +103,28 @@ func threadConfidenceThreshold(profile string) float64 {
 }
 
 func threadKey(path string, line int, category string, findingID string) string {
-	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
+	return threadLocationKey(path, line, category) + ":" + findingID
+}
+
+func threadLocationKey(path string, line int, category string) string {
+	return fmt.Sprintf("%s:%d:%s", path, line, category)
+}
+
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+	var prior string
+	found := false
+	prefix := locationKey + ":"
+	for key, findingID := range existing {
+		if key != locationKey && !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if found {
+			return "", false
+		}
+		prior = findingID
+		found = true
+	}
+	return prior, found
 }
 
 func threadBody(f findings.Finding) string {

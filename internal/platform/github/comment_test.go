@@ -108,6 +108,57 @@ func TestPlanInlineCommentsKeepsSameLineFindingsDistinct(t *testing.T) {
 	}
 }
 
+func TestPlanInlineCommentsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+	}}
+	existing := map[string]string{
+		commentKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanInlineComments(existing, items)
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+}
+
+func TestPlanInlineCommentsCreatesWhenPriorLocationIsAmbiguous(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "third issue",
+	}}
+	existing := map[string]string{
+		commentKey("main.go", 12, "security", "fp-old-a"): "fp-old-a",
+		commentKey("main.go", 12, "security", "fp-old-b"): "fp-old-b",
+	}
+
+	plan := PlanInlineComments(existing, items)
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionCreate {
+		t.Fatalf("action = %q, want create", plan.Actions[0].Type)
+	}
+}
+
 func TestLoadExistingStateReadsPriorPlan(t *testing.T) {
 	t.Parallel()
 

@@ -179,3 +179,22 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 		t.Fatalf("ReviewID = %q, want review-a", readBack.Findings[0].ReviewID)
 	}
 }
+
+func TestFingerprintPreservesPathCase(t *testing.T) {
+	t.Parallel()
+
+	base := Finding{
+		ReviewID:  "review-a",
+		Category:  "correctness",
+		Path:      "internal/app/service.go",
+		StartLine: 12,
+		EndLine:   12,
+		Message:   "same message",
+		Evidence:  "same evidence",
+	}
+	upper := base
+	upper.Path = "internal/app/Service.go"
+	if Fingerprint("repo", "head-a", base) == Fingerprint("repo", "head-a", upper) {
+		t.Fatal("Fingerprint() matched paths that differ by case")
+	}
+}

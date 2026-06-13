@@ -148,7 +148,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 }
 
 func normalizePath(v string) string {
-	return strings.TrimSpace(strings.ToLower(v))
+	return strings.TrimSpace(v)
 }
 
 func normalizeMessage(msg string) string {

@@ -86,6 +86,31 @@ func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
 	}
 }
 
+func TestPlanDiscussionsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+	}}
+	existing := map[string]string{
+		discussionKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanDiscussions(existing, items, []string{"high"})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+}
+
 func TestLoadExistingStateReadsPriorDiscussionPlan(t *testing.T) {
 	t.Parallel()
 
@@ -153,5 +178,22 @@ func TestSummarizeDecisionAndApprovalPolicy(t *testing.T) {
 		ApproveOnPass: true,
 	}, findings.FindingsBundle{HeadSHA: "head-b"}, "head-b") {
 		t.Fatal("CanAutoApprove() = false, want true for clean pass on matching SHA")
+	}
+}
+
+func TestSummarizeDecisionIgnoresUnknownBlockOnSeverity(t *testing.T) {
+	t.Parallel()
+
+	result := SummarizeDecision(findings.FindingsBundle{Findings: []findings.Finding{{
+		Category: "maintainability",
+		Severity: "medium",
+		Path:     "main.go",
+		Message:  "advisory",
+	}}}, []string{"unknown"})
+	if result.Decision != MergeDecisionWarn {
+		t.Fatalf("Decision = %q, want warn", result.Decision)
+	}
+	if result.BlockCount != 0 || result.AdvisoryCount != 1 {
+		t.Fatalf("unexpected counts: %+v", result)
 	}
 }

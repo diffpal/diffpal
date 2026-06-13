@@ -102,6 +102,32 @@ func TestPlanThreadsKeepsSameLineFindingsDistinct(t *testing.T) {
 	}
 }
 
+func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-new",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "updated issue",
+		Evidence:   "same location",
+	}}
+	existing := map[string]string{
+		threadKey("main.go", 12, "security", "fp-old"): "fp-old",
+	}
+
+	plan := PlanThreads(existing, items, Context{})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+}
+
 func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	t.Parallel()
 
