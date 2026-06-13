@@ -22,6 +22,7 @@ type SummaryOptions struct {
 	ShowMetadata    bool
 	HideOverview    bool
 	Snippets        SnippetProvider
+	Links           FindingLinkProvider
 }
 
 func RenderSummary(bundle findings.FindingsBundle) string {
@@ -78,6 +79,7 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 			out.WriteString(RenderFindingDetail(finding, FindingDetailOptions{
 				ListItem: true,
 				Snippet:  snippetForFinding(opts.Snippets, finding),
+				Link:     linkForFinding(opts.Links, finding),
 			}))
 		}
 		out.WriteString("\n")
@@ -253,6 +255,7 @@ func lineRange(start, end int) string {
 type FindingDetailOptions struct {
 	ListItem bool
 	Snippet  CodeSnippet
+	Link     string
 }
 
 func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) string {
@@ -268,6 +271,9 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
 	}
 	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
+	if strings.TrimSpace(opts.Link) != "" {
+		fmt.Fprintf(&out, "\n%s%s\n\n", detailPrefix, strings.TrimSpace(opts.Link))
+	}
 	if opts.Snippet.Code != "" {
 		out.WriteString("\n")
 		indent := ""
@@ -296,6 +302,17 @@ func snippetForFinding(provider SnippetProvider, finding findings.Finding) CodeS
 		return CodeSnippet{}
 	}
 	return snippet
+}
+
+func linkForFinding(provider FindingLinkProvider, finding findings.Finding) string {
+	if provider == nil {
+		return ""
+	}
+	link, ok := provider.Link(finding)
+	if !ok {
+		return ""
+	}
+	return link
 }
 
 func writeCodeFence(out *strings.Builder, snippet CodeSnippet, indent string) {

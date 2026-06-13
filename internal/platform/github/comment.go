@@ -47,15 +47,15 @@ func PlanInlineCommentsWithProfile(existing map[string]string, findings []findin
 }
 
 type CommentOptions struct {
-	Profile  string
-	Snippets markdown.SnippetProvider
+	Profile string
+	Links   markdown.FindingLinkProvider
 }
 
 func PlanInlineCommentsWithOptions(existing map[string]string, findings []findings.Finding, opts CommentOptions) CommentPlan {
-	return planInlineComments(existing, findings, inlineConfidenceThreshold(opts.Profile), opts.Snippets)
+	return planInlineComments(existing, findings, inlineConfidenceThreshold(opts.Profile), opts.Links)
 }
 
-func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64, snippets markdown.SnippetProvider) CommentPlan {
+func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64, links markdown.FindingLinkProvider) CommentPlan {
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
@@ -66,7 +66,7 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			continue
 		}
 		key := commentKey(f.Path, f.StartLine, f.RuleID)
-		body := formatBody(f, snippets)
+		body := formatBody(f, links)
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
 			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
@@ -121,19 +121,19 @@ func commentKey(path string, line int, ruleID string) string {
 	return fmt.Sprintf("%s:%d:%s", path, line, ruleID)
 }
 
-func formatBody(f findings.Finding, snippets markdown.SnippetProvider) string {
+func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {
 	return markdown.RenderFindingDetail(f, markdown.FindingDetailOptions{
-		Snippet: snippetForFinding(snippets, f),
+		Link: linkForFinding(links, f),
 	})
 }
 
-func snippetForFinding(provider markdown.SnippetProvider, finding findings.Finding) markdown.CodeSnippet {
+func linkForFinding(provider markdown.FindingLinkProvider, finding findings.Finding) string {
 	if provider == nil {
-		return markdown.CodeSnippet{}
+		return ""
 	}
-	snippet, ok := provider.Snippet(finding)
+	link, ok := provider.Link(finding)
 	if !ok {
-		return markdown.CodeSnippet{}
+		return ""
 	}
-	return snippet
+	return link
 }

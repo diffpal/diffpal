@@ -22,6 +22,19 @@ type SnippetProvider interface {
 	Snippet(findings.Finding) (CodeSnippet, bool)
 }
 
+type FindingLinkProvider interface {
+	Link(findings.Finding) (string, bool)
+}
+
+type FindingLinkFunc func(findings.Finding) (string, bool)
+
+func (fn FindingLinkFunc) Link(finding findings.Finding) (string, bool) {
+	if fn == nil {
+		return "", false
+	}
+	return fn(finding)
+}
+
 type SnippetFunc func(findings.Finding) (CodeSnippet, bool)
 
 func (fn SnippetFunc) Snippet(finding findings.Finding) (CodeSnippet, bool) {

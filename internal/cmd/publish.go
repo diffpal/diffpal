@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -83,8 +84,8 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				return nil, 0, err
 			}
 			plan := github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
-				Profile:  string(profile),
-				Snippets: githubSnippetProvider(platform),
+				Profile: string(profile),
+				Links:   githubLinkProvider(platform, bundle),
 			})
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
@@ -199,16 +200,26 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
-		Snippets:        githubSnippetProvider(platform),
+		Links:           githubLinkProvider(platform, bundle),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts)
 }
 
-func githubSnippetProvider(platform string) markdown.SnippetProvider {
+func githubLinkProvider(platform string, bundle findings.FindingsBundle) markdown.FindingLinkProvider {
 	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
 		return nil
 	}
-	return markdown.NewWorktreeSnippetProvider(".")
+	ctx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
+	if err != nil {
+		ctx = github.Context{
+			Repo:    strings.TrimSpace(os.Getenv("GITHUB_REPOSITORY")),
+			HeadSHA: bundle.HeadSHA,
+		}
+	}
+	if strings.TrimSpace(ctx.HeadSHA) == "" {
+		ctx.HeadSHA = bundle.HeadSHA
+	}
+	return github.NewPermanentLinkProvider(ctx)
 }
 
 func publishSurfaceLabels(modes []string) []string {
