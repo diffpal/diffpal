@@ -26,7 +26,7 @@ jobs:
           node-version: 22
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
       - name: Restore Codex auth
         run: |
@@ -39,7 +39,7 @@ jobs:
       - name: Review pull request
         uses: diffpal/diffpal@v0.1.2
         with:
-          diffpal-version: latest
+          diffpal-version: 0.1.2
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}

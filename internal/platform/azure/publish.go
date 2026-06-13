@@ -21,12 +21,12 @@ const (
 )
 
 type ThreadAction struct {
-	Type      ThreadActionType
-	FindingID string
-	Path      string
-	Line      int
-	Body      string
-	ThreadID  string
+	Type      ThreadActionType `json:"type"`
+	FindingID string           `json:"finding_id"`
+	Path      string           `json:"path"`
+	Line      int              `json:"line"`
+	Body      string           `json:"body"`
+	ThreadID  string           `json:"thread_id"`
 }
 
 type ThreadState struct {

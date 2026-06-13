@@ -23,7 +23,7 @@ The fastest GitHub setup is:
 - workflow: [`examples/ci/github-actions/codex-api-key.yml`](examples/ci/github-actions/codex-api-key.yml)
 - secret: `OPENAI_API_KEY`
 
-The examples use npm `@latest` for onboarding. For production, pin
+The examples pin npm package versions. Update
 `@diffpal/diffpal`, `diffpal-version`, provider CLIs, and bridge packages to
 versions you have tested.
 
@@ -92,7 +92,7 @@ Local commands are useful for setup checks and debugging, but they are not the
 main CI setup path.
 
 ```bash
-npm install --global @diffpal/diffpal@latest @openai/codex@latest @normahq/codex-acp-bridge@latest
+npm install --global @diffpal/diffpal@0.1.2 @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 diffpal init
 diffpal doctor --mode github

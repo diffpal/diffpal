@@ -13,7 +13,7 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @github/copilot@latest
+  - script: npm install --global @github/copilot@1.0.61
     displayName: Install Copilot provider
 
   - task: DiffPalReview@1

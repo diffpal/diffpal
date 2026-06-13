@@ -48,7 +48,7 @@ diffpal:
 Install the matching provider command in CI:
 
 ```bash
-npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 ```
 
 Set `OPENAI_API_KEY` as a CI secret and authenticate Codex with
@@ -174,7 +174,7 @@ Use [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api
 Install and authenticate the provider in CI:
 
 ```bash
-npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 ```
 
@@ -204,7 +204,7 @@ Use [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/co
 Install the provider in CI:
 
 ```bash
-npm install --global @github/copilot@latest
+npm install --global @github/copilot@1.0.61
 ```
 
 Required secret: `COPILOT_GITHUB_TOKEN`.

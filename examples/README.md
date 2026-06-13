@@ -3,9 +3,10 @@
 Use these examples as copy-paste starting points. Pick one provider auth setup
 and one CI system.
 
-The examples use npm `@latest` for quick onboarding. For production, pin
-`@diffpal/diffpal`, `diffpal-version`, `@openai/codex`,
-`@normahq/codex-acp-bridge`, and `@github/copilot` to versions you have tested.
+The examples pin npm package versions so credentialed CI jobs do not execute
+newly published package versions automatically. Update `@diffpal/diffpal`,
+`diffpal-version`, `@openai/codex`, `@normahq/codex-acp-bridge`, and
+`@github/copilot` intentionally after testing.
 
 ## Provider Configs
 
