@@ -70,7 +70,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 				actionType = ActionUpdate
 			}
 		}
-		state = append(state, DiscussionState{ThreadHash: thread, FindingID: finding.ID})
+		state = append(state, DiscussionState{ThreadHash: actionThread, FindingID: finding.ID})
 		out = append(out, DiscussionAction{
 			Type:       actionType,
 			FindingID:  finding.ID,
