@@ -49,7 +49,7 @@ jobs:
           --repo ${{ github.repository }}
           --review-id github-pr-${{ github.event.pull_request.number }}
           --feedback balanced
-          --mode comments,summary
+          --mode summary
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
