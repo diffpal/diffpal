@@ -36,10 +36,13 @@ jobs:
       - name: Install Codex provider
         run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
 
-      - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+      - name: Restore Codex auth
+        run: |
+          mkdir -p "$HOME/.codex"
+          printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
+          chmod 600 "$HOME/.codex/auth.json"
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 
       - name: Run DiffPal review
         run: >-
@@ -50,6 +53,6 @@ jobs:
           --review-id github-pr-${{ github.event.pull_request.number }}
           --feedback balanced
           --mode summary
+          --gate
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
