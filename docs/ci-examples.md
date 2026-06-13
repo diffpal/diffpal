@@ -1,10 +1,10 @@
 # CI Setup Guide
 
 This is the main setup guide for running DiffPal in pull request pipelines.
-The default provider path is Copilot ACP.
+The default provider path is Codex ACP.
 
 The examples use npm `@latest` for quick onboarding. For production, pin
-`@diffpal/diffpal`, `diffpal-version`, and `@github/copilot` to versions you
+`@diffpal/diffpal`, `diffpal-version`, and `@openai/codex` to versions you
 have tested.
 
 ## Common Setup
@@ -12,9 +12,9 @@ have tested.
 Every CI system needs:
 
 1. A full git checkout, so DiffPal can compare base and head commits.
-2. Node.js, because the Copilot provider is installed with npm.
+2. Node.js, because the Codex provider is installed with npm.
 3. A DiffPal config committed at `.config/diffpal/config.yaml`.
-4. `COPILOT_GITHUB_TOKEN` as a secret for the Copilot provider.
+4. `OPENAI_API_KEY` as a secret for the Codex provider.
 5. A platform token so DiffPal can publish PR feedback.
 
 Commit `.config/diffpal/config.yaml` with the provider and review gate:
@@ -24,13 +24,13 @@ version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:
@@ -54,7 +54,7 @@ troubleshooting command, but it is not required in the normal PR workflow.
 
 | Name | Required | Purpose |
 | --- | --- | --- |
-| `COPILOT_GITHUB_TOKEN` | yes | Authenticates the Copilot CLI provider. |
+| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
 | `GITHUB_TOKEN` | built in | Publishes check runs, summary comments, and inline comments. |
 
 Workflow permissions:
@@ -66,7 +66,7 @@ permissions:
   checks: write
 ```
 
-Use a same-repository PR guard before exposing `COPILOT_GITHUB_TOKEN`.
+Use a same-repository PR guard before exposing `OPENAI_API_KEY`.
 
 ### Workflow
 
@@ -100,8 +100,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Copilot provider
-        run: npm install --global @github/copilot@latest
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@latest
+
+      - name: Authenticate Codex
+        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Review pull request
         uses: diffpal/diffpal@v0.1.2
@@ -118,7 +123,7 @@ jobs:
           summary-overview: true
           gate: true
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -144,7 +149,7 @@ jobs:
 
 | Name | Required | Purpose |
 | --- | --- | --- |
-| `COPILOT_GITHUB_TOKEN` | yes | Authenticates the Copilot CLI provider. |
+| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
 | `CI_JOB_TOKEN` | usually | Publishes from GitLab CI when allowed by your instance. |
 | `GITLAB_TOKEN` | optional | Dedicated API token when `CI_JOB_TOKEN` is not enough. |
 
@@ -166,7 +171,8 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
-    - npm install --global @diffpal/diffpal@latest @github/copilot@latest
+    - npm install --global @diffpal/diffpal@latest @openai/codex@latest
+    - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-
       diffpal review gitlab
@@ -209,7 +215,7 @@ diffpal-review:
 
 | Name | Required | Purpose |
 | --- | --- | --- |
-| `COPILOT_GITHUB_TOKEN` | yes | Authenticates the Copilot CLI provider. |
+| `OPENAI_API_KEY` | yes | Authenticates the Codex CLI provider. |
 | `SYSTEM_ACCESSTOKEN` | yes | Publishes Azure PR threads and status. |
 
 In Azure Pipelines, enable **Allow scripts to access the OAuth token** so
@@ -237,8 +243,13 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install --global @github/copilot@latest
-    displayName: Install Copilot provider
+  - script: npm install --global @openai/codex@latest
+    displayName: Install Codex provider
+
+  - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+    displayName: Authenticate Codex
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
 
   - task: DiffPalReview@1
     displayName: DiffPal review
@@ -250,7 +261,7 @@ steps:
       feedback: balanced
       gate: true
     env:
-      COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
@@ -306,7 +317,7 @@ Common artifacts:
 ## Production Hardening
 
 - Pin npm package versions after the first successful setup.
-- Keep `COPILOT_GITHUB_TOKEN` out of untrusted fork pipelines.
+- Keep `OPENAI_API_KEY` out of untrusted fork pipelines.
 - Start with `--block-on high`; lower the threshold only after tuning policy.
 - Keep `fetch-depth: 0`, `GIT_DEPTH: "0"`, or `fetchDepth: 0` in CI.
 - Run `diffpal doctor --mode <host>` before enabling a blocking gate.

@@ -16,7 +16,7 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 		WorkingDir: dir,
 		ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
 		StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
-	}, []string{"openai-fast", "copilot-acp"})
+	}, []string{"openai-fast", "codex-acp"})
 	if err != nil {
 		t.Fatalf("InitWorkspace() error = %v", err)
 	}
@@ -31,14 +31,14 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generated config failed to load: %v", err)
 	}
-	if cfg.ProviderID() != "copilot-acp" {
-		t.Fatalf("ProviderID() = %q, want copilot-acp", cfg.ProviderID())
+	if cfg.ProviderID() != "codex-acp" {
+		t.Fatalf("ProviderID() = %q, want codex-acp", cfg.ProviderID())
 	}
 	if _, ok := cfg.Providers["openai-fast"]; !ok {
 		t.Fatalf("generated config missing openai-fast provider: %+v", cfg.Providers)
 	}
-	if _, ok := cfg.Providers["copilot-acp"]; !ok {
-		t.Fatalf("generated config missing copilot-acp provider: %+v", cfg.Providers)
+	if _, ok := cfg.Providers["codex-acp"]; !ok {
+		t.Fatalf("generated config missing codex-acp provider: %+v", cfg.Providers)
 	}
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
@@ -51,9 +51,9 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	t.Parallel()
 
-	rendered := composeConfig([]string{"openai-fast", "copilot-acp"})
-	if !strings.Contains(rendered, "diffpal:\n  provider: copilot-acp") {
-		t.Fatalf("composeConfig() missing copilot diffpal provider:\n%s", rendered)
+	rendered := composeConfig([]string{"openai-fast", "codex-acp"})
+	if !strings.Contains(rendered, "diffpal:\n  provider: codex-acp") {
+		t.Fatalf("composeConfig() missing codex diffpal provider:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "  gate:\n    block_on: high") {
 		t.Fatalf("composeConfig() missing gate.block_on:\n%s", rendered)
@@ -62,7 +62,7 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 		t.Fatalf("composeConfig() should keep profiles/platform auth in templates only:\n%s", rendered)
 	}
 	for _, needle := range []string{
-		"      model: gpt-5-mini",
+		"      reasoning_effort: low",
 		"    language: en",
 		"      - security",
 		"      - bugs",
@@ -145,5 +145,14 @@ func TestSelectedDefaultProviderFallsBackToFirstDetected(t *testing.T) {
 
 	if got := selectedDefaultProvider([]string{"openai-fast"}); got != "openai-fast" {
 		t.Fatalf("selectedDefaultProvider() = %q, want openai-fast", got)
+	}
+}
+
+func TestSelectedDefaultProviderPrefersCodex(t *testing.T) {
+	t.Parallel()
+
+	got := selectedDefaultProvider([]string{"openai-fast", "copilot-acp", "codex-acp"})
+	if got != "codex-acp" {
+		t.Fatalf("selectedDefaultProvider() = %q, want codex-acp", got)
 	}
 }

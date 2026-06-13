@@ -17,14 +17,14 @@ version: v1
 
 runtime:
   providers:
-    copilot-acp:
-      type: copilot_acp
-      copilot_acp:
-        model: gpt-5-mini
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
   mcp_servers: {}
 
 diffpal:
-  provider: copilot-acp
+  provider: codex-acp
   gate:
     block_on: high
   review:
@@ -70,9 +70,9 @@ Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
 
-The default public onboarding provider is `copilot-acp`. Install it with
-`npm install --global @github/copilot@latest` and provide
-`COPILOT_GITHUB_TOKEN` in CI.
+The default public onboarding provider is `codex-acp`. Install it with
+`npm install --global @openai/codex@latest` and authenticate Codex with
+`OPENAI_API_KEY` in CI.
 
 `diffpal.platforms.github.summary_comment.enabled` defaults to `true`. When
 `summary` mode is selected, DiffPal posts or updates a PR-level GitHub summary

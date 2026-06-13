@@ -60,7 +60,7 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - The `DiffPalReview@1` task installs `@diffpal/diffpal` by default. Set
   `diffpalVersion` to pin a version or dist-tag.
 - Install the provider command separately, for example
-  `npm install --global @github/copilot@latest`.
+  `npm install --global @openai/codex@latest`.
 - Set `install: false` to use `diffpal` from `PATH`, or set `diffpalPath` to a
   custom binary path. Custom paths skip automatic installation.
 - Optional task inputs `language`, `reviewChecks`, and `feedback` map to the
