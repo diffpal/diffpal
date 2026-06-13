@@ -85,7 +85,7 @@ type ChunkFinding struct {
 }
 
 type ChunkOutput struct {
-	ChangeSummary []string       `json:"change_summary,omitempty"`
+	ChangeSummary []string       `json:"change_summary"`
 	Findings      []ChunkFinding `json:"findings"`
 }
 

@@ -16,9 +16,12 @@ type Finding struct {
 }
 
 type CodeLocation struct {
-	Path      string `json:"path"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
+	Path  string            `json:"path"`
+	Lines CodeLocationLines `json:"lines"`
+}
+
+type CodeLocationLines struct {
+	Begin int `json:"begin"`
 }
 
 func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
@@ -33,9 +36,10 @@ func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 			Severity:    mapSeverity(f.Severity),
 			Fingerprint: findings.Fingerprint(repo, bundle.HeadSHA, f),
 			Location: CodeLocation{
-				Path:      f.Path,
-				StartLine: f.StartLine,
-				EndLine:   f.EndLine,
+				Path: f.Path,
+				Lines: CodeLocationLines{
+					Begin: f.StartLine,
+				},
 			},
 		})
 	}
@@ -52,11 +56,13 @@ func ToJSON(bundle findings.FindingsBundle, repo string) ([]byte, error) {
 
 func mapSeverity(v string) string {
 	switch v {
-	case "critical", "high":
-		return "high"
+	case "critical":
+		return "critical"
+	case "high":
+		return "major"
 	case "medium":
-		return "medium"
+		return "minor"
 	default:
-		return "low"
+		return "info"
 	}
 }

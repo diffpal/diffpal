@@ -61,7 +61,7 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 		if f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
 			continue
 		}
-		key := threadKey(f.Path, f.StartLine, f.Category)
+		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
 		action := ActionCreate
 		if prior, ok := existing[key]; ok {
 			if prior == f.ID {
@@ -98,8 +98,8 @@ func threadConfidenceThreshold(profile string) float64 {
 	return MinThreadConfidence
 }
 
-func threadKey(path string, line int, category string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, category)
+func threadKey(path string, line int, category string, findingID string) string {
+	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
 }
 
 func threadBody(f findings.Finding) string {

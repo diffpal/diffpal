@@ -43,7 +43,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		},
 	}
 	existing := map[string]string{
-		threadKey("internal/db/query.go", 20, "security"): "old-fp",
+		threadKey("internal/db/query.go", 20, "security", "fp-update"): "old-fp",
 	}
 
 	plan := PlanThreads(existing, findingsList, Context{
@@ -66,6 +66,39 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 	}
 	if len(plan.State) != 2 {
 		t.Fatalf("len(State) = %d, want 2 actionable states", len(plan.State))
+	}
+}
+
+func TestPlanThreadsKeepsSameLineFindingsDistinct(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{
+			ID:         "fp-a",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "first issue",
+		},
+		{
+			ID:         "fp-b",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "second issue",
+		},
+	}
+
+	plan := PlanThreads(nil, items, Context{})
+	if len(plan.State) != 2 {
+		t.Fatalf("state = %d, want 2", len(plan.State))
+	}
+	if plan.State[0].ThreadID == plan.State[1].ThreadID {
+		t.Fatalf("same-line findings share thread id %q", plan.State[0].ThreadID)
 	}
 }
 

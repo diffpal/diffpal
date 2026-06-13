@@ -72,7 +72,7 @@ func Validate(bundle FindingsBundle) error {
 		}
 	}
 	for _, f := range bundle.Findings {
-		if f.Path == "" {
+		if strings.TrimSpace(f.Path) == "" {
 			return ValidationError{Field: "finding.path", Msg: "path is required"}
 		}
 		if f.Category == "" {
@@ -93,10 +93,10 @@ func Validate(bundle FindingsBundle) error {
 		if f.Evidence == "" {
 			return ValidationError{Field: "finding.evidence", Msg: "evidence is required"}
 		}
-		if f.StartLine < 0 || f.EndLine < 0 {
-			return ValidationError{Field: "finding.line", Msg: "line numbers must be non-negative"}
+		if f.StartLine <= 0 || f.EndLine <= 0 {
+			return ValidationError{Field: "finding.line", Msg: "line numbers must be positive"}
 		}
-		if f.EndLine > 0 && f.StartLine > f.EndLine {
+		if f.StartLine > f.EndLine {
 			return ValidationError{Field: "finding.line", Msg: "start_line must be <= end_line"}
 		}
 		if f.Confidence < 0 || f.Confidence > 1 {

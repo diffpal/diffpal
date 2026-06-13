@@ -52,7 +52,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			advisory = append(advisory, finding)
 			continue
 		}
-		thread := discussionKey(finding.Path, finding.StartLine, finding.Category)
+		thread := discussionKey(finding.Path, finding.StartLine, finding.Category, finding.ID)
 		actionType := ActionCreate
 		if prior, ok := existing[thread]; ok {
 			if prior == finding.ID {
@@ -83,8 +83,8 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 	}
 }
 
-func discussionKey(path string, line int, category string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, category)
+func discussionKey(path string, line int, category string, findingID string) string {
+	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
 }
 
 func discussionBody(f findings.Finding) string {
@@ -97,12 +97,33 @@ func discussionBody(f findings.Finding) string {
 		"**Provider**: " + f.Provider,
 	}
 	if f.Evidence != "" {
-		lines = append(lines, "", "**Evidence:**", "```", f.Evidence, "```")
+		fence := markdownFence(f.Evidence)
+		lines = append(lines, "", "**Evidence:**", fence, f.Evidence, fence)
 	}
 	if f.Suggestion != "" {
-		lines = append(lines, "", "**Suggestion:**", "```", f.Suggestion, "```")
+		fence := markdownFence(f.Suggestion)
+		lines = append(lines, "", "**Suggestion:**", fence, f.Suggestion, fence)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func markdownFence(content string) string {
+	maxRun := 0
+	current := 0
+	for _, r := range content {
+		if r == '`' {
+			current++
+			if current > maxRun {
+				maxRun = current
+			}
+			continue
+		}
+		current = 0
+	}
+	if maxRun < 3 {
+		return "```"
+	}
+	return strings.Repeat("`", maxRun+1)
 }
 
 func formatConfidence(v float64) string {

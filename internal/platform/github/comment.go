@@ -65,7 +65,7 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		if f.StartLine <= 0 || f.Confidence < minConfidence {
 			continue
 		}
-		key := commentKey(f.Path, f.StartLine, f.Category)
+		key := commentKey(f.Path, f.StartLine, f.Category, f.ID)
 		body := formatBody(f, links)
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
@@ -117,8 +117,8 @@ func LoadExistingState(path string) (map[string]string, error) {
 	return out, nil
 }
 
-func commentKey(path string, line int, category string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, category)
+func commentKey(path string, line int, category string, findingID string) string {
+	return fmt.Sprintf("%s:%d:%s:%s", path, line, category, findingID)
 }
 
 func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {

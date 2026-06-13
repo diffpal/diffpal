@@ -44,8 +44,8 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	}
 
 	existing := map[string]string{
-		discussionKey("internal/db/query.go", 12, "security"):      "old-fp",
-		discussionKey("internal/app/service.go", 8, "correctness"): "fp-skip",
+		discussionKey("internal/db/query.go", 12, "security", "fp-update"):    "old-fp",
+		discussionKey("internal/app/service.go", 8, "correctness", "fp-skip"): "fp-skip",
 	}
 	plan := PlanDiscussions(existing, findingsList, []string{"high"})
 
@@ -63,6 +63,26 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	}
 	if !strings.Contains(plan.AdvisorySummary, "Medium maintainability") {
 		t.Fatalf("advisory summary missing advisory finding:\n%s", plan.AdvisorySummary)
+	}
+}
+
+func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
+	t.Parallel()
+
+	body := discussionBody(findings.Finding{
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.9,
+		Message:    "unsafe markdown",
+		Evidence:   "```go\nfmt.Println(\"x\")\n```",
+		Suggestion: "````suggestion\nx\n````",
+	})
+
+	if !strings.Contains(body, "`````\n````suggestion\nx\n````\n`````") {
+		t.Fatalf("suggestion fence was not lengthened safely:\n%s", body)
+	}
+	if strings.Contains(body, "**Evidence:**\n```\n```go") {
+		t.Fatalf("evidence used unsafe triple fence:\n%s", body)
 	}
 }
 

@@ -53,8 +53,8 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	}
 
 	existing := map[string]string{
-		commentKey("internal/db/query.go", 22, "security"):           "fp-old",
-		commentKey("internal/app/service.go", 31, "maintainability"): "fp-skip",
+		commentKey("internal/db/query.go", 22, "security", "fp-update"):         "fp-old",
+		commentKey("internal/app/service.go", 31, "maintainability", "fp-skip"): "fp-skip",
 	}
 	plan := PlanInlineComments(existing, findingsList)
 
@@ -72,6 +72,39 @@ func TestPlanInlineCommentsFiltersAndReconciles(t *testing.T) {
 	}
 	if len(plan.State) != 3 {
 		t.Fatalf("len(State) = %d, want 3 high-confidence findings", len(plan.State))
+	}
+}
+
+func TestPlanInlineCommentsKeepsSameLineFindingsDistinct(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{
+			ID:         "fp-a",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "first issue",
+		},
+		{
+			ID:         "fp-b",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  12,
+			Message:    "second issue",
+		},
+	}
+
+	plan := PlanInlineComments(nil, items)
+	if len(plan.State) != 2 {
+		t.Fatalf("state = %d, want 2", len(plan.State))
+	}
+	if plan.State[0].Key == plan.State[1].Key {
+		t.Fatalf("same-line findings share key %q", plan.State[0].Key)
 	}
 }
 

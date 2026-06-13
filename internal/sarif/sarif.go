@@ -99,7 +99,7 @@ func ToReport(bundle findings.FindingsBundle) Report {
 		r.Runs[0].Results = append(r.Runs[0].Results, Result{
 			Rule:    f.Category,
 			Level:   sarifLevel(f.Severity),
-			Message: Message{Text: f.Message},
+			Message: Message{Text: resultMessage(f)},
 			Locations: []Location{
 				{
 					PhysicalLocation: PhysicalLocation{
@@ -148,7 +148,7 @@ func buildRules(findingsList []findings.Finding) []Rule {
 		byID[finding.Category] = Rule{
 			ID:               finding.Category,
 			Name:             finding.Category,
-			ShortDescription: Message{Text: finding.Title},
+			ShortDescription: Message{Text: "DiffPal " + finding.Category + " finding"},
 			Properties: RuleProperties{
 				Category: finding.Category,
 			},
@@ -164,4 +164,14 @@ func buildRules(findingsList []findings.Finding) []Rule {
 		rules = append(rules, byID[id])
 	}
 	return rules
+}
+
+func resultMessage(f findings.Finding) string {
+	if f.Title == "" {
+		return f.Message
+	}
+	if f.Message == "" || f.Message == f.Title {
+		return f.Title
+	}
+	return f.Title + ": " + f.Message
 }

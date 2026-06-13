@@ -64,6 +64,9 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 	if run.Tool.Driver.Rules[0].ID != "correctness" || run.Tool.Driver.Rules[1].ID != "security" {
 		t.Fatalf("unexpected category rule ordering: %+v", run.Tool.Driver.Rules)
 	}
+	if run.Tool.Driver.Rules[1].ShortDescription.Text != "DiffPal security finding" {
+		t.Fatalf("security rule description = %q", run.Tool.Driver.Rules[1].ShortDescription.Text)
+	}
 	if len(run.Results) != 3 {
 		t.Fatalf("Results = %d, want 3", len(run.Results))
 	}
@@ -73,6 +76,9 @@ func TestToReportMapsStableRulesAndLocations(t *testing.T) {
 	}
 	if first.Level != "error" {
 		t.Fatalf("first Level = %q, want error", first.Level)
+	}
+	if first.Message.Text != "unsafe SQL construction: query concatenates user input" {
+		t.Fatalf("first message = %q", first.Message.Text)
 	}
 	if first.Locations[0].PhysicalLocation.ArtifactLocation.URI != "internal/db/query.go" {
 		t.Fatalf("first location URI = %q", first.Locations[0].PhysicalLocation.ArtifactLocation.URI)
