@@ -89,6 +89,9 @@ func TestToJSONUsesGitLabCodeQualityLocationShape(t *testing.T) {
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
+	if len(payload) != 1 {
+		t.Fatalf("len(payload) = %d, want 1: %s", len(payload), raw)
+	}
 	location, ok := payload[0]["location"].(map[string]any)
 	if !ok {
 		t.Fatalf("location missing or wrong type: %s", raw)
@@ -162,5 +165,37 @@ func TestConvertFingerprintDoesNotDependOnFindingWording(t *testing.T) {
 	}
 	if first[0].Fingerprint != second[0].Fingerprint {
 		t.Fatalf("fingerprint changed with wording: %q vs %q", first[0].Fingerprint, second[0].Fingerprint)
+	}
+}
+
+func TestConvertFingerprintDistinguishesSameLineFindings(t *testing.T) {
+	t.Parallel()
+
+	items, err := Convert(findings.FindingsBundle{Findings: []findings.Finding{
+		{
+			Category:  "maintainability",
+			Severity:  "medium",
+			Path:      "internal/app/service.go",
+			StartLine: 14,
+			EndLine:   16,
+			Message:   "first issue",
+		},
+		{
+			Category:  "maintainability",
+			Severity:  "medium",
+			Path:      "internal/app/service.go",
+			StartLine: 14,
+			EndLine:   16,
+			Message:   "second issue",
+		},
+	}}, "repo")
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2", len(items))
+	}
+	if items[0].Fingerprint == items[1].Fingerprint {
+		t.Fatalf("same-line findings share fingerprint %q", items[0].Fingerprint)
 	}
 }

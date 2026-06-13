@@ -28,15 +28,18 @@ type CodeLocationLines struct {
 
 func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 	out := make([]Finding, 0, len(bundle.Findings))
+	occurrences := map[string]int{}
 	for _, f := range bundle.Findings {
 		if f.Category != "maintainability" {
 			continue
 		}
+		identity := codeQualityIdentity(f)
+		occurrences[identity]++
 		out = append(out, Finding{
 			Description: fmt.Sprintf("[%s] %s", f.Category, f.Message),
 			CheckName:   f.Category,
 			Severity:    mapSeverity(f.Severity),
-			Fingerprint: codeQualityFingerprint(repo, f),
+			Fingerprint: codeQualityFingerprint(repo, f, occurrences[identity]),
 			Location: CodeLocation{
 				Path: f.Path,
 				Lines: CodeLocationLines{
@@ -48,13 +51,14 @@ func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 	return out, nil
 }
 
-func codeQualityFingerprint(repo string, f findings.Finding) string {
+func codeQualityFingerprint(repo string, f findings.Finding, occurrence int) string {
 	type payload struct {
 		Repo      string `json:"repo"`
 		Path      string `json:"path"`
 		LineStart int    `json:"line_start"`
 		LineEnd   int    `json:"line_end"`
 		Category  string `json:"category"`
+		Slot      int    `json:"slot"`
 	}
 	canonical := payload{
 		Repo:      repo,
@@ -62,10 +66,20 @@ func codeQualityFingerprint(repo string, f findings.Finding) string {
 		LineStart: f.StartLine,
 		LineEnd:   f.EndLine,
 		Category:  strings.TrimSpace(strings.ToLower(f.Category)),
+		Slot:      occurrence,
 	}
 	raw, _ := json.Marshal(canonical)
 	sum := sha256.Sum256(raw)
 	return fmt.Sprintf("%x", sum[:])
+}
+
+func codeQualityIdentity(f findings.Finding) string {
+	return fmt.Sprintf("%s:%d:%d:%s",
+		strings.TrimSpace(f.Path),
+		f.StartLine,
+		f.EndLine,
+		strings.TrimSpace(strings.ToLower(f.Category)),
+	)
 }
 
 func ToJSON(bundle findings.FindingsBundle, repo string) ([]byte, error) {
