@@ -34,7 +34,7 @@ jobs:
         run: go build -o .artifacts/bin/diffpal ./cmd/diffpal
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@latest @normahq/codex-acp-bridge@latest
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
       - name: Restore Codex auth
         run: |

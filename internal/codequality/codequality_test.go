@@ -133,3 +133,34 @@ func TestConvertFingerprintDoesNotDependOnHeadSHA(t *testing.T) {
 		t.Fatalf("fingerprint changed with head SHA: %q vs %q", first[0].Fingerprint, second[0].Fingerprint)
 	}
 }
+
+func TestConvertFingerprintDoesNotDependOnFindingWording(t *testing.T) {
+	t.Parallel()
+
+	firstFinding := findings.Finding{
+		Category:  "maintainability",
+		Severity:  "medium",
+		Path:      "internal/app/service.go",
+		StartLine: 14,
+		EndLine:   16,
+		Title:     "Long helper",
+		Message:   "helper is difficult to follow",
+		Evidence:  "nested branches",
+	}
+	secondFinding := firstFinding
+	secondFinding.Title = "Complex helper"
+	secondFinding.Message = "helper has too much branching"
+	secondFinding.Evidence = "different wording"
+
+	first, err := Convert(findings.FindingsBundle{Findings: []findings.Finding{firstFinding}}, "repo")
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+	second, err := Convert(findings.FindingsBundle{Findings: []findings.Finding{secondFinding}}, "repo")
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+	if first[0].Fingerprint != second[0].Fingerprint {
+		t.Fatalf("fingerprint changed with wording: %q vs %q", first[0].Fingerprint, second[0].Fingerprint)
+	}
+}

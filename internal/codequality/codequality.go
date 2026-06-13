@@ -50,32 +50,21 @@ func Convert(bundle findings.FindingsBundle, repo string) ([]Finding, error) {
 
 func codeQualityFingerprint(repo string, f findings.Finding) string {
 	type payload struct {
-		Repo        string `json:"repo"`
-		Path        string `json:"path"`
-		LineStart   int    `json:"line_start"`
-		LineEnd     int    `json:"line_end"`
-		Category    string `json:"category"`
-		TitleNorm   string `json:"title_norm"`
-		MessageNorm string `json:"message_norm"`
-		Evidence    string `json:"evidence"`
+		Repo      string `json:"repo"`
+		Path      string `json:"path"`
+		LineStart int    `json:"line_start"`
+		LineEnd   int    `json:"line_end"`
+		Category  string `json:"category"`
 	}
 	canonical := payload{
-		Repo:        repo,
-		Path:        strings.TrimSpace(f.Path),
-		LineStart:   f.StartLine,
-		LineEnd:     f.EndLine,
-		Category:    strings.TrimSpace(strings.ToLower(f.Category)),
-		TitleNorm:   strings.TrimSpace(strings.ToLower(f.Title)),
-		MessageNorm: strings.TrimSpace(strings.ToLower(f.Message)),
-		Evidence:    shaText(f.Evidence),
+		Repo:      repo,
+		Path:      strings.TrimSpace(f.Path),
+		LineStart: f.StartLine,
+		LineEnd:   f.EndLine,
+		Category:  strings.TrimSpace(strings.ToLower(f.Category)),
 	}
 	raw, _ := json.Marshal(canonical)
 	sum := sha256.Sum256(raw)
-	return fmt.Sprintf("%x", sum[:])
-}
-
-func shaText(v string) string {
-	sum := sha256.Sum256([]byte(v))
 	return fmt.Sprintf("%x", sum[:])
 }
 

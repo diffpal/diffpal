@@ -53,10 +53,15 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			continue
 		}
 		thread := discussionKey(finding.Path, finding.StartLine, finding.Category, finding.ID)
+		actionThread := thread
 		actionType := ActionCreate
 		prior, ok := existing[thread]
 		if !ok {
-			prior, ok = singleExistingForLocation(existing, discussionLocationKey(finding.Path, finding.StartLine, finding.Category))
+			var priorThread string
+			priorThread, prior, ok = singleExistingForLocation(existing, discussionLocationKey(finding.Path, finding.StartLine, finding.Category))
+			if ok {
+				actionThread = priorThread
+			}
 		}
 		if ok {
 			if prior == finding.ID {
@@ -73,7 +78,7 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			Path:       finding.Path,
 			Line:       finding.StartLine,
 			Blocking:   blocking,
-			ThreadHash: thread,
+			ThreadHash: actionThread,
 		})
 	}
 	var advisorySummary string
@@ -95,7 +100,8 @@ func discussionLocationKey(path string, line int, category string) string {
 	return fmt.Sprintf("%s:%d:%s", path, line, category)
 }
 
-func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, string, bool) {
+	var priorKey string
 	var prior string
 	found := false
 	prefix := locationKey + ":"
@@ -104,12 +110,13 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 			continue
 		}
 		if found {
-			return "", false
+			return "", "", false
 		}
+		priorKey = key
 		prior = findingID
 		found = true
 	}
-	return prior, found
+	return priorKey, prior, found
 }
 
 func discussionBody(f findings.Finding) string {

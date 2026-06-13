@@ -123,6 +123,9 @@ func TestPlanDiscussionsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testin
 	if plan.Actions[0].Type != ActionUpdate {
 		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
 	}
+	if plan.Actions[0].ThreadHash != discussionKey("main.go", 12, "security", "fp-old") {
+		t.Fatalf("ThreadHash = %q, want prior thread hash", plan.Actions[0].ThreadHash)
+	}
 }
 
 func TestLoadExistingStateReadsPriorDiscussionPlan(t *testing.T) {

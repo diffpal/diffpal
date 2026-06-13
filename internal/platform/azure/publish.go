@@ -62,10 +62,15 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 			continue
 		}
 		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
+		actionThreadID := key
 		action := ActionCreate
 		prior, ok := existing[key]
 		if !ok {
-			prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
+			var priorThreadID string
+			priorThreadID, prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
+			if ok {
+				actionThreadID = priorThreadID
+			}
 		}
 		if ok {
 			if prior == f.ID {
@@ -81,7 +86,7 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 			Path:      f.Path,
 			Line:      f.StartLine,
 			Body:      threadBody(f),
-			ThreadID:  key,
+			ThreadID:  actionThreadID,
 		})
 	}
 	return ThreadPlan{
@@ -110,7 +115,8 @@ func threadLocationKey(path string, line int, category string) string {
 	return fmt.Sprintf("%s:%d:%s", path, line, category)
 }
 
-func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {
+func singleExistingForLocation(existing map[string]string, locationKey string) (string, string, bool) {
+	var priorKey string
 	var prior string
 	found := false
 	prefix := locationKey + ":"
@@ -119,12 +125,13 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 			continue
 		}
 		if found {
-			return "", false
+			return "", "", false
 		}
+		priorKey = key
 		prior = findingID
 		found = true
 	}
-	return prior, found
+	return priorKey, prior, found
 }
 
 func threadBody(f findings.Finding) string {
