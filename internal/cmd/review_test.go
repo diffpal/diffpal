@@ -369,7 +369,9 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
+	var called atomic.Bool
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
@@ -386,6 +388,9 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "publish=skipped-fork") {
 		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+	if called.Load() {
+		t.Fatal("review runner was called for fork PR")
 	}
 }
 
@@ -407,7 +412,9 @@ func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T)
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
+	var called atomic.Bool
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
@@ -425,6 +432,9 @@ func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T)
 	if !strings.Contains(out.String(), "publish=skipped-fork") {
 		t.Fatalf("output missing fork skip marker:\n%s", out.String())
 	}
+	if called.Load() {
+		t.Fatal("review runner was called for fork PR")
+	}
 }
 
 func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
@@ -440,7 +450,9 @@ func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
+	var called atomic.Bool
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
@@ -468,6 +480,9 @@ func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "mode=summary") {
 		t.Fatalf("output shows publish artifacts despite context error:\n%s", out.String())
+	}
+	if called.Load() {
+		t.Fatal("review runner was called after fork safety context error")
 	}
 }
 

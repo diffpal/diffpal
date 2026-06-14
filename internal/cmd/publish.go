@@ -86,6 +86,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: payload.Conclusion})
 		case "github_comments":
+			blocking = max(blocking, decision.BlockCount)
 			existing, err := github.LoadExistingState(targetOut)
 			if err != nil {
 				return nil, 0, err

@@ -144,6 +144,24 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			return withExitCode(2, err)
 		}
 	}
+	if cmd.Flags().Lookup("review-channel") != nil {
+		reviewChannel, _ := cmd.Flags().GetString("review-channel")
+		if _, err := github.NewReviewIdentity(reviewChannel); err != nil {
+			return withExitCode(2, err)
+		}
+	}
+	if platform == "github" {
+		skipReview, err := shouldSkipGitHubReview(cmd)
+		if err != nil {
+			return withExitCode(4, err)
+		}
+		if skipReview {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
+				return withExitCode(5, err)
+			}
+			return nil
+		}
+	}
 
 	execution, err := executeReview(cmd, defaultReviewID, run)
 	if err != nil {
@@ -422,6 +440,16 @@ func shouldSkipGitHubPublish(bundle findings.FindingsBundle) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
+	base, _ := cmd.Flags().GetString("base")
+	head, _ := cmd.Flags().GetString("head")
+	ctx, err := github.ResolveContext(base, head)
+	if err != nil {
+		return false, fmt.Errorf("resolve github context for fork safety: %w", err)
+	}
+	return ctx.IsFork, nil
 }
 
 func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {

@@ -145,6 +145,50 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 	}
 }
 
+func TestPublishBundleToFilesGitHubCommentsReportsBlocking(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_EVENT_PATH", "")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+
+	bundle := findings.FindingsBundle{
+		Version:  findings.VersionV1,
+		ReviewID: "github-pr-1",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/db/query.go"},
+		},
+		Findings: []findings.Finding{
+			{
+				ID:         "fp-sec",
+				ReviewID:   "github-pr-1",
+				Category:   "security",
+				Severity:   "high",
+				Confidence: 0.96,
+				Path:       "internal/db/query.go",
+				StartLine:  3,
+				EndLine:    5,
+				Title:      "unsafe SQL construction",
+				Message:    "query concatenates user input",
+				Evidence:   "user is appended into SQL",
+				Suggestion: "Use a parameterized statement.",
+				Blocking:   true,
+			},
+		},
+	}
+
+	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"comments"}, "inline", true, "", "")
+	if err != nil {
+		t.Fatalf("publishBundleToFiles() error = %v", err)
+	}
+	if blocking != 1 {
+		t.Fatalf("blocking = %d, want 1", blocking)
+	}
+}
+
 func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
 	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"check-run", "summary"}, "", true, "review.out", "")
 	if err == nil {
