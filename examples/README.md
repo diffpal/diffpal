@@ -44,7 +44,9 @@ command that starts your provider's ACP stdio server.
 - OpenCode ACP uses the `opencode acp` command resolved by the runtime. Install
   and authenticate OpenCode before running DiffPal.
 - The GitLab examples restrict secret-backed jobs to same-project merge
-  requests. The Azure examples skip credentialed review steps when
+  requests, require a protected `DIFFPAL_TRUSTED_REVIEW=true` variable, and run
+  as manual jobs so maintainers decide when provider credentials are exposed.
+  The Azure examples skip credentialed review steps when
   `System.PullRequest.IsFork` is `True`.
 
 To use another ACP CLI, copy the closest CI example for your host and replace

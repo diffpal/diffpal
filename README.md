@@ -121,9 +121,9 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - uses: diffpal/diffpal@v0.1.5
+      - uses: diffpal/diffpal@v0.1.7
         with:
-          diffpal-version: 0.1.5
+          diffpal-version: 0.1.7
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           profile: ci
