@@ -10,3 +10,4 @@
 - Added the `omnidist-release` GitHub workflow for npm-only `@diffpal/diffpal` releases.
 - Added the `diffpal-dev` GitHub workflow so DiffPal reviews same-repository pull requests using the locally built CLI, and left the released-package `diffpal` workflow disabled until the action is ready for PR gating.
 - Added lint, test, race-test, actionlint, and govulncheck coverage for CI.
+- Updated the GitHub Action default and CI examples to use the current `0.1.5` CLI release.
