@@ -76,17 +76,23 @@ jobs:
 
 Inject `OPENAI_API_KEY` only inside a job with that guard.
 
-4. Build Azure DevOps extension packages:
+4. Validate and package Azure DevOps extension artifacts:
 
 ```bash
 npm --prefix tasks/azure-devops ci
+npm --prefix tasks/azure-devops audit --omit=dev --audit-level=high
+npm --prefix tasks/azure-devops run smoke
 npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
-6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
-7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
+5. Upload `dist/diffpal-review.vsix` and `dist/diffpal-review-dev.vsix` as
+   release artifacts.
+6. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
+7. Publish Azure DevOps extension packages only from this tag flow when the
+   matching marketplace credentials, such as `AZURE_DEVOPS_EXT_PAT`, are
+   available.
+8. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
 
 ## Required GitHub setup
 
@@ -127,13 +133,15 @@ with default `install: true`; provider setup such as `@openai/codex` and
 
 ## CI baseline
 
-- The `ci` workflow provides `lint`, `test`, `security`, and `azure-devops-task` jobs in one workflow run.
+- The `ci` workflow provides `lint`, `test`, and `security` jobs in one workflow run.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
-- `azure-devops-task` runs `npm ci`, runtime dependency audit, and TypeScript build.
-- Azure DevOps VSIX packaging is a release/manual packaging step via `npm --prefix tasks/azure-devops run package:prod` and `package:dev`.
-- `omnidist-release` runs only on SemVer tags and handles build, npm publish, and GitHub release assets.
+- Azure DevOps task validation and VSIX packaging are tag-release work, not PR
+  checks.
+- `omnidist-release` runs only on SemVer tags and handles build, npm publish,
+  Azure DevOps task audit/smoke/package validation, VSIX artifact upload, and
+  GitHub release assets.
 
 ## Self-review gate
 

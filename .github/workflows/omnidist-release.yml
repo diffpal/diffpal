@@ -33,6 +33,16 @@ jobs:
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
       - name: Verify artifacts
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+      - name: Install Azure DevOps task dependencies
+        run: npm --prefix tasks/azure-devops ci
+      - name: Audit Azure DevOps task runtime dependencies
+        run: npm --prefix tasks/azure-devops audit --omit=dev --audit-level=high
+      - name: Smoke test Azure DevOps task
+        run: npm --prefix tasks/azure-devops run smoke
+      - name: Package Azure DevOps extensions
+        run: |
+          npm --prefix tasks/azure-devops run package:prod
+          npm --prefix tasks/azure-devops run package:dev
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
@@ -45,6 +55,14 @@ jobs:
         with:
           name: dist
           path: .omnidist/default/dist/**/*
+          if-no-files-found: error
+      - name: Upload Azure DevOps extension artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: azure-devops-vsix
+          path: |
+            dist/diffpal-review.vsix
+            dist/diffpal-review-dev.vsix
           if-no-files-found: error
 
   publish_npm:
@@ -104,6 +122,11 @@ jobs:
             fi
             cp "$f" "release-assets/${base}-${os}-${arch}${ext}"
           done < <(find .omnidist/default/dist -type f ! -name VERSION -print0 | sort -z)
+      - name: Download Azure DevOps extension artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: azure-devops-vsix
+          path: release-assets
       - name: Generate checksums
         run: |
           cd release-assets
