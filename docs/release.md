@@ -117,8 +117,8 @@ Before the first public release:
 After release, verify:
 
 ```bash
-npm view @diffpal/diffpal version
-npm install @diffpal/diffpal@1.2.3
+VERSION="$(npm view @diffpal/diffpal version)"
+npm install "@diffpal/diffpal@${VERSION}"
 ./node_modules/.bin/diffpal version
 ```
 

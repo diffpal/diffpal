@@ -397,7 +397,10 @@ func emitReviewSummary(cmd *cobra.Command, result reviewer.Result, contextLines 
 		return withExitCode(5, err)
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "bundle=%s\n", outPath)
-	return withExitCode(5, err)
+	if err != nil {
+		return withExitCode(5, err)
+	}
+	return nil
 }
 
 func countBlockingFindings(bundle findings.FindingsBundle) int {

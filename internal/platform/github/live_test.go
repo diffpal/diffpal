@@ -131,6 +131,36 @@ func TestPublishSummaryCommentFindsMarkerOnNextPage(t *testing.T) {
 	}
 }
 
+func TestPublishSummaryCommentRejectsCrossHostPagination(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	handlerErrs := make(chan error, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
+			w.Header().Set("Link", `<https://evil.example/repos/acme/diffpal/issues/7/comments?per_page=100&page=2>; rel="next"`)
+			_, _ = w.Write([]byte(`[{"id":41,"body":"not diffpal"}]`))
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
+	if err == nil {
+		t.Fatal("PublishSummaryComment() error = nil, want untrusted pagination error")
+	}
+	if !strings.Contains(err.Error(), "untrusted GitHub pagination URL") {
+		t.Fatalf("PublishSummaryComment() error = %v, want untrusted pagination error", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+}
+
 func TestPublishSummaryCommentIgnoresQuotedMarker(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var posted bool

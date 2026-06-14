@@ -154,20 +154,47 @@ func getGitHubIssueCommentsPage(ctx context.Context, token, pageURL string, clie
 	if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
 		return issueCommentsPage{}, err
 	}
+	nextURL, err := nextLinkURL(resp.Header.Get("Link"), pageURL)
+	if err != nil {
+		return issueCommentsPage{}, err
+	}
 	return issueCommentsPage{
 		comments: comments,
-		nextURL:  nextLinkURL(resp.Header.Get("Link")),
+		nextURL:  nextURL,
 	}, nil
 }
 
-func nextLinkURL(header string) string {
+func nextLinkURL(header, currentPageURL string) (string, error) {
+	currentURL, err := url.Parse(currentPageURL)
+	if err != nil {
+		return "", err
+	}
 	for _, part := range strings.Split(header, ",") {
 		link, rel, ok := parseLinkHeaderPart(part)
 		if ok && rel == "next" {
-			return link
+			trusted, err := trustedPaginationURL(link, currentURL)
+			if err != nil {
+				return "", err
+			}
+			if !trusted {
+				return "", fmt.Errorf("untrusted GitHub pagination URL: %s", link)
+			}
+			return link, nil
 		}
 	}
-	return ""
+	return "", nil
+}
+
+func trustedPaginationURL(link string, currentURL *url.URL) (bool, error) {
+	nextURL, err := url.Parse(link)
+	if err != nil {
+		return false, err
+	}
+	if !nextURL.IsAbs() {
+		nextURL = currentURL.ResolveReference(nextURL)
+	}
+	return strings.EqualFold(nextURL.Scheme, currentURL.Scheme) &&
+		strings.EqualFold(nextURL.Host, currentURL.Host), nil
 }
 
 func parseLinkHeaderPart(part string) (string, string, bool) {
