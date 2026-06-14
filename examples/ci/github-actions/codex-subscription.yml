@@ -38,9 +38,9 @@ jobs:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 
       - name: Review pull request
-        uses: diffpal/diffpal@v0.1.5
+        uses: diffpal/diffpal@v0.1.7
         with:
-          diffpal-version: 0.1.5
+          diffpal-version: 0.1.7
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}

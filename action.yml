@@ -12,7 +12,7 @@ inputs:
   diffpal-version:
     description: npm version or dist-tag for @diffpal/diffpal. Use an exact version for reproducible CI.
     required: false
-    default: 0.1.5
+    default: 0.1.7
   diffpal-path:
     description: Path to an existing diffpal binary. Custom paths skip automatic installation.
     required: false
