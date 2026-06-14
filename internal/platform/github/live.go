@@ -111,13 +111,18 @@ func findSummaryComment(ctx context.Context, token, url string, identity ReviewI
 			return 0, err
 		}
 		for _, comment := range resp.comments {
-			if strings.Contains(comment.Body, marker) {
+			if hasSummaryMarker(comment.Body, marker) {
 				return comment.ID, nil
 			}
 		}
 		nextURL = resp.nextURL
 	}
 	return 0, nil
+}
+
+func hasSummaryMarker(body, marker string) bool {
+	body = strings.TrimLeft(body, " \t\r\n")
+	return body == marker || strings.HasPrefix(body, marker+"\n")
 }
 
 type issueCommentsPage struct {

@@ -54,14 +54,14 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	if payload.Count != 55 {
 		t.Fatalf("Count = %d, want 55", payload.Count)
 	}
-	if len(payload.AnnotationBatches) != 2 {
-		t.Fatalf("AnnotationBatches = %d, want 2", len(payload.AnnotationBatches))
+	if len(payload.AnnotationBatches) != 1 {
+		t.Fatalf("AnnotationBatches = %d, want 1 overflow batch", len(payload.AnnotationBatches))
 	}
-	if len(payload.AnnotationBatches[0].Annotations) != 50 {
-		t.Fatalf("first batch size = %d, want 50", len(payload.AnnotationBatches[0].Annotations))
+	if payload.AnnotationBatches[0].Index != 1 {
+		t.Fatalf("overflow batch index = %d, want 1", payload.AnnotationBatches[0].Index)
 	}
-	if len(payload.AnnotationBatches[1].Annotations) != 5 {
-		t.Fatalf("second batch size = %d, want 5", len(payload.AnnotationBatches[1].Annotations))
+	if len(payload.AnnotationBatches[0].Annotations) != 5 {
+		t.Fatalf("overflow batch size = %d, want 5", len(payload.AnnotationBatches[0].Annotations))
 	}
 	if len(payload.Annotations) != 50 {
 		t.Fatalf("Annotations = %d, want 50 primary annotations", len(payload.Annotations))

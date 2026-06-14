@@ -157,7 +157,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		if err != nil {
 			return withExitCode(2, err)
 		}
-		summary, err := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel)
+		summary, err := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel, execution.Repo)
 		if err != nil {
 			return withExitCode(2, err)
 		}
@@ -200,7 +200,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -421,7 +421,7 @@ func shouldSkipGitHubPublish(bundle findings.FindingsBundle) (bool, error) {
 	return true, nil
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -430,7 +430,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
+	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
 	if err != nil {
 		return err
 	}

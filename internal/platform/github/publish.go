@@ -73,8 +73,12 @@ func BuildCheckRunPayloadWithIdentity(ctx Context, bundle findings.FindingsBundl
 	}
 	batches := chunkAnnotations(annotations, maxAnnotationsPerBatch)
 	primary := []Annotation{}
+	overflow := []AnnotationBatch(nil)
 	if len(batches) > 0 {
 		primary = batches[0].Annotations
+		if len(batches) > 1 {
+			overflow = batches[1:]
+		}
 	}
 	return CheckRunPayload{
 		Name:              identity.CheckRunName(),
@@ -84,7 +88,7 @@ func BuildCheckRunPayloadWithIdentity(ctx Context, bundle findings.FindingsBundl
 		Summary:           statusSummary,
 		Count:             len(bundle.Findings),
 		Annotations:       primary,
-		AnnotationBatches: batches,
+		AnnotationBatches: overflow,
 	}
 }
 

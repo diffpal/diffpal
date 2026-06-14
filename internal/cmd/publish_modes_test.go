@@ -94,7 +94,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true, "")
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true, "", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -123,7 +123,7 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false, "")
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false, "", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -141,7 +141,7 @@ func TestRenderPublishSummaryUsesReviewChannelTitle(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "summary"}, true, "diffpal-dev")
+	}, FeedbackBalanced, []string{"check-run", "summary"}, true, "diffpal-dev", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -156,8 +156,34 @@ func TestRenderPublishSummaryRejectsInvalidReviewChannel(t *testing.T) {
 
 	_, err := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
-	}, FeedbackBalanced, []string{"summary"}, true, "bad/channel")
+	}, FeedbackBalanced, []string{"summary"}, true, "bad/channel", "")
 	if err == nil {
 		t.Fatal("renderPublishSummary() error = nil, want invalid review channel error")
+	}
+}
+
+func TestRenderPublishSummaryUsesRepoFallbackForGitHubLinks(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "")
+
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				Severity:  "medium",
+				Category:  "correctness",
+				Path:      "internal/file.go",
+				StartLine: 7,
+				EndLine:   7,
+				Title:     "finding",
+				Message:   "message",
+			},
+		},
+	}, FeedbackBalanced, []string{"summary"}, true, "", "acme/diffpal")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
+	if !strings.Contains(got, "https://github.com/acme/diffpal/blob/head-a/internal/file.go#L7") {
+		t.Fatalf("summary missing repo fallback link:\n%s", got)
 	}
 }

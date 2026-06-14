@@ -66,8 +66,8 @@ func TestPublishSummaryCommentUsesChannelMarker(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
 			_, _ = w.Write([]byte(`[
-				{"id":41,"body":"<!-- diffpal:summary --> stable"},
-				{"id":42,"body":"<!-- diffpal:summary:diffpal-dev --> dev"}
+				{"id":41,"body":"<!-- diffpal:summary -->\nstable"},
+				{"id":42,"body":"<!-- diffpal:summary:diffpal-dev -->\ndev"}
 			]`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
 			patched = true
@@ -105,7 +105,7 @@ func TestPublishSummaryCommentFindsMarkerOnNextPage(t *testing.T) {
 			w.Header().Set("Link", `<`+server.URL+`/repos/acme/diffpal/issues/7/comments?per_page=100&page=2>; rel="next"`)
 			_, _ = w.Write([]byte(`[{"id":41,"body":"not diffpal"}]`))
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments" && r.URL.Query().Get("page") == "2":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary --> old"}]`))
+			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary -->\nold"}]`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
 			patched = true
 			w.WriteHeader(http.StatusOK)
@@ -131,6 +131,46 @@ func TestPublishSummaryCommentFindsMarkerOnNextPage(t *testing.T) {
 	}
 }
 
+func TestPublishSummaryCommentIgnoresQuotedMarker(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var posted bool
+	var patched bool
+	handlerErrs := make(chan error, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
+			_, _ = w.Write([]byte(`[{"id":42,"body":"user quote: <!-- diffpal:summary --> old"}]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
+			posted = true
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
+			patched = true
+			w.WriteHeader(http.StatusOK)
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
+	if err != nil {
+		t.Fatalf("PublishSummaryComment() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if patched {
+		t.Fatal("quoted summary marker was updated")
+	}
+	if !posted {
+		t.Fatal("summary comment was not created")
+	}
+}
+
 func TestPublishSummaryCommentUpdatesExistingMarker(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var patched bool
@@ -138,7 +178,7 @@ func TestPublishSummaryCommentUpdatesExistingMarker(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary --> old"}]`))
+			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary -->\nold"}]`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
 			patched = true
 			w.WriteHeader(http.StatusOK)
