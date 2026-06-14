@@ -31,7 +31,7 @@ const (
 	FeedbackInline   FeedbackProfile = "inline"
 )
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string) ([]publishOutput, int, error) {
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -47,7 +47,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if strings.TrimSpace(out) != "" && len(modes) > 1 {
 		return nil, 0, fmt.Errorf("--out cannot be used with multiple publish modes")
 	}
-	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
 	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 
 	for _, mode := range modes {
@@ -69,7 +69,11 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				ctx = github.Context{}
 				ctx.HeadSHA = bundle.HeadSHA
 			}
-			payload := github.BuildCheckRunPayload(ctx, bundle, summary)
+			identity, err := github.NewReviewIdentity(reviewChannel)
+			if err != nil {
+				return nil, 0, err
+			}
+			payload := github.BuildCheckRunPayloadWithIdentity(ctx, bundle, summary, identity)
 			raw, err := json.MarshalIndent(payload, "", "  ")
 			if err != nil {
 				return nil, 0, err
@@ -195,8 +199,16 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string) string {
+	title := ""
+	if strings.ToLower(strings.TrimSpace(platform)) == "github" {
+		identity, err := github.NewReviewIdentity(reviewChannel)
+		if err == nil {
+			title = identity.SummaryTitle()
+		}
+	}
 	opts := markdown.SummaryOptions{
+		Title:           title,
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,

@@ -63,6 +63,10 @@ inputs:
     description: Review identifier for deterministic outputs.
     required: false
     default: ""
+  review-channel:
+    description: GitHub publishing channel for check runs and summary comments.
+    required: false
+    default: diffpal
   max-files:
     description: Maximum files from diff.
     required: false
@@ -121,6 +125,7 @@ runs:
         INPUT_OUT: ${{ inputs.out }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_REVIEW_ID: ${{ inputs.review-id }}
+        INPUT_REVIEW_CHANNEL: ${{ inputs.review-channel }}
         INPUT_MAX_FILES: ${{ inputs.max-files }}
         INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
         INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}

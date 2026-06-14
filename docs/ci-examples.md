@@ -164,6 +164,17 @@ The semantic change overview is shown by default in summary comments/checks.
 Turn it off with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
 
+For parallel GitHub review channels, set `review-channel`. The default channel
+is `diffpal`, which publishes `diffpal-checks` and updates the legacy DiffPal
+summary comment. A dev channel such as `diffpal-dev` publishes
+`diffpal-dev-checks` and a separate summary comment:
+
+```yaml
+with:
+  review-channel: diffpal-dev
+  review-id: github-pr-${{ github.event.pull_request.number }}-diffpal-dev
+```
+
 Default balanced publish modes:
 
 | Platform | Default modes |

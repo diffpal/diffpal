@@ -42,6 +42,9 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 
 	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
 
+	if payload.Name != "diffpal-checks" {
+		t.Fatalf("Name = %q, want diffpal-checks", payload.Name)
+	}
 	if payload.Conclusion != "failure" {
 		t.Fatalf("Conclusion = %q, want failure", payload.Conclusion)
 	}
@@ -81,6 +84,23 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	}
 	if strings.Contains(string(encoded), `"level"`) {
 		t.Fatalf("annotation JSON contains unsupported level field: %s", encoded)
+	}
+}
+
+func TestBuildCheckRunPayloadUsesReviewChannel(t *testing.T) {
+	t.Parallel()
+
+	identity, err := NewReviewIdentity("diffpal-dev")
+	if err != nil {
+		t.Fatalf("NewReviewIdentity() error = %v", err)
+	}
+	payload := BuildCheckRunPayloadWithIdentity(Context{HeadSHA: "head-a"}, findings.FindingsBundle{
+		ReviewID: "review-github-dev",
+		HeadSHA:  "head-a",
+	}, "# DiffPal Dev Review Summary", identity)
+
+	if payload.Name != "diffpal-dev-checks" {
+		t.Fatalf("Name = %q, want diffpal-dev-checks", payload.Name)
 	}
 }
 

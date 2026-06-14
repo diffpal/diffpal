@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -142,6 +143,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
+	var checkRunName string
+	var summaryBody string
 	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
@@ -152,10 +155,28 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		}
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
+			var payload struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode check run: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			checkRunName = payload.Name
 			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			var payload struct {
+				Body string `json:"body"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode summary comment: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			summaryBody = payload.Body
 			w.WriteHeader(http.StatusCreated)
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
@@ -179,6 +200,7 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
 		"--mode", "check-run,summary",
+		"--review-channel", "diffpal-dev",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -191,6 +213,15 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	case err := <-handlerErrs:
 		t.Fatal(err)
 	default:
+	}
+	if checkRunName != "diffpal-dev-checks" {
+		t.Fatalf("check run name = %q, want diffpal-dev-checks", checkRunName)
+	}
+	if !strings.Contains(summaryBody, "<!-- diffpal:summary:diffpal-dev -->") {
+		t.Fatalf("summary body missing channel marker:\n%s", summaryBody)
+	}
+	if !strings.Contains(summaryBody, "# DiffPal Dev Review Summary") {
+		t.Fatalf("summary body missing channel title:\n%s", summaryBody)
 	}
 	text := out.String()
 	for _, needle := range []string{

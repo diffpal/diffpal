@@ -45,7 +45,7 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", []string{"code-quality", "sarif"}, "", true, "")
+	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", []string{"code-quality", "sarif"}, "", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -114,7 +114,7 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "")
+	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 }
 
 func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
-	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"check-run", "summary"}, "", true, "review.out")
+	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"check-run", "summary"}, "", true, "review.out", "")
 	if err == nil {
 		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-mode error")
 	}

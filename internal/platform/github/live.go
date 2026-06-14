@@ -64,27 +64,29 @@ func PublishInlineComments(ctx context.Context, token string, reviewCtx Context,
 	return nil
 }
 
-const summaryCommentMarker = "<!-- diffpal:summary -->"
-
 type issueComment struct {
 	ID   int64  `json:"id"`
 	Body string `json:"body"`
 }
 
 func PublishSummaryComment(ctx context.Context, token string, reviewCtx Context, summary string, client *http.Client) error {
+	return PublishSummaryCommentWithIdentity(ctx, token, reviewCtx, summary, ReviewIdentity{}, client)
+}
+
+func PublishSummaryCommentWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, client *http.Client) error {
 	if reviewCtx.PRNumber <= 0 {
 		return fmt.Errorf("missing GitHub pull request number")
 	}
 	if strings.TrimSpace(reviewCtx.Repo) == "" {
 		return fmt.Errorf("missing GitHub repository")
 	}
-	body := summaryCommentBody(summary)
+	body := summaryCommentBody(summary, identity)
 	baseURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/issues/" + fmt.Sprint(reviewCtx.PRNumber) + "/comments"
 	headers := map[string]string{
 		"Authorization": "Bearer " + token,
 		"Accept":        "application/vnd.github+json",
 	}
-	existingID, err := findSummaryComment(ctx, token, baseURL, client)
+	existingID, err := findSummaryComment(ctx, token, baseURL, identity, client)
 	if err != nil {
 		return err
 	}
@@ -95,11 +97,11 @@ func PublishSummaryComment(ctx context.Context, token string, reviewCtx Context,
 	return platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, map[string]any{"body": body})
 }
 
-func summaryCommentBody(summary string) string {
-	return summaryCommentMarker + "\n" + strings.TrimSpace(summary) + "\n"
+func summaryCommentBody(summary string, identity ReviewIdentity) string {
+	return identity.SummaryMarker() + "\n" + strings.TrimSpace(summary) + "\n"
 }
 
-func findSummaryComment(ctx context.Context, token, url string, client *http.Client) (int64, error) {
+func findSummaryComment(ctx context.Context, token, url string, identity ReviewIdentity, client *http.Client) (int64, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+"?per_page=100", nil)
 	if err != nil {
 		return 0, err
@@ -123,8 +125,9 @@ func findSummaryComment(ctx context.Context, token, url string, client *http.Cli
 	if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
 		return 0, err
 	}
+	marker := identity.SummaryMarker()
 	for _, comment := range comments {
-		if strings.Contains(comment.Body, summaryCommentMarker) {
+		if strings.Contains(comment.Body, marker) {
 			return comment.ID, nil
 		}
 	}

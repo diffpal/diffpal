@@ -94,7 +94,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true)
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true, "")
 
 	for _, unwanted := range []string{
 		"- Feedback profile: balanced",
@@ -120,9 +120,24 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false)
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false, "")
 
 	if strings.Contains(got, "## Summary of Changes") {
 		t.Fatalf("summary contains hidden overview:\n%s", got)
+	}
+}
+
+func TestRenderPublishSummaryUsesReviewChannelTitle(t *testing.T) {
+	t.Parallel()
+
+	got := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2-diffpal-dev",
+		Files: []findings.ReviewedFile{
+			{Path: "README.md"},
+		},
+	}, FeedbackBalanced, []string{"check-run", "summary"}, true, "diffpal-dev")
+
+	if !strings.Contains(got, "# DiffPal Dev Review Summary") {
+		t.Fatalf("summary missing channel title:\n%s", got)
 	}
 }

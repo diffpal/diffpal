@@ -19,12 +19,13 @@ import (
 type reviewRunner func(context.Context, config.Config, reviewer.Options) (reviewer.Result, error)
 
 type reviewExecution struct {
-	Config  config.Config
-	Repo    string
-	OutPath string
-	BlockOn string
-	Gate    bool
-	Result  reviewer.Result
+	Config        config.Config
+	Repo          string
+	OutPath       string
+	BlockOn       string
+	Gate          bool
+	ReviewChannel string
+	Result        reviewer.Result
 }
 
 func newReviewCommand() *cobra.Command {
@@ -96,6 +97,7 @@ func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
 	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
 	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
+	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and summary comments")
 	cmd.Flags().Bool("dry-run", false, "Print the host review markdown without publishing")
 }
 
@@ -149,7 +151,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		if err != nil {
 			return withExitCode(2, err)
 		}
-		summary := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview)
+		summary := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel)
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(summary)); err != nil {
 			return withExitCode(5, err)
 		}
@@ -175,7 +177,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return nil
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "")
+	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "", execution.ReviewChannel)
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -183,7 +185,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback, summaryOverview); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -218,6 +220,10 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	outPath, _ := cmd.Flags().GetString("out")
 	repo, _ := cmd.Flags().GetString("repo")
 	reviewID, _ := cmd.Flags().GetString("review-id")
+	reviewChannel := github.DefaultReviewChannel
+	if cmd.Flags().Lookup("review-channel") != nil {
+		reviewChannel, _ = cmd.Flags().GetString("review-channel")
+	}
 
 	cfg, err := loadRequiredConfig()
 	if err != nil {
@@ -273,6 +279,9 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if outPath == "" {
 		outPath = findings.DefaultBundlePath
 	}
+	if _, err := github.NewReviewIdentity(reviewChannel); err != nil {
+		return reviewExecution{}, withExitCode(2, err)
+	}
 
 	runCtx := cmd.Context()
 	if runCtx == nil {
@@ -305,12 +314,13 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	}
 
 	return reviewExecution{
-		Config:  cfg,
-		Repo:    repo,
-		OutPath: outPath,
-		BlockOn: blockOn,
-		Gate:    gate,
-		Result:  result,
+		Config:        cfg,
+		Repo:          repo,
+		OutPath:       outPath,
+		BlockOn:       blockOn,
+		Gate:          gate,
+		ReviewChannel: reviewChannel,
+		Result:        result,
 	}, nil
 }
 
@@ -397,7 +407,7 @@ func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) 
 	return true
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -406,11 +416,15 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
+	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
 
 	switch platform {
 	case "github":
 		reviewCtx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
+		if err != nil {
+			return err
+		}
+		identity, err := github.NewReviewIdentity(reviewChannel)
 		if err != nil {
 			return err
 		}
@@ -427,7 +441,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
 				case "check_run":
-					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayload(reviewCtx, bundle, summary), nil); err != nil {
+					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayloadWithIdentity(reviewCtx, bundle, summary, identity), nil); err != nil {
 						return err
 					}
 				case "github_comments":
@@ -438,7 +452,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					if !summaryCommentEnabled {
 						continue
 					}
-					if err := github.PublishSummaryComment(ctx, token, reviewCtx, summary, nil); err != nil {
+					if err := github.PublishSummaryCommentWithIdentity(ctx, token, reviewCtx, summary, identity, nil); err != nil {
 						return err
 					}
 				}

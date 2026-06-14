@@ -69,6 +69,10 @@ The summary includes a semantic overview of the PR by default. Hide it with:
 summary-overview: false
 ```
 
+If you run multiple DiffPal workflows on the same pull request, give each one a
+different `review-channel` and `review-id` so their checks and summary comments
+stay separate.
+
 ## Other Setups
 
 - GitHub Actions: [`examples/ci/github-actions`](../examples/ci/github-actions)
