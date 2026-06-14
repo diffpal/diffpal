@@ -172,29 +172,30 @@ func nextLinkURL(header, currentPageURL string) (string, error) {
 	for _, part := range strings.Split(header, ",") {
 		link, rel, ok := parseLinkHeaderPart(part)
 		if ok && rel == "next" {
-			trusted, err := trustedPaginationURL(link, currentURL)
+			nextURL, trusted, err := trustedPaginationURL(link, currentURL)
 			if err != nil {
 				return "", err
 			}
 			if !trusted {
 				return "", fmt.Errorf("untrusted GitHub pagination URL: %s", link)
 			}
-			return link, nil
+			return nextURL, nil
 		}
 	}
 	return "", nil
 }
 
-func trustedPaginationURL(link string, currentURL *url.URL) (bool, error) {
+func trustedPaginationURL(link string, currentURL *url.URL) (string, bool, error) {
 	nextURL, err := url.Parse(link)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	if !nextURL.IsAbs() {
 		nextURL = currentURL.ResolveReference(nextURL)
 	}
-	return strings.EqualFold(nextURL.Scheme, currentURL.Scheme) &&
-		strings.EqualFold(nextURL.Host, currentURL.Host), nil
+	trusted := strings.EqualFold(nextURL.Scheme, currentURL.Scheme) &&
+		strings.EqualFold(nextURL.Host, currentURL.Host)
+	return nextURL.String(), trusted, nil
 }
 
 func parseLinkHeaderPart(part string) (string, string, bool) {
