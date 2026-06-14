@@ -121,12 +121,15 @@ test_wrapper_uses_installed_binary_and_feedback() {
     INPUT_BASE=base-sha \
     INPUT_HEAD=head-sha \
     INPUT_FEEDBACK=summary \
+    INPUT_REVIEW_CHANNEL=diffpal-dev \
     "$repo_root/tasks/github/run-diffpal-review.sh"
 
   assert_contains "$argv" "review"
   assert_contains "$argv" "github"
   assert_contains "$argv" "--feedback"
   assert_contains "$argv" "summary"
+  assert_contains "$argv" "--review-channel"
+  assert_contains "$argv" "diffpal-dev"
 }
 
 test_wrapper_mode_overrides_feedback() {

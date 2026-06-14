@@ -152,6 +152,44 @@ Allowed values:
 
 Use `--gate` in CI to fail the job when blocking findings exist.
 
+## MCP Servers
+
+MCP servers are declared once under `runtime.mcp_servers`, then attached to the
+provider that should see them. Use this when the review agent needs controlled
+access to repository tools, internal docs, ticket search, or another local
+capability.
+
+```yaml
+runtime:
+  mcp_servers:
+    repo-docs:
+      type: stdio
+      cmd: ["your-docs-mcp-server"]
+      args: ["--root", "."]
+      env:
+        DOCS_TOKEN: "${DOCS_TOKEN}"
+    policy-api:
+      type: http
+      url: "https://policy.example.com/mcp"
+      headers:
+        Authorization: "Bearer ${POLICY_MCP_TOKEN}"
+  providers:
+    codex-acp:
+      type: codex_acp
+      mcp_servers:
+        - repo-docs
+        - policy-api
+      codex_acp:
+        reasoning_effort: low
+
+diffpal:
+  provider: codex-acp
+```
+
+Keep MCP credentials in CI secrets. As with platform tokens, quote envsubst
+placeholders and avoid optional placeholders unless the variable always exists
+in that job.
+
 ## Platform Auth
 
 DiffPal can read platform tokens from config values, but CI environment
@@ -270,6 +308,28 @@ Use `COPILOT_GITHUB_TOKEN` for DiffPal so the provider token is separate from
 the platform publish token. The token must be a fine-grained GitHub PAT v2 with
 the Copilot Requests permission; classic PATs are not supported by the Copilot
 CLI.
+
+### OpenCode ACP
+
+Use [`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml).
+
+DiffPal's runtime starts OpenCode with its ACP command:
+
+```yaml
+runtime:
+  providers:
+    opencode-acp:
+      type: opencode_acp
+      opencode_acp:
+        model: opencode/big-pickle
+
+diffpal:
+  provider: opencode-acp
+```
+
+Install and authenticate `opencode` in CI before running DiffPal. If you need a
+custom OpenCode mode or model, add supported `opencode_acp` fields such as
+`mode`, `model`, or `extra_args`.
 
 ## Profiles
 

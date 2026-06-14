@@ -38,7 +38,7 @@ Copy the GitHub Actions example:
 
 ```bash
 mkdir -p .github/workflows
-cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal-review.yml
+cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 ```
 
 The example:
@@ -68,6 +68,10 @@ The summary includes a semantic overview of the PR by default. Hide it with:
 ```yaml
 summary-overview: false
 ```
+
+If you run multiple DiffPal workflows on the same pull request, give each one a
+different `review-channel` and `review-id` so their checks and summary comments
+stay separate.
 
 ## Other Setups
 

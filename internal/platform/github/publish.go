@@ -34,6 +34,10 @@ type CheckRunPayload struct {
 }
 
 func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSummary string) CheckRunPayload {
+	return BuildCheckRunPayloadWithIdentity(ctx, bundle, statusSummary, ReviewIdentity{})
+}
+
+func BuildCheckRunPayloadWithIdentity(ctx Context, bundle findings.FindingsBundle, statusSummary string, identity ReviewIdentity) CheckRunPayload {
 	levelBySeverity := map[string]string{
 		"critical": "failure",
 		"high":     "failure",
@@ -69,18 +73,22 @@ func BuildCheckRunPayload(ctx Context, bundle findings.FindingsBundle, statusSum
 	}
 	batches := chunkAnnotations(annotations, maxAnnotationsPerBatch)
 	primary := []Annotation{}
+	overflow := []AnnotationBatch(nil)
 	if len(batches) > 0 {
 		primary = batches[0].Annotations
+		if len(batches) > 1 {
+			overflow = batches[1:]
+		}
 	}
 	return CheckRunPayload{
-		Name:              "diffpal-checks",
+		Name:              identity.CheckRunName(),
 		Status:            "completed",
 		Conclusion:        conclusion,
 		HeadSHA:           ctx.HeadSHA,
 		Summary:           statusSummary,
 		Count:             len(bundle.Findings),
 		Annotations:       primary,
-		AnnotationBatches: batches,
+		AnnotationBatches: overflow,
 	}
 }
 

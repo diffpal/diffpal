@@ -31,7 +31,7 @@ const (
 	FeedbackInline   FeedbackProfile = "inline"
 )
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string) ([]publishOutput, int, error) {
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -47,7 +47,10 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if strings.TrimSpace(out) != "" && len(modes) > 1 {
 		return nil, 0, fmt.Errorf("--out cannot be used with multiple publish modes")
 	}
-	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview)
+	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
+	if err != nil {
+		return nil, 0, err
+	}
 	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 
 	for _, mode := range modes {
@@ -69,7 +72,11 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				ctx = github.Context{}
 				ctx.HeadSHA = bundle.HeadSHA
 			}
-			payload := github.BuildCheckRunPayload(ctx, bundle, summary)
+			identity, err := github.NewReviewIdentity(reviewChannel)
+			if err != nil {
+				return nil, 0, err
+			}
+			payload := github.BuildCheckRunPayloadWithIdentity(ctx, bundle, summary, identity)
 			raw, err := json.MarshalIndent(payload, "", "  ")
 			if err != nil {
 				return nil, 0, err
@@ -79,13 +86,14 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: payload.Conclusion})
 		case "github_comments":
+			blocking = max(blocking, decision.BlockCount)
 			existing, err := github.LoadExistingState(targetOut)
 			if err != nil {
 				return nil, 0, err
 			}
 			plan := github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
 				Profile: string(profile),
-				Links:   githubLinkProvider(platform, bundle),
+				Links:   githubLinkProvider(platform, bundle, repo),
 			})
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
@@ -195,26 +203,38 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool) string {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string, repo string) (string, error) {
+	title := ""
+	if strings.ToLower(strings.TrimSpace(platform)) == "github" {
+		identity, err := github.NewReviewIdentity(reviewChannel)
+		if err != nil {
+			return "", err
+		}
+		title = identity.SummaryTitle()
+	}
 	opts := markdown.SummaryOptions{
+		Title:           title,
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
-		Links:           githubLinkProvider(platform, bundle),
+		Links:           githubLinkProvider(platform, bundle, repo),
 	}
-	return markdown.RenderSummaryWithOptions(bundle, opts)
+	return markdown.RenderSummaryWithOptions(bundle, opts), nil
 }
 
-func githubLinkProvider(platform string, bundle findings.FindingsBundle) markdown.FindingLinkProvider {
+func githubLinkProvider(platform string, bundle findings.FindingsBundle, repo string) markdown.FindingLinkProvider {
 	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
 		return nil
 	}
 	ctx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
 	if err != nil {
 		ctx = github.Context{
-			Repo:    strings.TrimSpace(os.Getenv("GITHUB_REPOSITORY")),
+			Repo:    strings.TrimSpace(repo),
 			HeadSHA: bundle.HeadSHA,
 		}
+	}
+	if strings.TrimSpace(ctx.Repo) == "" {
+		ctx.Repo = strings.TrimSpace(os.Getenv("GITHUB_REPOSITORY"))
 	}
 	if strings.TrimSpace(ctx.HeadSHA) == "" {
 		ctx.HeadSHA = bundle.HeadSHA

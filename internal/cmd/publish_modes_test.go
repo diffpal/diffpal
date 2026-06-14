@@ -86,7 +86,7 @@ func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary("github", findings.FindingsBundle{
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",
@@ -94,7 +94,10 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true)
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, true, "", "")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
 
 	for _, unwanted := range []string{
 		"- Feedback profile: balanced",
@@ -112,7 +115,7 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 	t.Parallel()
 
-	got := renderPublishSummary("github", findings.FindingsBundle{
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
 		ChangeSummary: []string{
 			"Documented the GitHub setup flow for DiffPal users.",
@@ -120,9 +123,71 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false)
+	}, FeedbackBalanced, []string{"check-run", "comments", "sarif", "summary"}, false, "", "")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
 
 	if strings.Contains(got, "## Summary of Changes") {
 		t.Fatalf("summary contains hidden overview:\n%s", got)
+	}
+}
+
+func TestRenderPublishSummaryUsesReviewChannelTitle(t *testing.T) {
+	t.Parallel()
+
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2-diffpal-dev",
+		Files: []findings.ReviewedFile{
+			{Path: "README.md"},
+		},
+	}, FeedbackBalanced, []string{"check-run", "summary"}, true, "diffpal-dev", "")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
+
+	if !strings.Contains(got, "# DiffPal Dev Review Summary") {
+		t.Fatalf("summary missing channel title:\n%s", got)
+	}
+}
+
+func TestRenderPublishSummaryRejectsInvalidReviewChannel(t *testing.T) {
+	t.Parallel()
+
+	_, err := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+	}, FeedbackBalanced, []string{"summary"}, true, "bad/channel", "")
+	if err == nil {
+		t.Fatal("renderPublishSummary() error = nil, want invalid review channel error")
+	}
+}
+
+func TestRenderPublishSummaryUsesRepoFallbackForGitHubLinks(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "")
+	t.Setenv("GITHUB_EVENT_PATH", "")
+	t.Setenv("GITHUB_BASE_SHA", "")
+	t.Setenv("GITHUB_HEAD_SHA", "")
+
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{
+			{
+				Severity:  "medium",
+				Category:  "correctness",
+				Path:      "internal/file.go",
+				StartLine: 7,
+				EndLine:   7,
+				Title:     "finding",
+				Message:   "message",
+			},
+		},
+	}, FeedbackBalanced, []string{"summary"}, true, "", "acme/diffpal")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
+	if !strings.Contains(got, "https://github.com/acme/diffpal/blob/head-a/internal/file.go#L7") {
+		t.Fatalf("summary missing repo fallback link:\n%s", got)
 	}
 }

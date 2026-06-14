@@ -1,5 +1,5 @@
-name: diffpal
-description: Run DiffPal review in GitHub Actions
+name: DiffPal
+description: Run DiffPal review in GitHub Actions.
 author: DiffPal
 branding:
   icon: check-circle
@@ -10,9 +10,9 @@ inputs:
     required: false
     default: "true"
   diffpal-version:
-    description: npm version or dist-tag for @diffpal/diffpal.
+    description: npm version or dist-tag for @diffpal/diffpal. Use an exact version for reproducible CI.
     required: false
-    default: latest
+    default: 0.1.2
   diffpal-path:
     description: Path to an existing diffpal binary. Custom paths skip automatic installation.
     required: false
@@ -63,6 +63,10 @@ inputs:
     description: Review identifier for deterministic outputs.
     required: false
     default: ""
+  review-channel:
+    description: GitHub publishing channel for check runs and summary comments.
+    required: false
+    default: diffpal
   max-files:
     description: Maximum files from diff.
     required: false
@@ -84,7 +88,7 @@ inputs:
     required: false
     default: ""
   review-checks:
-    description: Comma-separated checks to run: security, bugs, performance, best-practices.
+    description: "Comma-separated checks to run: security, bugs, performance, best-practices."
     required: false
     default: ""
   instructions:
@@ -98,7 +102,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install DiffPal
+    - name: Install DiffPal CLI
       shell: bash
       env:
         INPUT_INSTALL: ${{ inputs.install }}
@@ -106,7 +110,7 @@ runs:
         INPUT_DIFFPAL_PATH: ${{ inputs.diffpal-path }}
       run: ${{ github.action_path }}/tasks/github/install-diffpal.sh
 
-    - name: Run DiffPal review
+    - name: Run DiffPal Review
       shell: bash
       env:
         INPUT_BASE: ${{ inputs.base }}
@@ -121,6 +125,7 @@ runs:
         INPUT_OUT: ${{ inputs.out }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_REVIEW_ID: ${{ inputs.review-id }}
+        INPUT_REVIEW_CHANNEL: ${{ inputs.review-channel }}
         INPUT_MAX_FILES: ${{ inputs.max-files }}
         INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
         INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}

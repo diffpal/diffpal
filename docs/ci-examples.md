@@ -23,6 +23,7 @@ CLI:
 | Codex API key | [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
 | Codex subscription auth | [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
 | Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
+| OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
 
 ## Using Another ACP CLI
 
@@ -45,6 +46,22 @@ diffpal:
 The rest of the GitHub, GitLab, and Azure examples stay the same: checkout the
 full git history, run DiffPal with the selected profile, and pass the platform
 token for publishing feedback.
+
+OpenCode is available as a first-class ACP alias:
+
+```yaml
+runtime:
+  providers:
+    opencode-acp:
+      type: opencode_acp
+      opencode_acp:
+        model: opencode/big-pickle
+
+diffpal:
+  provider: opencode-acp
+```
+
+Install and authenticate `opencode` in CI before the DiffPal step.
 
 ## GitHub Actions
 
@@ -163,6 +180,17 @@ Raw `mode` remains available for advanced publish-surface control and overrides
 The semantic change overview is shown by default in summary comments/checks.
 Turn it off with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
+
+For parallel GitHub review channels, set `review-channel`. The default channel
+is `diffpal`, which publishes `diffpal-checks` and updates the legacy DiffPal
+summary comment. A dev channel such as `diffpal-dev` publishes
+`diffpal-dev-checks` and a separate summary comment:
+
+```yaml
+with:
+  review-channel: diffpal-dev
+  review-id: github-pr-${{ github.event.pull_request.number }}-diffpal-dev
+```
 
 Default balanced publish modes:
 

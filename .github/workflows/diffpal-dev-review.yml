@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   review:
-    name: diffpal-dev/review
+    name: review
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -51,7 +51,8 @@ jobs:
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
           --repo ${{ github.repository }}
-          --review-id github-pr-${{ github.event.pull_request.number }}
+          --review-id github-pr-${{ github.event.pull_request.number }}-diffpal-dev
+          --review-channel diffpal-dev
           --feedback balanced
           --mode summary
           --gate

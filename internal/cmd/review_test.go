@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -142,6 +143,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
+	var checkRunName string
+	var summaryBody string
 	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
@@ -152,10 +155,28 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		}
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
+			var payload struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode check run: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			checkRunName = payload.Name
 			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+			var payload struct {
+				Body string `json:"body"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode summary comment: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			summaryBody = payload.Body
 			w.WriteHeader(http.StatusCreated)
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
@@ -179,6 +200,7 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
 		"--mode", "check-run,summary",
+		"--review-channel", "diffpal-dev",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -192,6 +214,15 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
+	if checkRunName != "diffpal-dev-checks" {
+		t.Fatalf("check run name = %q, want diffpal-dev-checks", checkRunName)
+	}
+	if !strings.Contains(summaryBody, "<!-- diffpal:summary:diffpal-dev -->") {
+		t.Fatalf("summary body missing channel marker:\n%s", summaryBody)
+	}
+	if !strings.Contains(summaryBody, "# DiffPal Dev Review Summary") {
+		t.Fatalf("summary body missing channel title:\n%s", summaryBody)
+	}
 	text := out.String()
 	for _, needle := range []string{
 		"findings=1",
@@ -202,6 +233,69 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("output missing %q:\n%s", needle, text)
 		}
+	}
+}
+
+func TestReviewChannelFlagIsGitHubOnly(t *testing.T) {
+	t.Parallel()
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		t.Fatal("review runner was called for help")
+		return reviewer.Result{}, nil
+	})
+
+	for _, args := range [][]string{
+		{"github", "--help"},
+		{"gitlab", "--help"},
+		{"ado", "--help"},
+	} {
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("Execute(%v) error = %v", args, err)
+		}
+		hasFlag := strings.Contains(out.String(), "--review-channel")
+		if args[0] == "github" && !hasFlag {
+			t.Fatalf("github help missing --review-channel:\n%s", out.String())
+		}
+		if args[0] != "github" && hasFlag {
+			t.Fatalf("%s help includes GitHub-only --review-channel:\n%s", args[0], out.String())
+		}
+	}
+}
+
+func TestReviewGitHubRejectsInvalidReviewChannelBeforeRunningReview(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called = true
+		return reviewer.Result{}, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--review-channel", "bad/channel", "--dry-run"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want invalid review channel error")
+	}
+	if called {
+		t.Fatal("review runner was called for invalid review channel")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != 2 {
+		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "invalid review channel") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -275,7 +369,9 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
+	var called atomic.Bool
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
@@ -292,6 +388,9 @@ func TestReviewGitHubSkipsPublishForForks(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "publish=skipped-fork") {
 		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+	if called.Load() {
+		t.Fatal("review runner was called for fork PR")
 	}
 }
 
@@ -313,7 +412,9 @@ func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T)
 	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
 	t.Setenv("GITHUB_EVENT_PATH", eventPath)
 
+	var called atomic.Bool
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
 		result := testReviewResult("github")
 		result.Bundle.BaseSHA = "base-a"
 		result.Bundle.HeadSHA = "head-a"
@@ -330,6 +431,58 @@ func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T)
 	}
 	if !strings.Contains(out.String(), "publish=skipped-fork") {
 		t.Fatalf("output missing fork skip marker:\n%s", out.String())
+	}
+	if called.Load() {
+		t.Fatal("review runner was called for fork PR")
+	}
+}
+
+func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	eventPath := filepath.Join(dir, "event.json")
+	if err := os.WriteFile(eventPath, []byte(`{`), 0o644); err != nil {
+		t.Fatalf("WriteFile(event.json) error = %v", err)
+	}
+	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_EVENT_PATH", eventPath)
+
+	var called atomic.Bool
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called.Store(true)
+		result := testReviewResult("github")
+		result.Bundle.BaseSHA = "base-a"
+		result.Bundle.HeadSHA = "head-a"
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json")})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want fork safety context error")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("Execute() error = %T, want exit coder", err)
+	}
+	if coder.ExitCode() != 4 {
+		t.Fatalf("ExitCode() = %d, want 4", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "resolve github context for fork safety") {
+		t.Fatalf("error missing fork safety context: %v", err)
+	}
+	if strings.Contains(out.String(), "mode=summary") {
+		t.Fatalf("output shows publish artifacts despite context error:\n%s", out.String())
+	}
+	if called.Load() {
+		t.Fatal("review runner was called after fork safety context error")
 	}
 }
 
@@ -378,9 +531,14 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("github"), nil

@@ -17,6 +17,7 @@ var severityOrder = map[string]int{
 }
 
 type SummaryOptions struct {
+	Title           string
 	FeedbackProfile string
 	PublishSurfaces []string
 	ShowMetadata    bool
@@ -35,7 +36,11 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	blocking := countBlocking(sortedFindings)
 
 	out := strings.Builder{}
-	out.WriteString("# DiffPal Review Summary\n\n")
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		title = "DiffPal Review Summary"
+	}
+	fmt.Fprintf(&out, "# %s\n\n", title)
 	if !opts.HideOverview {
 		writeChangeOverview(&out, bundle)
 	}

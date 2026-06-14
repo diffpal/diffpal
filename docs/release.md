@@ -52,7 +52,7 @@ secrets into artifacts/logs. Use GitHub Environment secrets with required
 reviewers for publish credentials.
 Concrete controls:
 
-- Run `diffpal-review` only for same-repository pull requests; do not expose
+- Run `diffpal` only for same-repository pull requests; do not expose
   `OPENAI_API_KEY` to forked PRs or `pull_request_target` workflows.
 - Keep workflow `permissions` minimal for each job and avoid unpinned
   third-party actions in jobs that can read release or review secrets.
@@ -76,17 +76,25 @@ jobs:
 
 Inject `OPENAI_API_KEY` only inside a job with that guard.
 
-4. Build Azure DevOps extension packages:
+4. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
+5. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
+
+Azure DevOps extension releases are intentionally separate from
+`omnidist-release`. The `azure-devops-release` workflow is triggered by the same
+SemVer tags and owns VSIX packaging plus Marketplace publishing.
+
+Azure package job:
 
 ```bash
 npm --prefix tasks/azure-devops ci
+npm --prefix tasks/azure-devops audit --omit=dev --audit-level=high
+npm --prefix tasks/azure-devops run smoke
 npm --prefix tasks/azure-devops run package:prod
 npm --prefix tasks/azure-devops run package:dev
 ```
 
-5. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
-6. Publish Azure DevOps extension packages when the matching marketplace credentials are available.
-7. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
+Azure publish job downloads the VSIX artifacts and publishes them only when
+`AZURE_DEVOPS_EXT_PAT` is configured.
 
 ## Required GitHub setup
 
@@ -94,10 +102,12 @@ Before the first public release:
 
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add `NPM_PUBLISH_TOKEN` for `.github/workflows/omnidist-release.yml`.
+- Add `AZURE_DEVOPS_EXT_PAT` for `.github/workflows/azure-devops-release.yml`
+  when Azure Marketplace publishing should run.
 - Add `OPENAI_API_KEY` as a protected Environment secret for Codex CLI authentication.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
-- Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal-review.yml`.
+- Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
 - Move or create a major action tag, such as `v1`, only after the npm package
@@ -107,12 +117,12 @@ Before the first public release:
 After release, verify:
 
 ```bash
-npm view @diffpal/diffpal version
-npm install @diffpal/diffpal@1.2.3
+VERSION="$(npm view @diffpal/diffpal version)"
+npm install "@diffpal/diffpal@${VERSION}"
 ./node_modules/.bin/diffpal version
 ```
 
-Open a same-repository pull request and confirm the `diffpal-review` workflow
+Open a same-repository pull request and confirm the `diffpal` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
 present. The GitHub Action smoke path should use the released root action tag
@@ -127,21 +137,24 @@ with default `install: true`; provider setup such as `@openai/codex` and
 
 ## CI baseline
 
-- The `ci` workflow provides `lint`, `test`, `security`, and `azure-devops-task` jobs in one workflow run.
+- The `ci` workflow provides `lint`, `test`, and `security` jobs in one workflow run.
 - `lint` checks module integrity, `gofmt`, `go vet`, `golangci-lint`, `actionlint`, and the CLI help surface.
 - `test` runs `go test ./...` and `go test -race ./...`.
 - `security` runs `go tool govulncheck ./...`.
-- `azure-devops-task` runs `npm ci`, runtime dependency audit, and TypeScript build.
-- Azure DevOps VSIX packaging is a release/manual packaging step via `npm --prefix tasks/azure-devops run package:prod` and `package:dev`.
-- `omnidist-release` runs only on SemVer tags and handles build, npm publish, and GitHub release assets.
+- No Azure DevOps task or extension work runs in `ci`.
+- `omnidist-release` runs only on SemVer tags and handles DiffPal CLI build,
+  npm publish, and GitHub release assets.
+- `azure-devops-release` runs only on SemVer tags and handles Azure DevOps VSIX
+  packaging plus PAT-gated Marketplace publishing.
 
 ## Self-review gate
 
-DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
-`omnidist-release`. Before promoting a release beyond the initial npm package,
-open a maintainer-controlled same-repository pull request and verify that
-`diffpal-review` publishes the `diffpal-checks` check run, posts the PR-level
-summary comment, and leaves the PR in the expected pass/fail state.
+DiffPal keeps four active GitHub workflows: `ci`, `diffpal`,
+`omnidist-release`, and `azure-devops-release`. Before promoting a release
+beyond the initial npm package, open a maintainer-controlled same-repository
+pull request and verify that `diffpal` publishes the `diffpal-checks` check run,
+posts the PR-level summary comment, and leaves the PR in the expected pass/fail
+state.
 
 ## Change log and audits
 

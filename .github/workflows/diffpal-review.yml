@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  disabled:
+  review:
+    name: review
     runs-on: ubuntu-latest
     steps:
       - run: echo "The released-package DiffPal PR workflow is disabled."

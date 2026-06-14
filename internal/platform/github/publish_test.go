@@ -42,6 +42,9 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 
 	payload := BuildCheckRunPayload(Context{HeadSHA: "head-a"}, bundle, CheckRunSummary(bundle))
 
+	if payload.Name != "diffpal-checks" {
+		t.Fatalf("Name = %q, want diffpal-checks", payload.Name)
+	}
 	if payload.Conclusion != "failure" {
 		t.Fatalf("Conclusion = %q, want failure", payload.Conclusion)
 	}
@@ -51,14 +54,14 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	if payload.Count != 55 {
 		t.Fatalf("Count = %d, want 55", payload.Count)
 	}
-	if len(payload.AnnotationBatches) != 2 {
-		t.Fatalf("AnnotationBatches = %d, want 2", len(payload.AnnotationBatches))
+	if len(payload.AnnotationBatches) != 1 {
+		t.Fatalf("AnnotationBatches = %d, want 1 overflow batch", len(payload.AnnotationBatches))
 	}
-	if len(payload.AnnotationBatches[0].Annotations) != 50 {
-		t.Fatalf("first batch size = %d, want 50", len(payload.AnnotationBatches[0].Annotations))
+	if payload.AnnotationBatches[0].Index != 1 {
+		t.Fatalf("overflow batch index = %d, want 1", payload.AnnotationBatches[0].Index)
 	}
-	if len(payload.AnnotationBatches[1].Annotations) != 5 {
-		t.Fatalf("second batch size = %d, want 5", len(payload.AnnotationBatches[1].Annotations))
+	if len(payload.AnnotationBatches[0].Annotations) != 5 {
+		t.Fatalf("overflow batch size = %d, want 5", len(payload.AnnotationBatches[0].Annotations))
 	}
 	if len(payload.Annotations) != 50 {
 		t.Fatalf("Annotations = %d, want 50 primary annotations", len(payload.Annotations))
@@ -81,6 +84,23 @@ func TestBuildCheckRunPayloadBatchesAnnotationsAndFailsOnBlockingFindings(t *tes
 	}
 	if strings.Contains(string(encoded), `"level"`) {
 		t.Fatalf("annotation JSON contains unsupported level field: %s", encoded)
+	}
+}
+
+func TestBuildCheckRunPayloadUsesReviewChannel(t *testing.T) {
+	t.Parallel()
+
+	identity, err := NewReviewIdentity("diffpal-dev")
+	if err != nil {
+		t.Fatalf("NewReviewIdentity() error = %v", err)
+	}
+	payload := BuildCheckRunPayloadWithIdentity(Context{HeadSHA: "head-a"}, findings.FindingsBundle{
+		ReviewID: "review-github-dev",
+		HeadSHA:  "head-a",
+	}, "# DiffPal Dev Review Summary", identity)
+
+	if payload.Name != "diffpal-dev-checks" {
+		t.Fatalf("Name = %q, want diffpal-dev-checks", payload.Name)
 	}
 }
 
