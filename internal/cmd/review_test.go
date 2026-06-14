@@ -236,6 +236,69 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	}
 }
 
+func TestReviewChannelFlagIsGitHubOnly(t *testing.T) {
+	t.Parallel()
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		t.Fatal("review runner was called for help")
+		return reviewer.Result{}, nil
+	})
+
+	for _, args := range [][]string{
+		{"github", "--help"},
+		{"gitlab", "--help"},
+		{"ado", "--help"},
+	} {
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("Execute(%v) error = %v", args, err)
+		}
+		hasFlag := strings.Contains(out.String(), "--review-channel")
+		if args[0] == "github" && !hasFlag {
+			t.Fatalf("github help missing --review-channel:\n%s", out.String())
+		}
+		if args[0] != "github" && hasFlag {
+			t.Fatalf("%s help includes GitHub-only --review-channel:\n%s", args[0], out.String())
+		}
+	}
+}
+
+func TestReviewGitHubRejectsInvalidReviewChannelBeforeRunningReview(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called = true
+		return reviewer.Result{}, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--review-channel", "bad/channel", "--dry-run"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want invalid review channel error")
+	}
+	if called {
+		t.Fatal("review runner was called for invalid review channel")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != 2 {
+		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "invalid review channel") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestReviewGitHubDryRunPrintsMarkdownWithoutPublishing(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -453,6 +516,7 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)

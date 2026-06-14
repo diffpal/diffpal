@@ -47,7 +47,10 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	if strings.TrimSpace(out) != "" && len(modes) > 1 {
 		return nil, 0, fmt.Errorf("--out cannot be used with multiple publish modes")
 	}
-	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
+	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
+	if err != nil {
+		return nil, 0, err
+	}
 	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 
 	for _, mode := range modes {
@@ -199,13 +202,14 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 	return modesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string) string {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string) (string, error) {
 	title := ""
 	if strings.ToLower(strings.TrimSpace(platform)) == "github" {
 		identity, err := github.NewReviewIdentity(reviewChannel)
-		if err == nil {
-			title = identity.SummaryTitle()
+		if err != nil {
+			return "", err
 		}
+		title = identity.SummaryTitle()
 	}
 	opts := markdown.SummaryOptions{
 		Title:           title,
@@ -214,7 +218,7 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 		HideOverview:    !summaryOverview,
 		Links:           githubLinkProvider(platform, bundle),
 	}
-	return markdown.RenderSummaryWithOptions(bundle, opts)
+	return markdown.RenderSummaryWithOptions(bundle, opts), nil
 }
 
 func githubLinkProvider(platform string, bundle findings.FindingsBundle) markdown.FindingLinkProvider {

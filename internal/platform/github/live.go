@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -102,15 +103,38 @@ func summaryCommentBody(summary string, identity ReviewIdentity) string {
 }
 
 func findSummaryComment(ctx context.Context, token, url string, identity ReviewIdentity, client *http.Client) (int64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+"?per_page=100", nil)
+	marker := identity.SummaryMarker()
+	nextURL := url + "?per_page=100"
+	for nextURL != "" {
+		resp, err := getGitHubIssueCommentsPage(ctx, token, nextURL, client)
+		if err != nil {
+			return 0, err
+		}
+		for _, comment := range resp.comments {
+			if strings.Contains(comment.Body, marker) {
+				return comment.ID, nil
+			}
+		}
+		nextURL = resp.nextURL
+	}
+	return 0, nil
+}
+
+type issueCommentsPage struct {
+	comments []issueComment
+	nextURL  string
+}
+
+func getGitHubIssueCommentsPage(ctx context.Context, token, pageURL string, client *http.Client) (issueCommentsPage, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
-		return 0, err
+		return issueCommentsPage{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	resp, err := platformapi.DefaultClient(client).Do(req)
 	if err != nil {
-		return 0, err
+		return issueCommentsPage{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -119,19 +143,49 @@ func findSummaryComment(ctx context.Context, token, url string, identity ReviewI
 		if msg == "" {
 			msg = resp.Status
 		}
-		return 0, fmt.Errorf("platform api %s %s failed: status=%d body=%s", http.MethodGet, url, resp.StatusCode, msg)
+		return issueCommentsPage{}, fmt.Errorf("platform api %s %s failed: status=%d body=%s", http.MethodGet, pageURL, resp.StatusCode, msg)
 	}
 	var comments []issueComment
 	if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
-		return 0, err
+		return issueCommentsPage{}, err
 	}
-	marker := identity.SummaryMarker()
-	for _, comment := range comments {
-		if strings.Contains(comment.Body, marker) {
-			return comment.ID, nil
+	return issueCommentsPage{
+		comments: comments,
+		nextURL:  nextLinkURL(resp.Header.Get("Link")),
+	}, nil
+}
+
+func nextLinkURL(header string) string {
+	for _, part := range strings.Split(header, ",") {
+		link, rel, ok := parseLinkHeaderPart(part)
+		if ok && rel == "next" {
+			return link
 		}
 	}
-	return 0, nil
+	return ""
+}
+
+func parseLinkHeaderPart(part string) (string, string, bool) {
+	part = strings.TrimSpace(part)
+	if !strings.HasPrefix(part, "<") {
+		return "", "", false
+	}
+	end := strings.Index(part, ">")
+	if end <= 1 {
+		return "", "", false
+	}
+	link := part[1:end]
+	if _, err := url.ParseRequestURI(link); err != nil {
+		return "", "", false
+	}
+	for _, param := range strings.Split(part[end+1:], ";") {
+		name, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+		if !ok || name != "rel" {
+			continue
+		}
+		return link, strings.Trim(value, `"`), true
+	}
+	return "", "", false
 }
 
 func githubAPIBaseURL() string {

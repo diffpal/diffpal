@@ -10,7 +10,7 @@ inputs:
     required: false
     default: "true"
   diffpal-version:
-    description: npm version or dist-tag for @diffpal/diffpal.
+    description: npm version or dist-tag for @diffpal/diffpal. Use an exact version for reproducible CI.
     required: false
     default: latest
   diffpal-path:

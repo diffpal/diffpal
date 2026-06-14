@@ -74,6 +74,9 @@ func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []
 	addReviewAnalysisFlags(host, name)
 	addReviewPolicyFlags(host)
 	addReviewPublishFlags(host)
+	if platform == "github" {
+		addGitHubReviewPublishFlags(host)
+	}
 	return host
 }
 
@@ -97,8 +100,11 @@ func addReviewPublishFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
 	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
 	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
-	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and summary comments")
 	cmd.Flags().Bool("dry-run", false, "Print the host review markdown without publishing")
+}
+
+func addGitHubReviewPublishFlags(cmd *cobra.Command) {
+	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and summary comments")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -151,7 +157,10 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		if err != nil {
 			return withExitCode(2, err)
 		}
-		summary := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel)
+		summary, err := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel)
+		if err != nil {
+			return withExitCode(2, err)
+		}
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(summary)); err != nil {
 			return withExitCode(5, err)
 		}
@@ -229,6 +238,9 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	reviewChannel := github.DefaultReviewChannel
 	if cmd.Flags().Lookup("review-channel") != nil {
 		reviewChannel, _ = cmd.Flags().GetString("review-channel")
+		if _, err := github.NewReviewIdentity(reviewChannel); err != nil {
+			return reviewExecution{}, withExitCode(2, err)
+		}
 	}
 
 	cfg, err := loadRequiredConfig()
@@ -285,10 +297,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if outPath == "" {
 		outPath = findings.DefaultBundlePath
 	}
-	if _, err := github.NewReviewIdentity(reviewChannel); err != nil {
-		return reviewExecution{}, withExitCode(2, err)
-	}
-
 	runCtx := cmd.Context()
 	if runCtx == nil {
 		runCtx = context.Background()
@@ -422,7 +430,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return err
 	}
 	modes = resolvedModes
-	summary := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
+	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel)
+	if err != nil {
+		return err
+	}
 
 	switch platform {
 	case "github":

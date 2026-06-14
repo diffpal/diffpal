@@ -5,12 +5,16 @@ import (
 	"strings"
 )
 
+// DefaultReviewChannel is the stable GitHub publishing channel used by DiffPal.
 const DefaultReviewChannel = "diffpal"
 
+// ReviewIdentity identifies one GitHub publishing channel.
 type ReviewIdentity struct {
+	// Channel is the normalized publishing channel name.
 	Channel string
 }
 
+// NewReviewIdentity returns a normalized GitHub review identity.
 func NewReviewIdentity(channel string) (ReviewIdentity, error) {
 	normalized := normalizeReviewChannel(channel)
 	if normalized == "" {
@@ -22,27 +26,30 @@ func NewReviewIdentity(channel string) (ReviewIdentity, error) {
 	return ReviewIdentity{Channel: normalized}, nil
 }
 
-func (identity ReviewIdentity) channel() string {
-	if identity.Channel == "" {
+func (id ReviewIdentity) channel() string {
+	if id.Channel == "" {
 		return DefaultReviewChannel
 	}
-	return identity.Channel
+	return id.Channel
 }
 
-func (identity ReviewIdentity) CheckRunName() string {
-	return identity.channel() + "-checks"
+// CheckRunName returns the GitHub check run name for the review channel.
+func (id ReviewIdentity) CheckRunName() string {
+	return id.channel() + "-checks"
 }
 
-func (identity ReviewIdentity) SummaryMarker() string {
-	channel := identity.channel()
+// SummaryMarker returns the hidden marker used to update one summary comment.
+func (id ReviewIdentity) SummaryMarker() string {
+	channel := id.channel()
 	if channel == DefaultReviewChannel {
 		return "<!-- diffpal:summary -->"
 	}
 	return "<!-- diffpal:summary:" + channel + " -->"
 }
 
-func (identity ReviewIdentity) SummaryTitle() string {
-	channel := identity.channel()
+// SummaryTitle returns the Markdown title for the review channel summary.
+func (id ReviewIdentity) SummaryTitle() string {
+	channel := id.channel()
 	if channel == DefaultReviewChannel {
 		return "DiffPal Review Summary"
 	}
