@@ -164,9 +164,13 @@ func TestRenderPublishSummaryRejectsInvalidReviewChannel(t *testing.T) {
 
 func TestRenderPublishSummaryUsesRepoFallbackForGitHubLinks(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "")
+	t.Setenv("GITHUB_EVENT_PATH", "")
+	t.Setenv("GITHUB_BASE_SHA", "")
+	t.Setenv("GITHUB_HEAD_SHA", "")
 
 	got, err := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
+		BaseSHA:  "base-a",
 		HeadSHA:  "head-a",
 		Findings: []findings.Finding{
 			{
