@@ -161,20 +161,26 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return nil
 	}
 
-	if platform == "github" && shouldSkipGitHubPublish(execution.Config, execution.Result.Bundle) {
-		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
-			return withExitCode(5, err)
+	if platform == "github" {
+		skipPublish, err := shouldSkipGitHubPublish(execution.Result.Bundle)
+		if err != nil {
+			return withExitCode(4, err)
 		}
-		if execution.Gate && blocking > 0 {
-			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
-		}
-		if blocking > 0 {
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+		if skipPublish {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
 				return withExitCode(5, err)
+			}
+			if execution.Gate && blocking > 0 {
+				return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+			}
+			if blocking > 0 {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
+					return withExitCode(5, err)
+				}
+				return nil
 			}
 			return nil
 		}
-		return nil
 	}
 
 	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "", execution.ReviewChannel)
@@ -396,15 +402,15 @@ func countBlockingFindings(bundle findings.FindingsBundle) int {
 	return count
 }
 
-func shouldSkipGitHubPublish(cfg config.Config, bundle findings.FindingsBundle) bool {
+func shouldSkipGitHubPublish(bundle findings.FindingsBundle) (bool, error) {
 	ctx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("resolve github context for fork safety: %w", err)
 	}
 	if !ctx.IsFork {
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {

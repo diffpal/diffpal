@@ -47,8 +47,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
     steps:
       - uses: actions/checkout@v6
 
@@ -67,12 +65,25 @@ jobs:
           name: azure-devops-vsix
           path: dist
 
+      - name: Check publish token
+        id: publish-token
+        env:
+          AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
+        run: |
+          if [[ -n "$AZURE_DEVOPS_EXT_PAT" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Skip publish when PAT is missing
-        if: ${{ env.AZURE_DEVOPS_EXT_PAT == '' }}
+        if: ${{ steps.publish-token.outputs.available != 'true' }}
         run: echo "AZURE_DEVOPS_EXT_PAT is not configured; skipping Azure DevOps Marketplace publish."
 
       - name: Publish Azure DevOps extensions
-        if: ${{ env.AZURE_DEVOPS_EXT_PAT != '' }}
+        if: ${{ steps.publish-token.outputs.available == 'true' }}
+        env:
+          AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
         run: |
           tasks/azure-devops/node_modules/.bin/tfx extension publish \
             --vsix dist/diffpal-review.vsix \

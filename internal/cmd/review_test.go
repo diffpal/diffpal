@@ -364,6 +364,50 @@ func TestReviewGitHubSkipsPublishForForkPullRequestTargetWithToken(t *testing.T)
 	}
 }
 
+func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	eventPath := filepath.Join(dir, "event.json")
+	if err := os.WriteFile(eventPath, []byte(`{`), 0o644); err != nil {
+		t.Fatalf("WriteFile(event.json) error = %v", err)
+	}
+	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_EVENT_PATH", eventPath)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.BaseSHA = "base-a"
+		result.Bundle.HeadSHA = "head-a"
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json")})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want fork safety context error")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("Execute() error = %T, want exit coder", err)
+	}
+	if coder.ExitCode() != 4 {
+		t.Fatalf("ExitCode() = %d, want 4", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "resolve github context for fork safety") {
+		t.Fatalf("error missing fork safety context: %v", err)
+	}
+	if strings.Contains(out.String(), "mode=summary") {
+		t.Fatalf("output shows publish artifacts despite context error:\n%s", out.String())
+	}
+}
+
 func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -412,6 +456,10 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
 	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
 	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
 		return testReviewResult("github"), nil
