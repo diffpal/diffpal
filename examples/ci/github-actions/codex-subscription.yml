@@ -1,15 +1,16 @@
-name: diffpal-review
+name: diffpal
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: diffpal-review-${{ github.event.pull_request.number }}
+  group: diffpal-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   review:
+    name: review
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
@@ -49,4 +50,3 @@ jobs:
           gate: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

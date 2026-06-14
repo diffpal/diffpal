@@ -52,7 +52,7 @@ secrets into artifacts/logs. Use GitHub Environment secrets with required
 reviewers for publish credentials.
 Concrete controls:
 
-- Run `diffpal-review` only for same-repository pull requests; do not expose
+- Run `diffpal` only for same-repository pull requests; do not expose
   `OPENAI_API_KEY` to forked PRs or `pull_request_target` workflows.
 - Keep workflow `permissions` minimal for each job and avoid unpinned
   third-party actions in jobs that can read release or review secrets.
@@ -103,7 +103,7 @@ Before the first public release:
 - Add `OPENAI_API_KEY` as a protected Environment secret for Codex CLI authentication.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
-- Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal-review.yml`.
+- Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
 - Move or create a major action tag, such as `v1`, only after the npm package
@@ -118,7 +118,7 @@ npm install @diffpal/diffpal@1.2.3
 ./node_modules/.bin/diffpal version
 ```
 
-Open a same-repository pull request and confirm the `diffpal-review` workflow
+Open a same-repository pull request and confirm the `diffpal` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
 present. The GitHub Action smoke path should use the released root action tag
@@ -145,10 +145,10 @@ with default `install: true`; provider setup such as `@openai/codex` and
 
 ## Self-review gate
 
-DiffPal keeps three active GitHub workflows: `ci`, `diffpal-review`, and
+DiffPal keeps three active GitHub workflows: `ci`, `diffpal`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
 open a maintainer-controlled same-repository pull request and verify that
-`diffpal-review` publishes the `diffpal-checks` check run, posts the PR-level
+`diffpal` publishes the `diffpal-checks` check run, posts the PR-level
 summary comment, and leaves the PR in the expected pass/fail state.
 
 ## Change log and audits

@@ -1,12 +1,13 @@
 # DiffPal Examples
 
-Use these examples as copy-paste starting points. Pick a ready-made provider
-recipe and one CI system, or adapt the generic ACP template for your own CLI.
+Use these examples as copy-paste starting points. Pick a provider recipe and one
+CI system, or adapt the generic ACP template for your own CLI.
 
 The examples pin npm package versions so credentialed CI jobs do not execute
 newly published package versions automatically. Update `@diffpal/diffpal`,
 `diffpal-version`, `@openai/codex`, `@normahq/codex-acp-bridge`, and
-`@github/copilot` intentionally after testing.
+`@github/copilot` intentionally after testing. If you use OpenCode, pin the
+OpenCode package or install source in your own CI setup the same way.
 
 ## Provider Recipes
 
@@ -16,6 +17,7 @@ newly published package versions automatically. Update `@diffpal/diffpal`,
 | Codex API key | [`configs/codex-api-key/config.yaml`](configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
 | Codex subscription auth | [`configs/codex-subscription/config.yaml`](configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
 | Copilot fine-grained PAT | [`configs/copilot-github-token/config.yaml`](configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
+| OpenCode ACP | [`configs/opencode-acp/config.yaml`](configs/opencode-acp/config.yaml) | OpenCode-specific |
 
 Copy the selected config to `.config/diffpal/config.yaml`. To use another ACP
 CLI, start from the generic ACP config and replace `generic_acp.cmd` with the
@@ -39,6 +41,8 @@ command that starts your provider's ACP stdio server.
 - Copilot token auth uses `COPILOT_GITHUB_TOKEN`. It must be a fine-grained
   GitHub PAT v2 with the Copilot Requests permission. Classic PATs are not
   supported by the Copilot CLI.
+- OpenCode ACP uses the `opencode acp` command resolved by the runtime. Install
+  and authenticate OpenCode before running DiffPal.
 - The GitLab examples restrict secret-backed jobs to same-project merge
   requests. The Azure examples skip credentialed review steps when
   `System.PullRequest.IsFork` is `True`.

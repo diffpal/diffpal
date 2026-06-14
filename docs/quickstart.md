@@ -38,7 +38,7 @@ Copy the GitHub Actions example:
 
 ```bash
 mkdir -p .github/workflows
-cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal-review.yml
+cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 ```
 
 The example:
