@@ -1,0 +1,86 @@
+name: azure-devops-release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tasks/azure-devops/package-lock.json
+
+      - name: Install dependencies
+        run: npm --prefix tasks/azure-devops ci
+
+      - name: Audit runtime dependencies
+        run: npm --prefix tasks/azure-devops audit --omit=dev --audit-level=high
+
+      - name: Smoke test task handler
+        run: npm --prefix tasks/azure-devops run smoke
+
+      - name: Package Azure DevOps extensions
+        run: |
+          npm --prefix tasks/azure-devops run package:prod
+          npm --prefix tasks/azure-devops run package:dev
+
+      - name: Upload Azure DevOps extension artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: azure-devops-vsix
+          path: |
+            dist/diffpal-review.vsix
+            dist/diffpal-review-dev.vsix
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tasks/azure-devops/package-lock.json
+
+      - name: Install publishing dependencies
+        run: npm --prefix tasks/azure-devops ci
+
+      - name: Download Azure DevOps extension artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: azure-devops-vsix
+          path: dist
+
+      - name: Skip publish when PAT is missing
+        if: ${{ env.AZURE_DEVOPS_EXT_PAT == '' }}
+        run: echo "AZURE_DEVOPS_EXT_PAT is not configured; skipping Azure DevOps Marketplace publish."
+
+      - name: Publish Azure DevOps extensions
+        if: ${{ env.AZURE_DEVOPS_EXT_PAT != '' }}
+        run: |
+          tasks/azure-devops/node_modules/.bin/tfx extension publish \
+            --vsix dist/diffpal-review.vsix \
+            --auth-type pat \
+            --token "$AZURE_DEVOPS_EXT_PAT" \
+            --no-prompt
+          tasks/azure-devops/node_modules/.bin/tfx extension publish \
+            --vsix dist/diffpal-review-dev.vsix \
+            --auth-type pat \
+            --token "$AZURE_DEVOPS_EXT_PAT" \
+            --no-prompt
