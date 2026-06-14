@@ -1,0 +1,32 @@
+version: v1
+
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+  gate:
+    block_on: high
+  review:
+    language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
+    checks:
+      - security
+      - bugs
+      - performance
+      - best-practices
+  platforms:
+    github: {}
+    gitlab: {}
+    azure: {}
+
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high

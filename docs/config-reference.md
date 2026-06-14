@@ -10,6 +10,41 @@ Generate a starter file with:
 diffpal init
 ```
 
+## Provider Model
+
+DiffPal delegates review to a provider selected by `diffpal.provider`.
+Providers live under `runtime.providers`.
+
+Use `generic_acp` for any CLI that can start an ACP stdio server:
+
+```yaml
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+```
+
+Install and authenticate that CLI in CI before running DiffPal. DiffPal sends
+the structured diff review request; the ACP agent owns its model, tools, and
+provider-specific credentials.
+
+Supported runtime provider types include:
+
+- `generic_acp`
+- `codex_acp`
+- `copilot_acp`
+- `gemini_acp`
+- `claude_code_acp`
+- `opencode_acp`
+- `openai`
+- `aistudio`
+- `pool`
+
 ## Default Codex Config
 
 The public onboarding path uses Codex ACP:
@@ -161,11 +196,32 @@ diffpal:
 
 Then set `OPENAI_API_KEY` in CI.
 
-## Provider Auth Setups
+## Provider Auth Recipes
 
 Copy-paste examples are in [`../examples`](../examples/README.md). The config
 shape stays the same across CI systems; only the provider install/auth step
-changes.
+changes. These recipes are maintained examples, not the full provider boundary.
+
+### Generic ACP CLI
+
+Use [`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml).
+
+Replace `generic_acp.cmd` with the command that starts your provider's ACP
+stdio server:
+
+```yaml
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+```
+
+Required secret: provider-specific.
 
 ### Codex API Key
 
