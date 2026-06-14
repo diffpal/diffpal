@@ -12,12 +12,13 @@ It is built for teams that want AI review output that is easy to scan:
 
 ## Quick Start
 
-1. Choose a provider config from [`examples/configs`](examples/configs).
+1. Choose a provider recipe from [`examples/configs`](examples/configs), or
+   adapt the generic ACP template for your own CLI.
 2. Copy it to `.config/diffpal/config.yaml`.
-3. Add the required CI secret.
-4. Copy the matching CI example from [`examples/ci`](examples/ci).
+3. Install and authenticate that provider CLI in CI.
+4. Copy a CI example from [`examples/ci`](examples/ci).
 
-The fastest GitHub setup is:
+The fastest GitHub recipe is Codex API-key auth:
 
 - config: [`examples/configs/codex-api-key/config.yaml`](examples/configs/codex-api-key/config.yaml)
 - workflow: [`examples/ci/github-actions/codex-api-key.yml`](examples/ci/github-actions/codex-api-key.yml)
@@ -27,10 +28,46 @@ The examples pin npm package versions. Update
 `@diffpal/diffpal`, `diffpal-version`, provider CLIs, and bridge packages to
 versions you have tested.
 
-## Supported Setups
+## Provider Model
 
-| Provider auth | Secret | Notes |
+DiffPal is not tied to one AI vendor. It delegates review to a provider
+declared under `runtime.providers`, and the selected provider is referenced by
+`diffpal.provider`.
+
+Use `generic_acp` for any CLI that can start an ACP stdio server:
+
+```yaml
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+```
+
+Install and authenticate that CLI before running DiffPal. DiffPal supplies the
+diff review request; the ACP agent decides how to use its own model, tools, and
+credentials.
+
+Runtime provider types:
+
+| Type | Use |
+| --- | --- |
+| `generic_acp` | Any ACP-compatible CLI command. |
+| `codex_acp`, `copilot_acp`, `gemini_acp`, `claude_code_acp`, `opencode_acp` | Convenience aliases for common ACP CLIs. |
+| `openai`, `aistudio` | Hosted model providers. |
+| `pool` | Ordered provider failover. |
+
+## Ready-Made Recipes
+
+These are maintained copy-paste recipes, not the full provider boundary:
+
+| Recipe | Secret | Notes |
 | --- | --- | --- |
+| Generic ACP CLI | provider-specific | Template for any ACP stdio command. |
 | Codex API key | `OPENAI_API_KEY` | Best first setup for CI. |
 | Codex subscription auth | `CODEX_AUTH_JSON_B64` | Trusted same-repository CI only. |
 | Copilot fine-grained PAT | `COPILOT_GITHUB_TOKEN` | Requires Copilot Requests permission; classic PATs are not supported. |

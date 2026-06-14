@@ -70,6 +70,25 @@ Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
 
+DiffPal can use any ACP-compatible CLI through `generic_acp`:
+
+```yaml
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+```
+
+Alias provider types are available for common ACP CLIs:
+`codex_acp`, `copilot_acp`, `gemini_acp`, `claude_code_acp`, and
+`opencode_acp`. Hosted provider types include `openai`, `aistudio`, and
+`pool`.
+
 The default public onboarding provider is `codex-acp`. Install it with
 `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`
 and authenticate Codex with `OPENAI_API_KEY` in CI.

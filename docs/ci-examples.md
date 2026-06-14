@@ -8,18 +8,43 @@ This guide explains how DiffPal behaves in CI. Copy-paste files live in
 Every CI system needs:
 
 1. A full git checkout, so DiffPal can compare base and head commits.
-2. Node.js, because the public provider CLIs are installed with npm.
+2. The provider CLI runtime required by your selected agent. The maintained
+   examples use Node.js because those provider CLIs are installed with npm.
 3. A DiffPal config committed at `.config/diffpal/config.yaml`.
 4. A provider auth secret.
 5. A platform token so DiffPal can publish PR feedback.
 
-Choose one provider setup:
+Choose a ready-made provider recipe or configure `generic_acp` for your own ACP
+CLI:
 
 | Setup | Config | Required secret |
 | --- | --- | --- |
+| Generic ACP CLI | [`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml) | provider-specific |
 | Codex API key | [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
 | Codex subscription auth | [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
 | Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
+
+## Using Another ACP CLI
+
+DiffPal can use any CLI that starts an ACP stdio server. Copy the CI example
+for your host, replace the provider install/authentication step with your CLI's
+setup, and use a config like:
+
+```yaml
+runtime:
+  providers:
+    my-review-agent:
+      type: generic_acp
+      generic_acp:
+        cmd: ["your-acp-cli", "acp", "--stdio"]
+
+diffpal:
+  provider: my-review-agent
+```
+
+The rest of the GitHub, GitLab, and Azure examples stay the same: checkout the
+full git history, run DiffPal with the selected profile, and pass the platform
+token for publishing feedback.
 
 ## GitHub Actions
 

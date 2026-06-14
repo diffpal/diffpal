@@ -1,22 +1,25 @@
 # DiffPal Examples
 
-Use these examples as copy-paste starting points. Pick one provider auth setup
-and one CI system.
+Use these examples as copy-paste starting points. Pick a ready-made provider
+recipe and one CI system, or adapt the generic ACP template for your own CLI.
 
 The examples pin npm package versions so credentialed CI jobs do not execute
 newly published package versions automatically. Update `@diffpal/diffpal`,
 `diffpal-version`, `@openai/codex`, `@normahq/codex-acp-bridge`, and
 `@github/copilot` intentionally after testing.
 
-## Provider Configs
+## Provider Recipes
 
 | Setup | Config | CI secret |
 | --- | --- | --- |
+| Generic ACP CLI | [`configs/generic-acp/config.yaml`](configs/generic-acp/config.yaml) | provider-specific |
 | Codex API key | [`configs/codex-api-key/config.yaml`](configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
 | Codex subscription auth | [`configs/codex-subscription/config.yaml`](configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
 | Copilot fine-grained PAT | [`configs/copilot-github-token/config.yaml`](configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 
-Copy the selected config to `.config/diffpal/config.yaml`.
+Copy the selected config to `.config/diffpal/config.yaml`. To use another ACP
+CLI, start from the generic ACP config and replace `generic_acp.cmd` with the
+command that starts your provider's ACP stdio server.
 
 ## CI Examples
 
@@ -28,6 +31,8 @@ Copy the selected config to `.config/diffpal/config.yaml`.
 
 ## Auth Notes
 
+- Generic ACP CLI auth is provider-specific. Install and authenticate the CLI in
+  CI before running DiffPal, then point `generic_acp.cmd` at its ACP command.
 - Codex API key uses `codex login --with-api-key` with `OPENAI_API_KEY`.
 - Codex subscription auth restores an existing `~/.codex/auth.json` from
   `CODEX_AUTH_JSON_B64`. Use it only in trusted same-repository CI.
@@ -37,3 +42,6 @@ Copy the selected config to `.config/diffpal/config.yaml`.
 - The GitLab examples restrict secret-backed jobs to same-project merge
   requests. The Azure examples skip credentialed review steps when
   `System.PullRequest.IsFork` is `True`.
+
+To use another ACP CLI, copy the closest CI example for your host and replace
+only the provider install/auth step plus `.config/diffpal/config.yaml`.

@@ -1,12 +1,17 @@
 # DiffPal Quickstart
 
-This guide gets DiffPal reviewing GitHub pull requests with Codex API-key auth.
-For other providers or CI systems, use the examples matrix:
+This guide gets DiffPal reviewing GitHub pull requests with the fastest
+ready-made recipe: Codex API-key auth. If you already have another
+ACP-compatible CLI, use the generic ACP config instead:
+[`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml).
+
+For other provider recipes or CI systems, use the examples matrix:
 [`examples/README.md`](../examples/README.md).
 
 ## 1. Add Config
 
-Copy the Codex API-key config:
+Copy the Codex API-key config, or replace it with the generic ACP config for
+your own provider CLI:
 
 ```bash
 mkdir -p .config/diffpal
@@ -43,6 +48,9 @@ The example:
 - authenticates Codex with `OPENAI_API_KEY`
 - uses the DiffPal action, which installs the DiffPal CLI
 - runs only on trusted same-repository PRs when secrets are required
+
+For another ACP CLI, keep the same workflow shape and replace the provider
+install/authentication step plus `.config/diffpal/config.yaml`.
 
 ## What Success Looks Like
 
