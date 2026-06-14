@@ -8,7 +8,7 @@ diffpal-review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH'
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
-    - npm install --global @diffpal/diffpal@0.1.2 @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    - npm install --global @diffpal/diffpal@0.1.5 @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
     - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-
