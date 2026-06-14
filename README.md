@@ -1,21 +1,22 @@
 # DiffPal
 
-DiffPal is an AI pull request reviewer built around the diff. It collects the
-changed files, asks your selected review agent for structured findings, and
-publishes the result back to GitHub, GitLab, or Azure DevOps as summaries,
-checks/statuses, inline comments, and artifacts.
+[![ci](https://github.com/diffpal/diffpal/actions/workflows/ci.yml/badge.svg)](https://github.com/diffpal/diffpal/actions/workflows/ci.yml)
+[![diffpal-dev review](https://github.com/diffpal/diffpal/actions/workflows/diffpal-dev-review.yml/badge.svg)](https://github.com/diffpal/diffpal/actions/workflows/diffpal-dev-review.yml)
+[![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-It is designed for teams that want useful review automation without handing
-merge decisions to a bot:
+**Diff-first AI review for pull requests.**
 
-- **Clear PR summaries** that explain the purpose of the change, even when
-  there are no findings.
-- **Actionable inline feedback** only when the finding is tied to changed code.
-- **Policy-aware gates** through checks and statuses, not synthetic approvals.
-- **Provider-neutral runtime** through Codex, Copilot, OpenCode, Gemini, Claude
-  Code, hosted APIs, or any ACP-compatible CLI.
-- **One profile-based config** that works across GitHub Actions, GitLab CI, and
-  Azure Pipelines.
+DiffPal turns changed code into structured findings, clear PR summaries, inline
+comments, and merge gates across GitHub, GitLab, and Azure DevOps. Bring the
+review agent your team already trusts: Codex, Copilot, OpenCode, Gemini, Claude
+Code, a hosted provider, or any ACP-compatible CLI.
+
+| Works with | Publishes | Gates on |
+| --- | --- | --- |
+| GitHub Actions, GitLab CI, Azure Pipelines | summaries, inline comments, checks/statuses, SARIF, Code Quality | policy thresholds through native CI checks and PR statuses |
+
+[Quickstart](docs/quickstart.md) · [CI examples](docs/ci-examples.md) · [Config reference](docs/config-reference.md) · [Provider recipes](examples/README.md)
 
 ## How DiffPal Works
 
