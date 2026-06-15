@@ -2,10 +2,15 @@
   "manifestVersion": 1,
   "id": "diffpal-review",
   "name": "DiffPal Review",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "diffpal",
   "description": "Run DiffPal pull request review from Azure Pipelines.",
   "public": true,
+  "content": {
+    "details": {
+      "path": "overview.md"
+    }
+  },
   "categories": [
     "Azure Pipelines"
   ],
@@ -15,6 +20,10 @@
     }
   ],
   "files": [
+    {
+      "path": "overview.md",
+      "addressable": true
+    },
     {
       "path": "DiffPalReviewV1"
     }
