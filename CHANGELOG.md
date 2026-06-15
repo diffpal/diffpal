@@ -16,3 +16,4 @@
 - Fixed Azure DevOps Marketplace extension IDs to publish as `diffpal.diffpal` and `diffpal.diffpal-dev`.
 - Fixed Azure DevOps Marketplace task UUIDs for the corrected extension identity.
 - Fixed Azure DevOps Marketplace release cleanup for stale extension IDs.
+- Fixed Azure DevOps Marketplace task UUIDs for the final `diffpal.diffpal` extension identity.

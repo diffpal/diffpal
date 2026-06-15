@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
-  "id": "ac00e44a-6642-466c-91f3-6debf2edd3b8",
+  "id": "11ba7ee0-fbfb-43f3-a744-8258d7332609",
   "name": "DiffPalReview",
   "friendlyName": "DiffPal Review",
   "description": "Run DiffPal review for Azure DevOps pull requests.",
@@ -9,7 +9,7 @@
   "author": "DiffPal",
   "version": {
     "Major": 1,
-    "Minor": 5,
+    "Minor": 6,
     "Patch": 0
   },
   "minimumAgentVersion": "3.224.0",
