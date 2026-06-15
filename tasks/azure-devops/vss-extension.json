@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "diffpal",
   "name": "DiffPal Review",
-  "version": "0.1.17",
+  "version": "0.1.19",
   "publisher": "diffpal",
   "description": "Run DiffPal pull request review from Azure Pipelines.",
   "public": true,
