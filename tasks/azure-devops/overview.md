@@ -33,4 +33,9 @@ passes provider credentials through environment variables.
 - Keep DiffPal configuration in `.config/diffpal/config.yaml` or pass a custom
   `configDir`.
 
-See the DiffPal repository for full CI examples and configuration reference.
+## Documentation
+
+- Repository: <https://github.com/diffpal/diffpal>
+- Azure Pipelines setup guide: <https://github.com/diffpal/diffpal/blob/main/docs/ci-examples.md#azure-pipelines>
+- Configuration reference: <https://github.com/diffpal/diffpal/blob/main/docs/config-reference.md>
+- Provider and CI examples: <https://github.com/diffpal/diffpal/tree/main/examples>

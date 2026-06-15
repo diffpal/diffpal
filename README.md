@@ -86,6 +86,19 @@ platform token, and runs DiffPal.
 | GitLab CI | [`examples/ci/gitlab`](examples/ci/gitlab) | MR summary, discussions, Code Quality, SARIF |
 | Azure Pipelines | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) | PR summary thread, PR threads, PR status |
 
+## Azure DevOps Marketplace Extension
+
+Azure Pipelines users can install the public
+[DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
+from the Azure DevOps Marketplace and add the `DiffPalReview@1` task to PR
+validation pipelines.
+
+The task installs `@diffpal/diffpal` by default, then runs `diffpal review ado`.
+You still need a committed DiffPal config, a provider credential such as
+`OPENAI_API_KEY`, `SYSTEM_ACCESSTOKEN` for PR feedback publishing, and a full git
+checkout. See the [Azure Pipelines setup guide](docs/ci-examples.md#azure-pipelines)
+for copy-paste examples.
+
 GitHub Actions can use the root action directly:
 
 ```yaml
