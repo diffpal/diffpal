@@ -35,9 +35,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Review pull request
-        uses: diffpal/diffpal@v0.1.7
+        uses: diffpal/action@v1
         with:
-          diffpal-version: 0.1.7
           profile: ci
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}

@@ -123,8 +123,8 @@ Before the first public release:
 - Ensure the key can authenticate Codex CLI for `.github/workflows/diffpal.yml`.
 - Push the release commit to `main`.
 - Push a SemVer tag such as `v0.1.0` to trigger `omnidist-release`.
-- Move or create a major action tag, such as `v1`, only after the npm package
-  exists and a same-repository PR verifies that the released root action
+- Move or create the `diffpal/action` major tag, such as `v1`, only after the
+  npm package exists and a same-repository PR verifies that the released action
   installs DiffPal automatically.
 
 After release, verify:
@@ -138,8 +138,8 @@ npm install "@diffpal/diffpal@${VERSION}"
 Open a same-repository pull request and confirm the `diffpal` workflow
 publishes the `diffpal-checks` check run, posts a PR-level summary comment even
 when no findings are present, and posts inline review comments when findings are
-present. The GitHub Action smoke path should use the released root action tag
-with default `install: true`; provider setup such as `@openai/codex` and
+present. The GitHub Action smoke path should use `diffpal/action@v1` with
+default `install: true`; provider setup such as `@openai/codex` and
 `@normahq/codex-acp-bridge` remains a separate explicit step.
 
 ## Branch policy expectations
