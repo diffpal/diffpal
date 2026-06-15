@@ -70,9 +70,9 @@ Expected result:
 - a failed job only when `gate: true` and blocking findings exist, or when setup
   or publishing fails
 
-The examples pin package versions for repeatable credentialed CI. After your
-first successful run, bump `@diffpal/diffpal`, provider CLIs, and bridge
-packages intentionally.
+The GitHub Action installs the latest DiffPal CLI by default. After your first
+successful run, pin `diffpal-version`, provider CLIs, and bridge packages when
+you need fully reproducible credentialed CI.
 
 ## Supported CI Systems
 
@@ -99,7 +99,8 @@ You still need a committed DiffPal config, a provider credential such as
 checkout. See the [Azure Pipelines setup guide](docs/ci-examples.md#azure-pipelines)
 for copy-paste examples.
 
-GitHub Actions can use the root action directly:
+GitHub Actions users can use the
+[DiffPal Review action](https://github.com/marketplace/actions/diffpal-review):
 
 ```yaml
 name: diffpal
@@ -134,9 +135,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - uses: diffpal/diffpal@v0.1.7
+      - uses: diffpal/action@v1
         with:
-          diffpal-version: 0.1.7
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           profile: ci
