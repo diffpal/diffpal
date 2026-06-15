@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,6 +46,157 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	}
 	if strings.Join(cfg.Review.Checks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Review.Checks = %v, want default review checks", cfg.Review.Checks)
+	}
+}
+
+func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".github", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".github", "workflows", "review.yml"), []byte("name: review\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := InitWizardWorkspace(WizardOptions{
+		InitOptions: InitOptions{
+			WorkingDir: dir,
+			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
+			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
+		},
+		Setup:    "codex-api-key",
+		Platform: "auto",
+		Profile:  "ci",
+		BlockOn:  "high",
+	})
+	if err != nil {
+		t.Fatalf("InitWizardWorkspace() error = %v", err)
+	}
+	if result.Setup != "codex-api-key" || result.Platform != "github" || result.Profile != "ci" || result.BlockOn != "high" {
+		t.Fatalf("InitWizardWorkspace() result = %+v, want codex GitHub ci high", result)
+	}
+
+	renderedBytes, err := os.ReadFile(result.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedBytes)
+	for _, needle := range []string{
+		"    codex-acp:",
+		"  provider: codex-acp",
+		"    github: {}",
+		"profiles:",
+		"  ci:",
+		"        block_on: high",
+	} {
+		if !strings.Contains(rendered, needle) {
+			t.Fatalf("wizard config missing %q:\n%s", needle, rendered)
+		}
+	}
+	if strings.Contains(rendered, "openai-fast") {
+		t.Fatalf("wizard config exposed openai-fast:\n%s", rendered)
+	}
+
+	cfg, err := dc.LoadConfig(dir, "", "ci")
+	if err != nil {
+		t.Fatalf("wizard config failed to load with ci profile: %v", err)
+	}
+	if cfg.ProviderID() != "codex-acp" {
+		t.Fatalf("ProviderID() = %q, want codex-acp", cfg.ProviderID())
+	}
+	if cfg.BlockOn() != "high" {
+		t.Fatalf("BlockOn() = %q, want high", cfg.BlockOn())
+	}
+}
+
+func TestInitWizardWorkspacePreservesExistingConfigWithoutForce(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".config", "diffpal", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	original := "version: v1\n# keep me\n"
+	if err := os.WriteFile(configPath, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InitWizardWorkspace(WizardOptions{
+		InitOptions: InitOptions{
+			WorkingDir: dir,
+			ConfigPath: configPath,
+		},
+		Setup:    "copilot-github-token",
+		Platform: "github",
+	}); err != nil {
+		t.Fatalf("InitWizardWorkspace() error = %v", err)
+	}
+	gotBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotBytes) != original {
+		t.Fatalf("wizard overwrote existing config without force:\n%s", gotBytes)
+	}
+}
+
+func TestComposeWizardConfigUsesSetupRecipes(t *testing.T) {
+	t.Parallel()
+
+	rendered := composeWizardConfig(wizardConfigOptions{
+		Setup:      "copilot-github-token",
+		ProviderID: "copilot-acp",
+		Platform:   "gitlab",
+		Profile:    "ci",
+		BlockOn:    "critical",
+	})
+	for _, needle := range []string{
+		"    copilot-acp:",
+		"      type: copilot_acp",
+		"        model: auto",
+		"    gitlab: {}",
+		"        block_on: critical",
+	} {
+		if !strings.Contains(rendered, needle) {
+			t.Fatalf("composeWizardConfig() missing %q:\n%s", needle, rendered)
+		}
+	}
+	if strings.Contains(rendered, "openai-fast") || strings.Contains(rendered, "gpt-5-mini") {
+		t.Fatalf("composeWizardConfig() exposed obsolete provider details:\n%s", rendered)
+	}
+}
+
+func TestDetectCIPlatform(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		path string
+		want string
+	}{
+		{name: "github", path: filepath.Join(".github", "workflows", "diffpal.yml"), want: "github"},
+		{name: "gitlab", path: ".gitlab-ci.yml", want: "gitlab"},
+		{name: "azure-root", path: "azure-pipelines.yml", want: "azure"},
+		{name: "azure-dir", path: filepath.Join(".azure-pipelines", "review.yaml"), want: "azure"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, tc.path)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("name: ci\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if got := detectCIPlatform(dir); got != tc.want {
+				t.Fatalf("detectCIPlatform() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

@@ -20,6 +20,18 @@ type InitResult struct {
 	IgnorePath  string
 	Templates   []string
 	ProviderSet []string
+	Setup       string
+	Platform    string
+	Profile     string
+	BlockOn     string
+}
+
+type WizardOptions struct {
+	InitOptions
+	Setup    string
+	Platform string
+	Profile  string
+	BlockOn  string
 }
 
 const defaultIgnore = `# DiffPal generated ignore file
@@ -81,6 +93,89 @@ func InitWorkspace(opts InitOptions, detectedProviders []string) (InitResult, er
 	return result, nil
 }
 
+func InitWizardWorkspace(opts WizardOptions) (InitResult, error) {
+	initOpts := opts.InitOptions
+	if initOpts.WorkingDir == "" {
+		initOpts.WorkingDir = "."
+	}
+	if initOpts.ConfigPath == "" {
+		initOpts.ConfigPath = filepath.Join(initOpts.WorkingDir, ".config", "diffpal", "config.yaml")
+	}
+	if initOpts.StatePath == "" {
+		initOpts.StatePath = filepath.Join(initOpts.WorkingDir, ".config", "diffpal", "state")
+	}
+
+	setup, providerID, err := resolveWizardSetup(opts.Setup)
+	if err != nil {
+		return InitResult{}, err
+	}
+	platform, err := resolveWizardPlatform(initOpts.WorkingDir, opts.Platform)
+	if err != nil {
+		return InitResult{}, err
+	}
+	profile := strings.TrimSpace(opts.Profile)
+	if profile == "" {
+		profile = "ci"
+	}
+	if !validWizardName(profile) {
+		return InitResult{}, fmt.Errorf("invalid profile %q", opts.Profile)
+	}
+	blockOn := strings.ToLower(strings.TrimSpace(opts.BlockOn))
+	if blockOn == "" {
+		blockOn = "high"
+	}
+	if !validWizardBlockOn(blockOn) {
+		return InitResult{}, fmt.Errorf("invalid block threshold %q", opts.BlockOn)
+	}
+
+	result := InitResult{
+		ConfigPath:  initOpts.ConfigPath,
+		StatePath:   initOpts.StatePath,
+		IgnorePath:  filepath.Join(initOpts.WorkingDir, ".diffpalignore"),
+		ProviderSet: []string{providerID},
+		Setup:       setup,
+		Platform:    platform,
+		Profile:     profile,
+		BlockOn:     blockOn,
+	}
+	configIgnorePath := filepath.Join(filepath.Dir(initOpts.ConfigPath), ".gitignore")
+	templateDir := filepath.Join(filepath.Dir(initOpts.ConfigPath), "templates")
+
+	if err := os.MkdirAll(filepath.Dir(initOpts.ConfigPath), 0o755); err != nil {
+		return result, err
+	}
+	if err := os.MkdirAll(initOpts.StatePath, 0o755); err != nil {
+		return result, err
+	}
+	if err := writeIfMissing(initOpts.ConfigPath, composeWizardConfig(wizardConfigOptions{
+		Setup:      setup,
+		ProviderID: providerID,
+		Platform:   platform,
+		Profile:    profile,
+		BlockOn:    blockOn,
+	}), initOpts.Force); err != nil {
+		return result, err
+	}
+	if err := writeIfMissing(configIgnorePath, defaultConfigGitignore, initOpts.Force); err != nil {
+		return result, err
+	}
+	if err := os.MkdirAll(templateDir, 0o755); err != nil {
+		return result, err
+	}
+	for _, template := range configTemplates() {
+		path := filepath.Join(templateDir, template.name)
+		if err := writeIfMissing(path, template.content, initOpts.Force); err != nil {
+			return result, err
+		}
+		result.Templates = append(result.Templates, path)
+	}
+	if err := writeIfMissing(result.IgnorePath, defaultIgnore, initOpts.Force); err != nil {
+		return result, err
+	}
+
+	return result, nil
+}
+
 func writeIfMissing(path, content string, force bool) error {
 	if !force {
 		if _, err := os.Stat(path); err == nil {
@@ -111,7 +206,7 @@ func composeConfig(detected []string) string {
 		case "copilot-acp":
 			lines = append(lines, "      type: copilot_acp")
 			lines = append(lines, "      copilot_acp:")
-			lines = append(lines, "        model: gpt-5-mini")
+			lines = append(lines, "        model: auto")
 		case "codex-acp":
 			lines = append(lines, "      type: codex_acp")
 			lines = append(lines, "      codex_acp:")
@@ -137,6 +232,173 @@ func composeConfig(detected []string) string {
 	lines = append(lines, "      - best-practices")
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
+}
+
+type wizardConfigOptions struct {
+	Setup      string
+	ProviderID string
+	Platform   string
+	Profile    string
+	BlockOn    string
+}
+
+func composeWizardConfig(opts wizardConfigOptions) string {
+	lines := []string{
+		"version: v1",
+		"",
+		"runtime:",
+		"  providers:",
+		fmt.Sprintf("    %s:", opts.ProviderID),
+	}
+	lines = append(lines, providerConfigLinesForSetup(opts.Setup)...)
+	lines = append(lines, "")
+	lines = append(lines, "diffpal:")
+	lines = append(lines, fmt.Sprintf("  provider: %s", opts.ProviderID))
+	lines = append(lines, "  gate:")
+	lines = append(lines, "    block_on: "+opts.BlockOn)
+	lines = append(lines, "  review:")
+	lines = append(lines, "    language: en")
+	lines = append(lines, "    instructions: |")
+	lines = append(lines, "      Prefer actionable findings that are directly supported by the diff.")
+	lines = append(lines, "    checks:")
+	lines = append(lines, "      - security")
+	lines = append(lines, "      - bugs")
+	lines = append(lines, "      - performance")
+	lines = append(lines, "      - best-practices")
+	if opts.Platform != "" && opts.Platform != "none" {
+		lines = append(lines, "  platforms:")
+		lines = append(lines, "    "+opts.Platform+": {}")
+	}
+	lines = append(lines, "")
+	lines = append(lines, "profiles:")
+	lines = append(lines, "  "+opts.Profile+":")
+	lines = append(lines, "    diffpal:")
+	lines = append(lines, "      gate:")
+	lines = append(lines, "        block_on: "+opts.BlockOn)
+	lines = append(lines, "")
+	return strings.Join(lines, "\n")
+}
+
+func providerConfigLinesForSetup(setup string) []string {
+	switch setup {
+	case "copilot-github-token":
+		return []string{
+			"      type: copilot_acp",
+			"      copilot_acp:",
+			"        model: auto",
+		}
+	case "generic-acp":
+		return []string{
+			"      type: generic_acp",
+			"      generic_acp:",
+			"        cmd: [\"your-acp-cli\", \"acp\", \"--stdio\"]",
+		}
+	default:
+		return []string{
+			"      type: codex_acp",
+			"      codex_acp:",
+			"        reasoning_effort: low",
+		}
+	}
+}
+
+func resolveWizardSetup(value string) (string, string, error) {
+	setup := strings.ToLower(strings.TrimSpace(value))
+	if setup == "" {
+		setup = "codex-api-key"
+	}
+	switch setup {
+	case "codex-api-key", "codex-subscription":
+		return setup, "codex-acp", nil
+	case "copilot-github-token":
+		return setup, "copilot-acp", nil
+	case "generic-acp":
+		return setup, "generic-acp", nil
+	default:
+		return "", "", fmt.Errorf("invalid setup %q", value)
+	}
+}
+
+func resolveWizardPlatform(workingDir, value string) (string, error) {
+	platform := strings.ToLower(strings.TrimSpace(value))
+	if platform == "" {
+		platform = "auto"
+	}
+	switch platform {
+	case "github", "gitlab", "azure", "none":
+		return platform, nil
+	case "auto":
+		return detectCIPlatform(workingDir), nil
+	default:
+		return "", fmt.Errorf("invalid platform %q", value)
+	}
+}
+
+func detectCIPlatform(workingDir string) string {
+	if workingDir == "" {
+		workingDir = "."
+	}
+	if matchesAny(filepath.Join(workingDir, ".github", "workflows", "*.yml"), filepath.Join(workingDir, ".github", "workflows", "*.yaml")) {
+		return "github"
+	}
+	if fileExists(filepath.Join(workingDir, ".gitlab-ci.yml")) {
+		return "gitlab"
+	}
+	if fileExists(filepath.Join(workingDir, "azure-pipelines.yml")) || fileExists(filepath.Join(workingDir, "azure-pipelines.yaml")) {
+		return "azure"
+	}
+	if matchesAny(filepath.Join(workingDir, ".azure-pipelines", "*.yml"), filepath.Join(workingDir, ".azure-pipelines", "*.yaml")) {
+		return "azure"
+	}
+	return "github"
+}
+
+func matchesAny(patterns ...string) bool {
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err == nil && len(matches) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func validWizardBlockOn(value string) bool {
+	switch value {
+	case "low", "medium", "high", "critical":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWizardName(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r >= 'a' && r <= 'z' {
+			continue
+		}
+		if r >= 'A' && r <= 'Z' {
+			continue
+		}
+		if r >= '0' && r <= '9' {
+			continue
+		}
+		switch r {
+		case '-', '_', '.':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func selectedDefaultProvider(detected []string) string {

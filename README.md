@@ -39,12 +39,14 @@ This is the fastest production-shaped setup: DiffPal installs itself through the
 GitHub Action, Codex is used as the review provider, and `OPENAI_API_KEY` stays
 in GitHub Secrets.
 
-1. Add the config:
+1. Generate the config:
 
 ```bash
-mkdir -p .config/diffpal
-cp examples/configs/codex-api-key/config.yaml .config/diffpal/config.yaml
+npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
 ```
+
+This writes `.config/diffpal/config.yaml` with a visible `ci` profile. Existing
+files are kept unless you pass `--force`.
 
 2. Add a repository secret:
 
@@ -146,6 +148,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+If you prefer copying files manually, use
+[`examples/configs/codex-api-key/config.yaml`](examples/configs/codex-api-key/config.yaml).
 For full copy-paste files and host-specific notes, read
 [`docs/ci-examples.md`](docs/ci-examples.md).
 
@@ -207,7 +211,8 @@ Use `diffpal.review.instructions`, the `instructions` action input, or
 DiffPal is not a single-provider product. It delegates review to
 `diffpal.provider`, which points at a provider under `runtime.providers`.
 
-Ready-made config recipes:
+Ready-made config recipes. These are the same names accepted by
+`diffpal init --wizard --setup ...`:
 
 | Setup | Config | Secret |
 | --- | --- | --- |

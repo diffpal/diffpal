@@ -4,11 +4,15 @@ DiffPal reads one repository config file:
 
 `.config/diffpal/config.yaml`
 
-Generate a starter file with:
+Generate a first-run onboarding config with:
 
 ```bash
-diffpal init
+diffpal init --wizard --setup codex-api-key --platform github
 ```
+
+Use plain `diffpal init` only when you want the older starter workspace plus
+template snippets. The wizard path writes a complete recipe config with a
+visible profile, for example `profiles.ci`.
 
 ## Provider Model
 
@@ -78,6 +82,12 @@ diffpal:
         enabled: true
     gitlab: {}
     azure: {}
+
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high
 ```
 
 Install the matching provider command in CI:
@@ -222,14 +232,14 @@ switch the selected provider and add a matching runtime provider:
 ```yaml
 runtime:
   providers:
-    openai-fast:
+    openai-api:
       type: openai
       openai:
         model: "${DIFFPAL_OPENAI_MODEL}"
         api_key: "${OPENAI_API_KEY}"
 
 diffpal:
-  provider: openai-fast
+  provider: openai-api
 ```
 
 Then set `OPENAI_API_KEY` in CI.

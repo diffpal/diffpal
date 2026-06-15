@@ -49,3 +49,24 @@ func TestReviewHelpShowsModeSubcommands(t *testing.T) {
 		t.Fatalf("review help still references removed flow:\n%s", text)
 	}
 }
+
+func TestInitHelpShowsWizardFlags(t *testing.T) {
+	cmd := NewRootCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"init", "--help"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	text := out.String()
+	for _, needle := range []string{"--wizard", "--setup", "--platform", "--profile", "--block-on"} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("init help missing %q:\n%s", needle, text)
+		}
+	}
+	if strings.Contains(text, "openai-fast") {
+		t.Fatalf("init help exposed internal provider name:\n%s", text)
+	}
+}
