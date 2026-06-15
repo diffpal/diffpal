@@ -245,6 +245,10 @@ authenticated:
 | `openai`, `aistudio` | Hosted API providers |
 | `pool` | Ordered provider failover |
 
+Hosted providers receive DiffPal's read-only review tools during each review:
+`list_files`, `read_file`, and `search_files`. These are request-level tools,
+not provider config. ACP providers keep their own tool surface.
+
 ## MCP Servers
 
 DiffPal can pass MCP servers through the Norma runtime to providers that support

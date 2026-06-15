@@ -3,11 +3,11 @@ module github.com/diffpal/diffpal
 go 1.26.4
 
 require (
-	github.com/normahq/norma v0.0.8
+	github.com/normahq/norma v0.0.9
 	github.com/spf13/cobra v1.10.2
 )
 
-require gopkg.in/yaml.v3 v3.0.1 // indirect
+require gopkg.in/yaml.v3 v3.0.1
 
 require (
 	github.com/microsoft/azure-devops-go-api/azuredevops/v7 v7.1.0
@@ -123,6 +123,7 @@ require (
 	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/safehtml v0.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
