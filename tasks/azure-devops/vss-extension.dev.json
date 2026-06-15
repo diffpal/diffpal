@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "id": "review-dev",
+  "id": "diffpal-dev",
   "name": "DiffPal Review Dev",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "publisher": "diffpal",
   "description": "Development build of the DiffPal pull request review task for Azure Pipelines.",
   "public": false,
@@ -37,7 +37,7 @@
   ],
   "contributions": [
     {
-      "id": "review-dev-task",
+      "id": "diffpal-dev-task",
       "type": "ms.vss-distributed-task.task",
       "targets": [
         "ms.vss-distributed-task.tasks"
