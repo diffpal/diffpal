@@ -51,25 +51,31 @@ type ChunkSpan struct {
 }
 
 type ChunkFile struct {
-	Path      string      `json:"path"`
-	Signature string      `json:"signature"`
-	Snippet   string      `json:"snippet"`
-	Spans     []ChunkSpan `json:"spans"`
+	Path         string      `json:"path"`
+	Signature    string      `json:"signature"`
+	Trust        string      `json:"trust"`
+	SnippetStart string      `json:"snippet_start"`
+	Snippet      string      `json:"snippet"`
+	SnippetEnd   string      `json:"snippet_end"`
+	Spans        []ChunkSpan `json:"spans"`
 }
 
 type ChunkInput struct {
-	ReviewID     string      `json:"review_id"`
-	Repo         string      `json:"repo"`
-	BaseSHA      string      `json:"base_sha"`
-	HeadSHA      string      `json:"head_sha"`
-	ChunkIndex   int         `json:"chunk_index"`
-	ChunkCount   int         `json:"chunk_count"`
-	ReviewTask   string      `json:"review_task"`
-	Language     string      `json:"language"`
-	ReviewChecks []string    `json:"review_checks"`
-	Instructions string      `json:"instructions,omitempty"`
-	TestSummary  string      `json:"test_summary"`
-	Files        []ChunkFile `json:"files"`
+	ReviewID              string      `json:"review_id"`
+	Repo                  string      `json:"repo"`
+	BaseSHA               string      `json:"base_sha"`
+	HeadSHA               string      `json:"head_sha"`
+	ChunkIndex            int         `json:"chunk_index"`
+	ChunkCount            int         `json:"chunk_count"`
+	ReviewTask            string      `json:"review_task"`
+	UntrustedInputWarning string      `json:"untrusted_input_warning"`
+	UntrustedInputStart   string      `json:"untrusted_input_start"`
+	UntrustedInputEnd     string      `json:"untrusted_input_end"`
+	Language              string      `json:"language"`
+	ReviewChecks          []string    `json:"review_checks"`
+	Instructions          string      `json:"instructions,omitempty"`
+	TestSummary           string      `json:"test_summary"`
+	Files                 []ChunkFile `json:"files"`
 }
 
 type ChunkFinding struct {
@@ -334,25 +340,31 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, re
 			spans = append(spans, ChunkSpan{Start: span.Start, End: span.End})
 		}
 		files = append(files, ChunkFile{
-			Path:      file.Path,
-			Signature: file.Signature,
-			Snippet:   file.Snippet,
-			Spans:     spans,
+			Path:         file.Path,
+			Signature:    file.Signature,
+			Trust:        "untrusted",
+			SnippetStart: promptpack.UntrustedFileContextStart,
+			Snippet:      promptpack.EscapeUntrusted(file.Snippet),
+			SnippetEnd:   promptpack.UntrustedFileContextEnd,
+			Spans:        spans,
 		})
 	}
 	return ChunkInput{
-		ReviewID:     reviewID,
-		Repo:         repo,
-		BaseSHA:      baseSHA,
-		HeadSHA:      headSHA,
-		ChunkIndex:   chunkIndex,
-		ChunkCount:   chunkCount,
-		ReviewTask:   promptpack.ReviewTask(reviewChecks),
-		Language:     language,
-		ReviewChecks: append([]string(nil), reviewChecks...),
-		Instructions: strings.TrimSpace(instructions),
-		TestSummary:  testSummary,
-		Files:        files,
+		ReviewID:              reviewID,
+		Repo:                  repo,
+		BaseSHA:               baseSHA,
+		HeadSHA:               headSHA,
+		ChunkIndex:            chunkIndex,
+		ChunkCount:            chunkCount,
+		ReviewTask:            promptpack.ReviewTask(reviewChecks),
+		UntrustedInputWarning: promptpack.UntrustedInputWarning,
+		UntrustedInputStart:   promptpack.UntrustedInputStart,
+		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
+		Language:              language,
+		ReviewChecks:          append([]string(nil), reviewChecks...),
+		Instructions:          strings.TrimSpace(instructions),
+		TestSummary:           testSummary,
+		Files:                 files,
 	}
 }
 

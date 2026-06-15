@@ -7,26 +7,33 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 )
 
 const providerIntegrationTimeout = 2 * time.Minute
 
 func unsafeHandlerInput() ChunkInput {
 	return ChunkInput{
-		ReviewID:     "integration-review",
-		Repo:         "diffpal/diffpal",
-		BaseSHA:      "base",
-		HeadSHA:      "head",
-		ChunkIndex:   0,
-		ChunkCount:   1,
-		ReviewTask:   reviewTask([]string{"security"}),
-		Language:     "en",
-		ReviewChecks: []string{"security"},
-		TestSummary:  "no_tests_in_diff",
+		ReviewID:              "integration-review",
+		Repo:                  "diffpal/diffpal",
+		BaseSHA:               "base",
+		HeadSHA:               "head",
+		ChunkIndex:            0,
+		ChunkCount:            1,
+		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
+		UntrustedInputWarning: promptpack.UntrustedInputWarning,
+		UntrustedInputStart:   promptpack.UntrustedInputStart,
+		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
+		Language:              "en",
+		ReviewChecks:          []string{"security"},
+		TestSummary:           "no_tests_in_diff",
 		Files: []ChunkFile{{
-			Path:      "internal/platformapi/admin_debug.go",
-			Signature: "func AdminDebugHandler(db *sql.DB) http.HandlerFunc",
-			Snippet: strings.Join([]string{
+			Path:         "internal/platformapi/admin_debug.go",
+			Signature:    "func AdminDebugHandler(db *sql.DB) http.HandlerFunc",
+			Trust:        "untrusted",
+			SnippetStart: promptpack.UntrustedFileContextStart,
+			Snippet: promptpack.EscapeUntrusted(strings.Join([]string{
 				"package platformapi",
 				"",
 				"import (",
@@ -49,8 +56,9 @@ func unsafeHandlerInput() ChunkInput {
 				`		_, _ = w.Write([]byte(productionToken))`,
 				"	}",
 				"}",
-			}, "\n"),
-			Spans: []ChunkSpan{{Start: 12, End: 20}},
+			}, "\n")),
+			SnippetEnd: promptpack.UntrustedFileContextEnd,
+			Spans:      []ChunkSpan{{Start: 12, End: 20}},
 		}},
 	}
 }
