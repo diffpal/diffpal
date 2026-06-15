@@ -1,0 +1,16 @@
+version: "3"
+
+tasks:
+  release:set-version:
+    desc: Set checked-in release metadata to VERSION.
+    requires:
+      vars:
+        - VERSION
+    preconditions:
+      - sh: command -v semverctl >/dev/null 2>&1
+        msg: "Install semverctl with: npm install --global @metalagman/semverctl@latest"
+    cmds:
+      - semverctl set file "{{.VERSION}}" tasks/azure-devops/package.json
+      - semverctl set file "{{.VERSION}}" tasks/azure-devops/vss-extension.json
+      - semverctl set file "{{.VERSION}}" tasks/azure-devops/vss-extension.dev.json
+      - npm --prefix tasks/azure-devops install --package-lock-only --ignore-scripts

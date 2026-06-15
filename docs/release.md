@@ -83,6 +83,19 @@ Azure DevOps extension releases are intentionally separate from
 `omnidist-release`. The `azure-devops-release` workflow is triggered by the same
 SemVer tags and owns VSIX packaging plus Marketplace publishing.
 
+Before tagging a release that should publish Azure DevOps extensions, update the
+checked-in Azure package and manifest versions:
+
+```bash
+npm install --global @metalagman/semverctl@latest
+task release:set-version VERSION=0.1.0
+```
+
+The workflow verifies that `tasks/azure-devops/package.json`,
+`tasks/azure-devops/vss-extension.json`, and
+`tasks/azure-devops/vss-extension.dev.json` match the pushed SemVer tag. It does
+not rewrite release metadata during the tag run.
+
 Azure package job:
 
 ```bash
