@@ -1,6 +1,6 @@
 {
   "name": "@diffpal/azure-devops-extension",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "private": true,
   "description": "Azure DevOps extension and pipeline task for DiffPal review",
   "scripts": {
