@@ -13,4 +13,4 @@
 - Updated the GitHub Action default and CI examples to use the current `0.1.7` CLI release.
 - Fixed Azure DevOps Marketplace packaging by adding the required extension overview asset.
 - Fixed Azure DevOps Marketplace packaging by adding the required 128x128 extension icon asset.
-- Fixed Azure DevOps Marketplace extension IDs to publish as `diffpal.review` and `diffpal.review-dev`.
+- Fixed Azure DevOps Marketplace extension IDs to publish as `diffpal.pr-review` and `diffpal.pr-review-dev`.
