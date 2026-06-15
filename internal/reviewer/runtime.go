@@ -14,6 +14,7 @@ import (
 	adkagent "google.golang.org/adk/agent"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
+	"google.golang.org/adk/tool"
 	"google.golang.org/genai"
 )
 
@@ -37,6 +38,10 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
+	reviewTools, err := reviewToolsForProvider(providerCfg, cfg.WorkingDir)
+	if err != nil {
+		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
+	}
 
 	agentRuntime, err := factory.Build(ctx, agentfactory.BuildRequest{
 		AgentID:           cfg.ProviderID,
@@ -44,6 +49,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		Description:       "DiffPal provider-backed review agent",
 		GlobalInstruction: reviewInstruction(cfg.Instructions),
 		WorkingDirectory:  cfg.WorkingDir,
+		Tools:             reviewTools,
 	})
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
@@ -144,6 +150,15 @@ func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
 		}
 	}
 	return nil
+}
+
+func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, workingDir string) ([]tool.Tool, error) {
+	switch strings.ToLower(strings.TrimSpace(providerCfg.Type)) {
+	case "openai", "aistudio":
+		return newReviewTools(workingDir)
+	default:
+		return nil, nil
+	}
 }
 
 func appendVisibleText(out *strings.Builder, content *genai.Content) {
