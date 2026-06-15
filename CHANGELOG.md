@@ -15,3 +15,4 @@
 - Fixed Azure DevOps Marketplace packaging by adding the required 128x128 extension icon asset.
 - Fixed Azure DevOps Marketplace extension IDs to publish as `diffpal.review` and `diffpal.review-dev`.
 - Fixed Azure DevOps Marketplace task UUIDs for the corrected extension identity.
+- Fixed Azure DevOps Marketplace release cleanup for stale extension IDs.
