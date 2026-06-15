@@ -132,6 +132,9 @@ func discussionBody(f findings.Finding) string {
 		fence := markdownFence(f.Evidence)
 		lines = append(lines, "", "**Evidence:**", fence, f.Evidence, fence)
 	}
+	if f.Impact != "" {
+		lines = append(lines, "", "**Impact**: "+f.Impact)
+	}
 	if f.Suggestion != "" {
 		fence := markdownFence(f.Suggestion)
 		lines = append(lines, "", "**Suggestion:**", fence, f.Suggestion, fence)

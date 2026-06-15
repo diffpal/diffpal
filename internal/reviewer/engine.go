@@ -15,6 +15,7 @@ import (
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/policy"
 	"github.com/diffpal/diffpal/internal/reliability"
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
 )
 
@@ -81,6 +82,7 @@ type ChunkFinding struct {
 	Title      string  `json:"title"`
 	Message    string  `json:"message"`
 	Evidence   string  `json:"evidence"`
+	Impact     string  `json:"impact"`
 	Suggestion string  `json:"suggestion,omitempty"`
 }
 
@@ -189,6 +191,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		HeadSHA:       result.HeadSHA,
 		Language:      language,
 		ReviewChecks:  append([]string(nil), reviewChecks...),
+		Prompt:        promptpack.ReviewMetadata(),
 		ChangeSummary: findings.SemanticChangeSummary(reviewed),
 		Files:         reviewed,
 		Findings:      []findings.Finding{},
@@ -344,17 +347,13 @@ func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, re
 		HeadSHA:      headSHA,
 		ChunkIndex:   chunkIndex,
 		ChunkCount:   chunkCount,
-		ReviewTask:   reviewTask(reviewChecks),
+		ReviewTask:   promptpack.ReviewTask(reviewChecks),
 		Language:     language,
 		ReviewChecks: append([]string(nil), reviewChecks...),
 		Instructions: strings.TrimSpace(instructions),
 		TestSummary:  testSummary,
 		Files:        files,
 	}
-}
-
-func reviewTask(checks []string) string {
-	return "Perform a code review of every provided file snippet and changed line span. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after reviewing each snippet for those checks."
 }
 
 func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig.ProviderConfig {
@@ -429,12 +428,13 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	title := strings.TrimSpace(item.Title)
 	message := strings.TrimSpace(item.Message)
 	evidence := strings.TrimSpace(item.Evidence)
+	impact := strings.TrimSpace(item.Impact)
 	suggestion := strings.TrimSpace(item.Suggestion)
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
 		return findings.Finding{}, false
 	}
-	if path == "" || title == "" || message == "" || evidence == "" {
+	if path == "" || title == "" || message == "" || evidence == "" || impact == "" {
 		return findings.Finding{}, false
 	}
 	if item.Confidence < 0 || item.Confidence > 1 {
@@ -457,6 +457,7 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 		Title:      title,
 		Message:    message,
 		Evidence:   evidence,
+		Impact:     impact,
 		Suggestion: suggestion,
 		Provider:   providerID,
 	}, true

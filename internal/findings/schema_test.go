@@ -150,6 +150,12 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	bundle := FindingsBundle{
 		ReviewID: "review-a",
 		HeadSHA:  "head-a",
+		Prompt: &PromptMetadata{
+			PromptID:      "diffpal.review",
+			PromptVersion: "v1.0.0",
+			Purpose:       "review_changed_diff",
+			SchemaVersion: "findings.v1",
+		},
 		Findings: []Finding{{
 			Category:   "security",
 			Severity:   "HIGH",
@@ -160,6 +166,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			Title:      "xss risk",
 			Message:    "unsafe HTML sink",
 			Evidence:   "innerHTML receives tainted input",
+			Impact:     "attackers can execute script in another user's browser",
 		}},
 	}
 	if err := WriteBundle(path, bundle, "repo-a"); err != nil {
@@ -177,6 +184,12 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	}
 	if readBack.Findings[0].ReviewID != "review-a" {
 		t.Fatalf("ReviewID = %q, want review-a", readBack.Findings[0].ReviewID)
+	}
+	if readBack.Prompt.PromptVersion != "v1.0.0" {
+		t.Fatalf("Prompt = %+v, want persisted prompt metadata", readBack.Prompt)
+	}
+	if readBack.Findings[0].Impact != "attackers can execute script in another user's browser" {
+		t.Fatalf("Impact = %q, want persisted impact", readBack.Findings[0].Impact)
 	}
 }
 

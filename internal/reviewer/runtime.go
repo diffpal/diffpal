@@ -8,6 +8,7 @@ import (
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/reliability"
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
 	"github.com/normahq/norma/pkg/runtime/mcpregistry"
 	"github.com/normahq/norma/pkg/runtime/structuredagent"
@@ -47,7 +48,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		AgentID:           cfg.ProviderID,
 		Name:              "DiffPalReviewerAgent",
 		Description:       "DiffPal provider-backed review agent",
-		GlobalInstruction: reviewInstruction(cfg.Instructions),
+		GlobalInstruction: promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions}),
 		WorkingDirectory:  cfg.WorkingDir,
 		Tools:             reviewTools,
 	})
@@ -59,9 +60,9 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	}
 
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
-		structuredagent.WithInputSchema(inputSchemaJSON),
-		structuredagent.WithOutputSchema(outputSchemaJSON),
-		structuredagent.WithSystemInstruction(reviewInstruction(cfg.Instructions)),
+		structuredagent.WithInputSchema(promptpack.InputSchemaJSON),
+		structuredagent.WithOutputSchema(promptpack.OutputSchemaJSON),
+		structuredagent.WithSystemInstruction(promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {

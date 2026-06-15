@@ -3,6 +3,7 @@ package azure
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/diffpal/diffpal/internal/findings"
@@ -66,6 +67,22 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 	}
 	if len(plan.State) != 2 {
 		t.Fatalf("len(State) = %d, want 2 actionable states", len(plan.State))
+	}
+}
+
+func TestThreadBodyIncludesImpactWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	body := threadBody(findings.Finding{
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.91,
+		Message:    "unsafe SQL concatenation",
+		Evidence:   "query concatenates input",
+		Impact:     "malicious users can delete unrelated sessions",
+	})
+	if !strings.Contains(body, "Impact: malicious users can delete unrelated sessions") {
+		t.Fatalf("thread body missing impact:\n%s", body)
 	}
 }
 

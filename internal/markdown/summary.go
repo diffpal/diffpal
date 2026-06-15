@@ -281,6 +281,9 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	if finding.Evidence != "" {
 		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, finding.Evidence)
 	}
+	if finding.Impact != "" {
+		fmt.Fprintf(&out, "%s**Impact**: %s\n", detailPrefix, finding.Impact)
+	}
 	if hasLink {
 		fmt.Fprintf(&out, "%s**Source**:\n%s%s\n", detailPrefix, detailPrefix, link)
 	}

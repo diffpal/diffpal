@@ -37,6 +37,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 				Title:      "behavior changed without guard",
 				Message:    "the modified print path is not guarded by a flag",
 				Evidence:   "line 4 now emits a different string",
+				Impact:     "callers can no longer rely on the previous command output",
 			}},
 		}},
 	}
@@ -94,8 +95,14 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if result.Bundle.Language != "en" {
 		t.Fatalf("Bundle.Language = %q, want en", result.Bundle.Language)
 	}
+	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != "v1.0.0" {
+		t.Fatalf("Bundle.Prompt = %+v, want prompt pack metadata", result.Bundle.Prompt)
+	}
 	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
+	}
+	if got.Impact != "callers can no longer rely on the previous command output" {
+		t.Fatalf("Impact = %q, want copied provider impact", got.Impact)
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
 		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
@@ -156,6 +163,7 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					Title:      "behavior changed",
 					Message:    "the output changed",
 					Evidence:   "line 4 changed",
+					Impact:     "callers see different behavior",
 				},
 				{
 					Category:   "performance",
@@ -167,6 +175,7 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					Title:      "performance finding",
 					Message:    "performance should be filtered",
 					Evidence:   "line 4 changed",
+					Impact:     "runtime cost would increase",
 				},
 			},
 		}},
@@ -263,6 +272,7 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 				Title:      "Request-controlled shell command execution",
 				Message:    "The handler passes the command query parameter directly to sh -c.",
 				Evidence:   `exec.Command("sh", "-c", command)`,
+				Impact:     "remote callers can execute arbitrary shell commands",
 				Suggestion: "Remove shell execution or dispatch only fixed allowlisted operations.",
 			}},
 		}},
@@ -326,6 +336,7 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Title:      "output changed",
 					Message:    "the function output changed",
 					Evidence:   "line 4 was edited",
+					Impact:     "callers observe a changed output value",
 				},
 				{
 					Category:   "maintainability",
@@ -337,6 +348,7 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Title:      "output changed",
 					Message:    "the function output changed",
 					Evidence:   "line 4 was edited",
+					Impact:     "callers observe a changed output value",
 				},
 				{
 					Category:   "unknown",
@@ -348,6 +360,7 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Title:      "bad category",
 					Message:    "bad category",
 					Evidence:   "bad category",
+					Impact:     "bad category",
 				},
 				{
 					Category:   "security",
@@ -359,6 +372,18 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					Title:      "deleted file finding",
 					Message:    "deleted file should be ignored",
 					Evidence:   "file is deleted",
+					Impact:     "deleted file finding should be ignored",
+				},
+				{
+					Category:   "maintainability",
+					Severity:   "medium",
+					Confidence: 0.88,
+					Path:       "keep.go",
+					StartLine:  4,
+					EndLine:    4,
+					Title:      "missing impact",
+					Message:    "provider omitted impact",
+					Evidence:   "line 4 was edited",
 				},
 			},
 		}},
@@ -416,6 +441,7 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 					Title:      "retry recovered",
 					Message:    "the second attempt succeeded",
 					Evidence:   "transient failure was retried",
+					Impact:     "review still completes after a transient provider error",
 				}},
 			},
 		},

@@ -400,6 +400,24 @@ func emitReviewSummary(cmd *cobra.Command, result reviewer.Result, contextLines 
 			return withExitCode(5, err)
 		}
 	}
+	if result.Bundle.Prompt != nil && result.Bundle.Prompt.PromptID != "" {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "prompt_id=%s\n", result.Bundle.Prompt.PromptID)
+		if err != nil {
+			return withExitCode(5, err)
+		}
+	}
+	if result.Bundle.Prompt != nil && result.Bundle.Prompt.PromptVersion != "" {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "prompt_version=%s\n", result.Bundle.Prompt.PromptVersion)
+		if err != nil {
+			return withExitCode(5, err)
+		}
+	}
+	if result.Bundle.Prompt != nil && result.Bundle.Prompt.SchemaVersion != "" {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "prompt_schema_version=%s\n", result.Bundle.Prompt.SchemaVersion)
+		if err != nil {
+			return withExitCode(5, err)
+		}
+	}
 	for _, file := range result.Files {
 		_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s -> %s\n", file.FromPath, file.ToPath)
 		if err != nil {

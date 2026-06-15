@@ -122,6 +122,22 @@ config file.
 | `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
 | `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
 
+## Prompt Pack
+
+DiffPal review prompts are versioned as Prompt Pack v1. Generated findings
+artifacts include prompt metadata so review output can be traced back to the
+prompt contract:
+
+- `prompt_id`: `diffpal.review`
+- `prompt_version`: `v1.0.0`
+- `purpose`: `review_changed_diff`
+- `schema_version`: `findings.v1`
+
+`diffpal.review.instructions`, `--instructions`, and `--instructions-file`
+are appended as repository-local tuning in a dedicated prompt section. DiffPal
+still sends the diff itself as an untrusted JSON user payload; file snippets and
+comments in the diff are not treated as instructions.
+
 Review checks map to finding categories:
 
 | Check | Categories |
