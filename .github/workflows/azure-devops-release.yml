@@ -38,8 +38,8 @@ jobs:
         with:
           name: azure-devops-vsix
           path: |
-            dist/review.vsix
-            dist/review-dev.vsix
+            dist/pr-review.vsix
+            dist/pr-review-dev.vsix
           if-no-files-found: error
 
   publish:
@@ -86,12 +86,12 @@ jobs:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
         run: |
           tasks/azure-devops/node_modules/.bin/tfx extension publish \
-            --vsix dist/review.vsix \
+            --vsix dist/pr-review.vsix \
             --auth-type pat \
             --token "$AZURE_DEVOPS_EXT_PAT" \
             --no-prompt
           tasks/azure-devops/node_modules/.bin/tfx extension publish \
-            --vsix dist/review-dev.vsix \
+            --vsix dist/pr-review-dev.vsix \
             --auth-type pat \
             --token "$AZURE_DEVOPS_EXT_PAT" \
             --no-prompt
