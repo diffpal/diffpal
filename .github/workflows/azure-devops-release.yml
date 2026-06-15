@@ -85,6 +85,22 @@ jobs:
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
         run: |
+          for extension_id in \
+            diffpal-review \
+            diffpal-review-dev \
+            ai-diff-review \
+            ai-diff-review-dev \
+            review \
+            review-dev
+          do
+            tasks/azure-devops/node_modules/.bin/tfx extension unpublish \
+              --publisher diffpal \
+              --extension-id "$extension_id" \
+              --auth-type pat \
+              --token "$AZURE_DEVOPS_EXT_PAT" \
+              --no-prompt || true
+          done
+
           tasks/azure-devops/node_modules/.bin/tfx extension publish \
             --vsix dist/review.vsix \
             --auth-type pat \
