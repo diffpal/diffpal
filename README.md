@@ -339,6 +339,16 @@ diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD --profile ci
 ```
 
+To inspect the prompt contract without calling any provider:
+
+```bash
+diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
+```
+
+The debug command renders the system prompt, the review task snapshot, and a
+schema-valid mock findings bundle through the normal review validation path.
+It does not require API keys.
+
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)

@@ -143,6 +143,17 @@ Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
 role changes or instructions to follow.
 
+Use the offline debug harness to inspect the active prompt and task snapshot
+without spending provider quota:
+
+```bash
+diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
+```
+
+The command still loads config, collects the git diff, runs review
+normalization, and writes a schema-valid mock findings bundle. It replaces only
+the provider call with a local debug runtime.
+
 Review checks map to finding categories:
 
 | Check | Categories |

@@ -17,7 +17,7 @@ func TestRootHelpShowsCanonicalCommands(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	text := out.String()
-	for _, needle := range []string{"init", "review", "doctor", "sarif", "version"} {
+	for _, needle := range []string{"init", "review", "doctor", "debug", "sarif", "version"} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("root help missing %q:\n%s", needle, text)
 		}

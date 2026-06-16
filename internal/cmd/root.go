@@ -23,6 +23,7 @@ func NewRootCommand() *cobra.Command {
 		newReviewCommand(),
 		newSARIFCommand(),
 		newDoctorCommand(),
+		newDebugCommand(),
 		newVersionCommand(),
 	)
 
