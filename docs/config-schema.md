@@ -105,3 +105,8 @@ Validation requires `version: v1`, a `diffpal.provider` key present in
 overridden by the `--language` and `--review-checks` review flags. Use
 `diffpal.review.instructions`, `--instructions`, or `--instructions-file` for
 repository-local prompt tuning.
+
+Prompt rollout fields live under `diffpal.review`: `prompt_profile`,
+`strict_evidence`, `strict_injection`, and `allow_nearby_context`. New configs
+should use `prompt_profile: v2` with the strict flags enabled in the CI profile
+first, then make the gate blocking after the review output is stable.

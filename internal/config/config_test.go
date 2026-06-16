@@ -25,6 +25,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    prompt_profile: legacy
+    strict_evidence: false
+    strict_injection: false
+    allow_nearby_context: false
     checks:
       - bugs
 profiles:
@@ -34,6 +38,10 @@ profiles:
         block_on: critical
       review:
         language: Spanish
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
         checks:
           - performance
 `)
@@ -53,6 +61,12 @@ profiles:
 	}
 	if strings.Join(cfg.Review.Checks, ",") != "performance" {
 		t.Fatalf("Review.Checks = %v, want [performance]", cfg.Review.Checks)
+	}
+	if cfg.PromptProfile() != "v2" {
+		t.Fatalf("PromptProfile() = %q, want v2", cfg.PromptProfile())
+	}
+	if !cfg.StrictEvidence() || !cfg.StrictInjection() || !cfg.AllowNearbyContext() {
+		t.Fatalf("rollout flags = strict_evidence:%v strict_injection:%v allow_nearby_context:%v, want all true", cfg.StrictEvidence(), cfg.StrictInjection(), cfg.AllowNearbyContext())
 	}
 }
 
@@ -117,6 +131,30 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.Providers["openai-fast"].OpenAI.Model != "gpt-env" {
 		t.Fatalf("OpenAI.Model = %q, want gpt-env", cfg.Providers["openai-fast"].OpenAI.Model)
+	}
+}
+
+func TestLoadConfigRejectsInvalidPromptProfile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
+version: v1
+runtime:
+  providers:
+    openai-fast:
+      type: openai
+      openai:
+        model: gpt-5.4-mini
+diffpal:
+  provider: openai-fast
+  review:
+    prompt_profile: experimental
+`)
+
+	_, err := LoadConfig(dir, "", "")
+	if err == nil || !strings.Contains(err.Error(), `invalid review.prompt_profile "experimental"`) {
+		t.Fatalf("LoadConfig() error = %v, want invalid prompt profile error", err)
 	}
 }
 

@@ -225,6 +225,10 @@ func composeConfig(detected []string) string {
 	lines = append(lines, "    block_on: high")
 	lines = append(lines, "  review:")
 	lines = append(lines, "    language: en")
+	lines = append(lines, "    prompt_profile: v2")
+	lines = append(lines, "    strict_evidence: true")
+	lines = append(lines, "    strict_injection: true")
+	lines = append(lines, "    allow_nearby_context: true")
 	lines = append(lines, "    checks:")
 	lines = append(lines, "      - security")
 	lines = append(lines, "      - bugs")
@@ -258,6 +262,10 @@ func composeWizardConfig(opts wizardConfigOptions) string {
 	lines = append(lines, "    block_on: "+opts.BlockOn)
 	lines = append(lines, "  review:")
 	lines = append(lines, "    language: en")
+	lines = append(lines, "    prompt_profile: v2")
+	lines = append(lines, "    strict_evidence: true")
+	lines = append(lines, "    strict_injection: true")
+	lines = append(lines, "    allow_nearby_context: true")
 	lines = append(lines, "    instructions: |")
 	lines = append(lines, "      Prefer actionable findings that are directly supported by the diff.")
 	lines = append(lines, "    checks:")
@@ -275,6 +283,11 @@ func composeWizardConfig(opts wizardConfigOptions) string {
 	lines = append(lines, "    diffpal:")
 	lines = append(lines, "      gate:")
 	lines = append(lines, "        block_on: "+opts.BlockOn)
+	lines = append(lines, "      review:")
+	lines = append(lines, "        prompt_profile: v2")
+	lines = append(lines, "        strict_evidence: true")
+	lines = append(lines, "        strict_injection: true")
+	lines = append(lines, "        allow_nearby_context: true")
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
@@ -462,6 +475,11 @@ func configTemplates() []configTemplate {
 				"    diffpal:",
 				"      gate:",
 				"        block_on: high",
+				"      review:",
+				"        prompt_profile: v2",
+				"        strict_evidence: true",
+				"        strict_injection: true",
+				"        allow_nearby_context: true",
 				"",
 			}, "\n"),
 		},

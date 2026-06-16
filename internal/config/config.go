@@ -49,9 +49,13 @@ type GateConfig struct {
 }
 
 type ReviewConfig struct {
-	Language     string   `json:"language"     yaml:"language"     mapstructure:"language"`
-	Checks       []string `json:"checks"       yaml:"checks"       mapstructure:"checks"`
-	Instructions string   `json:"instructions" yaml:"instructions" mapstructure:"instructions"`
+	Language           string   `json:"language"                       yaml:"language"                       mapstructure:"language"`
+	Checks             []string `json:"checks"                         yaml:"checks"                         mapstructure:"checks"`
+	Instructions       string   `json:"instructions"                   yaml:"instructions"                   mapstructure:"instructions"`
+	PromptProfile      string   `json:"prompt_profile,omitempty"       yaml:"prompt_profile,omitempty"       mapstructure:"prompt_profile"`
+	StrictEvidence     *bool    `json:"strict_evidence,omitempty"      yaml:"strict_evidence,omitempty"      mapstructure:"strict_evidence"`
+	StrictInjection    *bool    `json:"strict_injection,omitempty"     yaml:"strict_injection,omitempty"     mapstructure:"strict_injection"`
+	AllowNearbyContext *bool    `json:"allow_nearby_context,omitempty" yaml:"allow_nearby_context,omitempty" mapstructure:"allow_nearby_context"`
 }
 
 type PlatformConfigs struct {
@@ -215,6 +219,9 @@ func (cfg Config) Validate() error {
 	if _, err := NormalizeReviewChecks(cfg.Review.Checks); err != nil {
 		return err
 	}
+	if _, err := NormalizePromptProfile(cfg.Review.PromptProfile); err != nil {
+		return err
+	}
 	if err := cfg.Platforms.Validate(); err != nil {
 		return err
 	}
@@ -233,6 +240,10 @@ func (cfg *Config) Normalize() error {
 	cfg.Review.Language = language
 	cfg.Review.Checks = checks
 	cfg.Review.Instructions = strings.TrimSpace(cfg.Review.Instructions)
+	cfg.Review.PromptProfile, err = NormalizePromptProfile(cfg.Review.PromptProfile)
+	if err != nil {
+		return err
+	}
 	cfg.Provider = strings.TrimSpace(cfg.Provider)
 	cfg.Gate.BlockOn = strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
 	if cfg.Gate.BlockOn == "" {
@@ -271,6 +282,35 @@ func (cfg Config) ReviewChecks() []string {
 
 func (cfg Config) ReviewInstructions() string {
 	return strings.TrimSpace(cfg.Review.Instructions)
+}
+
+func (cfg Config) PromptProfile() string {
+	profile, err := NormalizePromptProfile(cfg.Review.PromptProfile)
+	if err != nil || profile == "" {
+		return "v2"
+	}
+	return profile
+}
+
+func (cfg Config) StrictEvidence() bool {
+	if cfg.Review.StrictEvidence == nil {
+		return true
+	}
+	return *cfg.Review.StrictEvidence
+}
+
+func (cfg Config) StrictInjection() bool {
+	if cfg.Review.StrictInjection == nil {
+		return true
+	}
+	return *cfg.Review.StrictInjection
+}
+
+func (cfg Config) AllowNearbyContext() bool {
+	if cfg.Review.AllowNearbyContext == nil {
+		return true
+	}
+	return *cfg.Review.AllowNearbyContext
 }
 
 func (cfg *Config) ApplyEnvOverrides() error {
@@ -330,6 +370,16 @@ func NormalizeReviewChecks(values []string) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+func NormalizePromptProfile(value string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "", "legacy", "v2":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("invalid review.prompt_profile %q; supported values are legacy, v2", value)
+	}
 }
 
 func canonicalReviewCheck(value string) (string, bool) {

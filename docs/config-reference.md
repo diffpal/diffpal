@@ -69,6 +69,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    prompt_profile: v2
+    strict_evidence: true
+    strict_injection: true
+    allow_nearby_context: true
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
     checks:
@@ -88,6 +92,11 @@ profiles:
     diffpal:
       gate:
         block_on: high
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
 ```
 
 Install the matching provider command in CI:
@@ -121,6 +130,10 @@ config file.
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
 | `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
 | `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
+| `diffpal.review.prompt_profile` | `v2` | Prompt/schema rollout profile. Supported values: `legacy`, `v2`. |
+| `diffpal.review.strict_evidence` | `true` | Require structured evidence in provider findings. |
+| `diffpal.review.strict_injection` | `true` | Keep prompt-injection hardening enabled for task snapshots and tool evidence. |
+| `diffpal.review.allow_nearby_context` | `true` | Allow supporting context outside changed lines while keeping changed-line anchors required. |
 
 ## Prompt Pack
 
@@ -142,6 +155,22 @@ the diff; ACP providers use their native Git and filesystem tools.
 Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
 role changes or instructions to follow.
+
+For rollout, canary stricter prompt behavior in a named profile first:
+
+```yaml
+profiles:
+  ci:
+    diffpal:
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
+```
+
+Then run CI with `--profile ci`. Keep `gate: false` or omit `--gate` until the
+profile produces stable findings for your repository.
 
 Use the offline debug harness to inspect the active prompt and task snapshot
 without spending provider quota:

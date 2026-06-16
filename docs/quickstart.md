@@ -22,6 +22,7 @@ This creates `.config/diffpal/config.yaml` with:
 - `diffpal.gate.block_on: high`
 - the standard review checks
 - a visible `profiles.ci` profile
+- v2 prompt rollout flags enabled in the `ci` profile
 - a GitHub platform block
 
 The command keeps existing files unless you pass `--force`.
