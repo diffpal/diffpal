@@ -1,8 +1,9 @@
 # DiffPal Quickstart
 
-This guide gets DiffPal reviewing GitHub pull requests with the fastest
-ready-made recipe: Codex API-key auth. If you already have another
-ACP-compatible CLI, use the generic ACP config instead:
+DiffPal is provider-agnostic AI review for pull requests. This guide uses the
+default Codex API-key recipe because it is the fastest ready-made GitHub
+Actions setup, not because Codex is the product boundary. If you already have
+another ACP-compatible CLI, use the generic ACP config instead:
 [`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml).
 
 For other provider recipes or CI systems, use the examples matrix:

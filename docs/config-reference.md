@@ -16,8 +16,9 @@ visible profile, for example `profiles.ci`.
 
 ## Provider Model
 
-DiffPal delegates review to a provider selected by `diffpal.provider`.
-Providers live under `runtime.providers`.
+DiffPal's provider-agnostic boundary is `runtime.providers`. Each entry
+describes one AI provider, ACP-compatible CLI, hosted API provider, or provider
+pool. `diffpal.provider` selects the entry used for reviews.
 
 Use `generic_acp` for any CLI that can start an ACP stdio server:
 
@@ -34,8 +35,8 @@ diffpal:
 ```
 
 Install and authenticate that CLI in CI before running DiffPal. DiffPal sends
-the structured diff review request; the ACP agent owns its model, tools, and
-provider-specific credentials.
+the structured diff review request and owns the review output contract; the ACP
+agent owns its model, tools, account, and provider-specific credentials.
 
 Supported runtime provider types include:
 
@@ -49,9 +50,9 @@ Supported runtime provider types include:
 - `aistudio`
 - `pool`
 
-## Default Codex Config
+## Default Codex Recipe
 
-The public onboarding path uses Codex ACP:
+The default public onboarding recipe uses Codex ACP:
 
 ```yaml
 version: v1
@@ -333,7 +334,8 @@ own tool surface.
 
 Copy-paste examples are in [`../examples`](../examples/README.md). The config
 shape stays the same across CI systems; only the provider install/auth step
-changes. These recipes are maintained examples, not the full provider boundary.
+changes. These recipes are maintained examples; the product boundary for
+provider choice is the `runtime.providers` entry selected by `diffpal.provider`.
 
 ### Generic ACP CLI
 
