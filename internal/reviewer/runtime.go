@@ -44,14 +44,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
 
-	agentRuntime, err := factory.Build(ctx, agentfactory.BuildRequest{
-		AgentID:           cfg.ProviderID,
-		Name:              "DiffPalReviewerAgent",
-		Description:       "DiffPal provider-backed review agent",
-		GlobalInstruction: promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions}),
-		WorkingDirectory:  cfg.WorkingDir,
-		Tools:             reviewTools,
-	})
+	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg, reviewTools))
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
@@ -62,7 +55,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
 		structuredagent.WithoutInputSchema(),
 		structuredagent.WithOutputSchema(promptpack.OutputSchemaJSON),
-		structuredagent.WithSystemInstruction(promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
+		structuredagent.WithSystemInstruction(reviewSystemInstruction(cfg.Instructions)),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
@@ -120,6 +113,20 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		return ChunkOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
 	return output, usage, nil
+}
+
+func reviewSystemInstruction(instructions string) string {
+	return promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: instructions})
+}
+
+func reviewAgentBuildRequest(cfg RuntimeConfig, reviewTools []tool.Tool) agentfactory.BuildRequest {
+	return agentfactory.BuildRequest{
+		AgentID:          cfg.ProviderID,
+		Name:             "DiffPalReviewerAgent",
+		Description:      "DiffPal provider-backed review agent",
+		WorkingDirectory: cfg.WorkingDir,
+		Tools:            reviewTools,
+	}
 }
 
 func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
