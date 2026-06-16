@@ -5,6 +5,10 @@ This guide explains how DiffPal behaves in CI. Copy-paste files live in
 
 ## Common Setup
 
+DiffPal's portability point is provider install/auth: CI chooses and
+authenticates the provider, while DiffPal keeps the PR review workflow,
+artifacts, and publishing behavior consistent across hosts.
+
 Every CI system needs:
 
 1. A full git checkout, so DiffPal can compare base and head commits.
@@ -15,7 +19,8 @@ Every CI system needs:
 5. A platform token so DiffPal can publish PR feedback.
 
 Choose a ready-made provider recipe or configure `generic_acp` for your own ACP
-CLI:
+CLI. The selected provider lives under `runtime.providers`; the CI-specific
+steps are the install and authentication commands for that provider.
 
 | Setup | Config | Required secret |
 | --- | --- | --- |

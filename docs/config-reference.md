@@ -16,8 +16,9 @@ visible profile, for example `profiles.ci`.
 
 ## Provider Model
 
-DiffPal delegates review to a provider selected by `diffpal.provider`.
-Providers live under `runtime.providers`.
+DiffPal's provider-agnostic boundary is `runtime.providers`. Each entry
+describes one AI provider, ACP-compatible CLI, hosted API provider, or provider
+pool. `diffpal.provider` selects the entry used for reviews.
 
 Use `generic_acp` for any CLI that can start an ACP stdio server:
 
@@ -34,8 +35,8 @@ diffpal:
 ```
 
 Install and authenticate that CLI in CI before running DiffPal. DiffPal sends
-the structured diff review request; the ACP agent owns its model, tools, and
-provider-specific credentials.
+the structured diff review request and owns the review output contract; the ACP
+agent owns its model, tools, account, and provider-specific credentials.
 
 Supported runtime provider types include:
 
@@ -49,9 +50,9 @@ Supported runtime provider types include:
 - `aistudio`
 - `pool`
 
-## Default Codex Config
+## Default Codex Recipe
 
-The public onboarding path uses Codex ACP:
+The default public onboarding recipe uses Codex ACP:
 
 ```yaml
 version: v1
@@ -69,6 +70,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    prompt_profile: v2
+    strict_evidence: true
+    strict_injection: true
+    allow_nearby_context: true
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
     checks:
@@ -88,6 +93,11 @@ profiles:
     diffpal:
       gate:
         block_on: high
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
 ```
 
 Install the matching provider command in CI:
@@ -121,6 +131,10 @@ config file.
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
 | `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
 | `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
+| `diffpal.review.prompt_profile` | `v2` | Prompt/schema rollout profile. Supported values: `legacy`, `v2`. |
+| `diffpal.review.strict_evidence` | `true` | Require structured evidence in provider findings. |
+| `diffpal.review.strict_injection` | `true` | Keep prompt-injection hardening enabled for task snapshots and tool evidence. |
+| `diffpal.review.allow_nearby_context` | `true` | Allow supporting context outside changed lines while keeping changed-line anchors required. |
 
 ## Prompt Pack
 
@@ -131,7 +145,7 @@ prompt contract:
 - `prompt_id`: `diffpal.review`
 - `prompt_version`: `v1.2.0`
 - `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v1`
+- `schema_version`: `findings.v2`
 
 `diffpal.review.instructions`, `--instructions`, and `--instructions-file`
 are appended as repository-local tuning in a dedicated prompt section. DiffPal
@@ -143,6 +157,33 @@ Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
 role changes or instructions to follow.
 
+For rollout, canary stricter prompt behavior in a named profile first:
+
+```yaml
+profiles:
+  ci:
+    diffpal:
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
+```
+
+Then run CI with `--profile ci`. Keep `gate: false` or omit `--gate` until the
+profile produces stable findings for your repository.
+
+Use the offline debug harness to inspect the active prompt and task snapshot
+without spending provider quota:
+
+```bash
+diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
+```
+
+The command still loads config, collects the git diff, runs review
+normalization, and writes a schema-valid mock findings bundle. It replaces only
+the provider call with a local debug runtime.
+
 Review checks map to finding categories:
 
 | Check | Categories |
@@ -151,6 +192,24 @@ Review checks map to finding categories:
 | `bugs` | correctness, reliability |
 | `performance` | performance |
 | `best-practices` | maintainability, testing, style |
+
+## Severity Matrix
+
+DiffPal asks providers to classify severity by concrete impact, not confidence
+or preference. The active Prompt Pack uses the same definitions:
+
+- Severity is based on concrete impact, not confidence or preference.
+- critical: changed code can directly cause severe compromise, destructive data loss, privilege bypass, total outage, or unrecoverable corruption.
+- high: changed code can cause an exploitable security flaw, user-visible data corruption, frequent crash, major outage risk, or severe performance regression on a common path.
+- medium: changed code can cause an edge-case correctness failure, intermittent reliability issue, meaningful performance cost, confusing maintainability risk, or missing coverage for important behavior.
+- low: changed code has a localized maintainability, testing, or style issue with clear evidence and a concrete improvement, but no immediate user-visible failure.
+- security: use critical for direct compromise, credential exposure, destructive access, or privilege bypass; high for exploitable vulnerabilities with meaningful impact; medium for plausible weaknesses requiring extra conditions; low for hardening gaps with limited direct exploitability.
+- correctness: use critical for unrecoverable corruption or system-wide wrong behavior; high for common-path wrong results or data corruption; medium for plausible edge-case failures; low for small inconsistencies with bounded impact.
+- reliability: use critical for total outage, deadlock, or unrecoverable resource exhaustion; high for frequent crashes, leaks, or retry storms; medium for intermittent failure modes; low for localized resilience or observability gaps.
+- performance: use critical for regressions that can make the service unavailable or explode cost; high for severe common-path latency, memory, or query regressions; medium for measurable inefficient behavior; low for small avoidable inefficiencies with clear evidence.
+- maintainability: use critical only when the change creates an immediate operational hazard; high when the change makes future safe modification very risky; medium for confusing structure likely to cause defects; low for localized clarity or consistency issues.
+- testing: use critical only when missing validation can allow severe unsafe behavior to ship; high for untested high-risk behavior; medium for missing meaningful coverage of new behavior; low for small missing edge-case coverage.
+- style: use critical, high, or medium only when the issue has a non-style impact and should usually be reclassified; use low for repo-enforced style/readability issues that are actionable.
 
 Override review settings per run:
 
@@ -266,15 +325,17 @@ diffpal:
 Then set `OPENAI_API_KEY` in CI.
 
 Hosted providers receive DiffPal's read-only review tools at review time:
-`list_files`, `read_file`, and `search_files`. These tools are not configured in
-YAML; they are attached to the review request and scoped to the job working
-directory. ACP providers keep their own tool surface.
+`git_changed_files`, `git_diff`, `list_files`, `read_file`, and
+`search_files`. These tools are not configured in YAML; they are attached to the
+review request and scoped to the job working directory. ACP providers keep their
+own tool surface.
 
 ## Provider Auth Recipes
 
 Copy-paste examples are in [`../examples`](../examples/README.md). The config
 shape stays the same across CI systems; only the provider install/auth step
-changes. These recipes are maintained examples, not the full provider boundary.
+changes. These recipes are maintained examples; the product boundary for
+provider choice is the `runtime.providers` entry selected by `diffpal.provider`.
 
 ### Generic ACP CLI
 

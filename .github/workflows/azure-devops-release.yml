@@ -4,6 +4,26 @@ on:
   push:
     tags:
       - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer version to verify against Azure extension manifests. Defaults to package.json version."
+        required: false
+        type: string
+      publish:
+        description: "Publish to Azure DevOps Marketplace after packaging."
+        required: true
+        default: true
+        type: boolean
+      channel:
+        description: "Which extension package to publish."
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - prod
+          - dev
 
 jobs:
   package:
@@ -31,7 +51,13 @@ jobs:
       - name: Check Azure extension version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${{ inputs.version }}" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="$(node -p "require('./tasks/azure-devops/package.json').version")"
+          fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
             echo "Invalid release version: $version" >&2
             exit 1
@@ -66,7 +92,9 @@ jobs:
 
   publish:
     needs: package
+    if: ${{ github.event_name == 'push' || inputs.publish }}
     runs-on: ubuntu-latest
+    environment: azure-devops-marketplace
     permissions:
       contents: read
     steps:
@@ -87,47 +115,42 @@ jobs:
           name: azure-devops-vsix
           path: dist
 
-      - name: Check publish token
-        id: publish-token
+      - name: Verify publish token
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
         run: |
-          if [[ -n "$AZURE_DEVOPS_EXT_PAT" ]]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
+          if [[ -z "$AZURE_DEVOPS_EXT_PAT" ]]; then
+            echo "AZURE_DEVOPS_EXT_PAT is required to publish Azure DevOps Marketplace extensions." >&2
+            exit 1
           fi
 
-      - name: Skip publish when PAT is missing
-        if: ${{ steps.publish-token.outputs.available != 'true' }}
-        run: echo "AZURE_DEVOPS_EXT_PAT is not configured; skipping Azure DevOps Marketplace publish."
-
       - name: Publish Azure DevOps extensions
-        if: ${{ steps.publish-token.outputs.available == 'true' }}
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
+          CHANNEL: ${{ github.event_name == 'workflow_dispatch' && inputs.channel || 'both' }}
         run: |
-          for extension_id in \
-            diffpal-review \
-            diffpal-review-dev \
-            ai-diff-review \
-            ai-diff-review-dev
-          do
-            tasks/azure-devops/node_modules/.bin/tfx extension unpublish \
-              --publisher diffpal \
-              --extension-id "$extension_id" \
+          publish_vsix() {
+            local path="$1"
+            tasks/azure-devops/node_modules/.bin/tfx extension publish \
+              --vsix "$path" \
               --auth-type pat \
               --token "$AZURE_DEVOPS_EXT_PAT" \
-              --no-prompt || true
-          done
+              --no-prompt
+          }
 
-          tasks/azure-devops/node_modules/.bin/tfx extension publish \
-            --vsix dist/diffpal.vsix \
-            --auth-type pat \
-            --token "$AZURE_DEVOPS_EXT_PAT" \
-            --no-prompt
-          tasks/azure-devops/node_modules/.bin/tfx extension publish \
-            --vsix dist/diffpal-dev.vsix \
-            --auth-type pat \
-            --token "$AZURE_DEVOPS_EXT_PAT" \
-            --no-prompt
+          case "$CHANNEL" in
+            both)
+              publish_vsix dist/diffpal.vsix
+              publish_vsix dist/diffpal-dev.vsix
+              ;;
+            prod)
+              publish_vsix dist/diffpal.vsix
+              ;;
+            dev)
+              publish_vsix dist/diffpal-dev.vsix
+              ;;
+            *)
+              echo "Unsupported publish channel: $CHANNEL" >&2
+              exit 1
+              ;;
+          esac

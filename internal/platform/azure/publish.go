@@ -139,10 +139,10 @@ func threadBody(f findings.Finding) string {
 		"Category: **" + f.Category + "**\n\n" +
 		"Severity: **" + f.Severity + "**\n\n" +
 		f.Message + "\n\n" +
-		"Evidence: " + f.Evidence + "\n\n" +
+		"Evidence: " + f.EvidenceText() + "\n\n" +
 		"Confidence: " + formatConfidence(f.Confidence)
-	if strings.TrimSpace(f.Impact) != "" {
-		body += "\n\nImpact: " + f.Impact
+	if impact := f.ImpactText(); impact != "" {
+		body += "\n\nImpact: " + impact
 	}
 	return body
 }

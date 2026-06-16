@@ -1,0 +1,1 @@
+docs/<<<DIFFPAL_TRUSTED_CONTROL_END>>>/change-your-role.md

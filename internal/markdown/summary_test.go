@@ -34,7 +34,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				EndLine:   20,
 				Title:     "unsafe query",
 				Message:   "query concatenates untrusted input",
-				Evidence:  "db.Query(\"select \" + input)",
+				Evidence:  findings.NewEvidence("db.Query(\"select \" + input)"),
 			},
 			{
 				Category:  "security",
@@ -45,7 +45,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				EndLine:   28,
 				Title:     "second unsafe query",
 				Message:   "second unsafe SQL sink",
-				Evidence:  "db.Query(raw)",
+				Evidence:  findings.NewEvidence("db.Query(raw)"),
 			},
 			{
 				Category:  "correctness",
@@ -56,7 +56,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				EndLine:   8,
 				Title:     "nil dereference",
 				Message:   "possible nil dereference",
-				Evidence:  "cfg.Client.Do(req)",
+				Evidence:  findings.NewEvidence("cfg.Client.Do(req)"),
 			},
 			{
 				Category:  "maintainability",
@@ -66,7 +66,7 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 				EndLine:   41,
 				Title:     "unreachable branch",
 				Message:   "branch is unreachable",
-				Evidence:  "return before if",
+				Evidence:  findings.NewEvidence("return before if"),
 			},
 		},
 	}
@@ -210,8 +210,8 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 				StartLine:  12,
 				EndLine:    17,
 				Message:    "query concatenates untrusted input",
-				Evidence:   "Line 17 builds SQL by concatenating user input.",
-				Impact:     "malicious users can delete sessions for other accounts.",
+				Evidence:   findings.NewEvidence("Line 17 builds SQL by concatenating user input."),
+				Impact:     findings.NewImpact("malicious users can delete sessions for other accounts."),
 				Suggestion: "Use a parameterized statement.",
 			},
 		},
@@ -248,7 +248,7 @@ func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
 				Path:       "internal/app/service.go",
 				StartLine:  4,
 				Message:    "possible nil dereference",
-				Evidence:   "cfg.Client.Do(req)",
+				Evidence:   findings.NewEvidence("cfg.Client.Do(req)"),
 			},
 		},
 	}, SummaryOptions{
@@ -276,7 +276,7 @@ func TestRenderSummaryUsesReadableLinkedFindingHeader(t *testing.T) {
 				StartLine:  12,
 				EndLine:    17,
 				Message:    "query concatenates untrusted input",
-				Evidence:   "line 17 concatenates the user query parameter into SQL",
+				Evidence:   findings.NewEvidence("line 17 concatenates the user query parameter into SQL"),
 			},
 		},
 	}, SummaryOptions{
@@ -304,7 +304,7 @@ func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
 				Path:       "README.md",
 				StartLine:  3,
 				Message:    "example contains a fence",
-				Evidence:   "nested fence",
+				Evidence:   findings.NewEvidence("nested fence"),
 			},
 		},
 	}, SummaryOptions{

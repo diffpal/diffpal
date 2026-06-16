@@ -5,12 +5,17 @@
 [![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Diff-first AI review for pull requests.**
+**Open-source, provider-agnostic AI review for pull requests.**
 
-DiffPal turns changed code into structured findings, clear PR summaries, inline
-comments, and merge gates across GitHub, GitLab, and Azure DevOps. Bring the
-review agent your team already trusts: Codex, Copilot, OpenCode, Gemini, Claude
-Code, a hosted provider, or any ACP-compatible CLI.
+DiffPal is an open-source PR review system that turns changed code into
+structured findings, clear summaries, inline feedback, artifacts, and merge
+gates. Teams bring their own AI provider or ACP-compatible CLI, so there is no
+mandatory hosted DiffPal review service and no required per-seat review
+platform.
+
+DiffPal owns diff collection, finding schema validation, summary rendering,
+inline publishing, CI artifacts, and gate decisions. Your provider owns the
+model, tool loop, account, and credentials.
 
 | Works with | Publishes | Gates on |
 | --- | --- | --- |
@@ -28,16 +33,33 @@ pull request diff
   -> platform publisher and CI artifacts
 ```
 
-DiffPal owns the diff collection, finding schema, gating, and platform publish
-logic. Your provider owns the model, tool loop, account, and credentials. That
-split keeps CI setup predictable while still letting you choose the agent stack
-your team already trusts.
+DiffPal owns the PR review workflow around the model call. The selected
+provider supplies the review intelligence, while DiffPal keeps output shape,
+publishing, artifacts, and merge policy consistent across hosts.
+
+Review instructions are produced by DiffPal's versioned Prompt Pack. Findings
+artifacts include the prompt id, prompt version, purpose, and findings schema
+version, so a review can be traced back to the exact prompt contract that
+generated it. See the [config reference](docs/config-reference.md#prompt-pack)
+and [findings schema](docs/findings-schema.md) for the current metadata.
+
+## Bring Your Own Provider
+
+Provider choice is a config boundary: `diffpal.provider` selects an entry under
+`runtime.providers`. Use Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted
+API provider, an ordered provider pool, or any CLI that can start an ACP stdio
+server.
+
+That model keeps cost and account control in your provider account. DiffPal
+does not require a hosted review service or per-seat platform subscription to
+collect diffs, publish PR feedback, write artifacts, or enforce merge gates.
 
 ## Quick Start: GitHub Actions
 
-This is the fastest production-shaped setup: DiffPal installs itself through the
-GitHub Action, Codex is used as the review provider, and `OPENAI_API_KEY` stays
-in GitHub Secrets.
+This is the fastest production-shaped setup using the default Codex API-key
+recipe: DiffPal installs itself through the GitHub Action, Codex is selected as
+the review provider, and `OPENAI_API_KEY` stays in GitHub Secrets. You can swap
+the provider recipe while keeping the same DiffPal review workflow.
 
 1. Generate the config:
 
@@ -78,9 +100,10 @@ you need fully reproducible credentialed CI.
 
 ## Supported CI Systems
 
-Use the same `.config/diffpal/config.yaml` shape in every CI system. The host
-workflow only changes how it checks out code, installs the provider, passes the
-platform token, and runs DiffPal.
+Use the same `.config/diffpal/config.yaml` shape in every CI system. GitHub,
+GitLab, and Azure are publishing targets; the core workflow only changes how CI
+checks out code, installs the provider, passes the platform token, and runs
+DiffPal.
 
 | CI system | Examples | Output surfaces |
 | --- | --- | --- |
@@ -93,7 +116,9 @@ platform token, and runs DiffPal.
 Azure Pipelines users can install the public
 [DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
 from the Azure DevOps Marketplace and add the `DiffPalReview@1` task to PR
-validation pipelines.
+validation pipelines. Extension source and release automation live in the
+separate [diffpal-azure-devops](https://github.com/diffpal/azure-devops)
+repository.
 
 The task installs `@diffpal/diffpal` by default, then runs `diffpal review ado`.
 You still need a committed DiffPal config, a provider credential such as
@@ -174,6 +199,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    prompt_profile: v2
+    strict_evidence: true
+    strict_injection: true
+    allow_nearby_context: true
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
     checks:
@@ -191,6 +220,11 @@ profiles:
     diffpal:
       gate:
         block_on: high
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true
 ```
 
 Review checks are intentionally simple. They ask the agent what to focus on;
@@ -203,13 +237,21 @@ DiffPal does not hardcode individual signal slugs:
 | `performance` | performance |
 | `best-practices` | maintainability, testing, style |
 
+Severity is impact-based across all categories. The full critical/high/medium/low
+matrix is in the [config reference](docs/config-reference.md#severity-matrix).
+
 Use `diffpal.review.instructions`, the `instructions` action input, or
 `--instructions-file` for repository-specific review guidance.
 
-## Bring Your Own Agent
+The review rollout fields are safe to canary per profile. Keep the repository
+default conservative if needed, then set `profiles.ci.diffpal.review` to
+`prompt_profile: v2`, `strict_evidence: true`, `strict_injection: true`, and
+`allow_nearby_context: true` before making the gate blocking.
 
-DiffPal is not a single-provider product. It delegates review to
-`diffpal.provider`, which points at a provider under `runtime.providers`.
+## Provider Recipes and Runtime Types
+
+DiffPal delegates review to `diffpal.provider`, which points at a provider
+under `runtime.providers`.
 
 Ready-made config recipes. These are the same names accepted by
 `diffpal init --wizard --setup ...`:
@@ -251,8 +293,14 @@ authenticated:
 | `pool` | Ordered provider failover |
 
 Hosted providers receive DiffPal's read-only review tools during each review:
-`list_files`, `read_file`, and `search_files`. These are request-level tools,
-not provider config. ACP providers keep their own tool surface.
+`git_changed_files`, `git_diff`, `list_files`, `read_file`, and
+`search_files`. These are request-level tools, not provider config. ACP
+providers keep their own tool surface.
+
+For hosted providers, DiffPal records review tool usage in the findings bundle
+and rejects a result when the provider did not inspect the diff with `git_diff`.
+ACP providers use their native Git and filesystem tools, so DiffPal records that
+runtime inspection proof is not available for that provider class.
 
 ## MCP Servers
 
@@ -323,6 +371,16 @@ printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 diffpal doctor --mode github
 diffpal review local --base origin/main --head HEAD --profile ci
 ```
+
+To inspect the prompt contract without calling any provider:
+
+```bash
+diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
+```
+
+The debug command renders the system prompt, the review task snapshot, and a
+schema-valid mock findings bundle through the normal review validation path.
+It does not require API keys.
 
 ## Documentation
 

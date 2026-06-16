@@ -1,0 +1,170 @@
+[
+  {
+    "name": "no finding",
+    "review_checks": ["security"],
+    "findings": [],
+    "want": []
+  },
+  {
+    "name": "critical security",
+    "review_checks": ["security"],
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "confidence": 0.98,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "request-controlled command execution",
+        "message": "the changed handler executes a request parameter as a shell command",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed line passes request-controlled data to command execution",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "remote callers can execute arbitrary commands",
+          "scope": "server runtime"
+        }
+      }
+    ],
+    "want": [{"category": "security", "severity": "critical"}]
+  },
+  {
+    "name": "high security",
+    "review_checks": ["security"],
+    "findings": [
+      {
+        "category": "security",
+        "severity": "high",
+        "confidence": 0.93,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "user input reaches SQL text",
+        "message": "the changed query concatenates a request value into SQL",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed line builds SQL from untrusted input",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "attackers can alter the query",
+          "scope": "database records"
+        }
+      }
+    ],
+    "want": [{"category": "security", "severity": "high"}]
+  },
+  {
+    "name": "medium correctness",
+    "review_checks": ["bugs"],
+    "findings": [
+      {
+        "category": "correctness",
+        "severity": "medium",
+        "confidence": 0.84,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "empty input is accepted",
+        "message": "the changed branch treats an empty identifier as valid",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed condition returns success before validating the identifier",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "edge-case inputs can produce incorrect results",
+          "scope": "request validation"
+        }
+      }
+    ],
+    "want": [{"category": "correctness", "severity": "medium"}]
+  },
+  {
+    "name": "medium reliability",
+    "review_checks": ["bugs"],
+    "findings": [
+      {
+        "category": "reliability",
+        "severity": "medium",
+        "confidence": 0.82,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "retry loop ignores cancellation",
+        "message": "the changed retry loop continues after context cancellation",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed loop retries without checking context state",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "cancelled work can continue and consume resources",
+          "scope": "background jobs"
+        }
+      }
+    ],
+    "want": [{"category": "reliability", "severity": "medium"}]
+  },
+  {
+    "name": "low maintainability",
+    "review_checks": ["best-practices"],
+    "findings": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "confidence": 0.72,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "duplicated branch condition",
+        "message": "the changed condition duplicates the previous branch",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed line repeats the same predicate as nearby code",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "future changes are easier to make incorrectly",
+          "scope": "local control flow"
+        }
+      }
+    ],
+    "want": [{"category": "maintainability", "severity": "low"}]
+  },
+  {
+    "name": "low testing",
+    "review_checks": ["best-practices"],
+    "findings": [
+      {
+        "category": "testing",
+        "severity": "low",
+        "confidence": 0.7,
+        "path": "src/app.go",
+        "start_line": 10,
+        "end_line": 10,
+        "changed_span": {"path": "src/app.go", "start_line": 10, "end_line": 10},
+        "title": "new branch lacks edge-case coverage",
+        "message": "the changed validation branch has no matching test fixture",
+        "evidence": {
+          "anchor": "L10",
+          "reasoning_basis": "the changed branch introduces behavior not covered by nearby tests",
+          "source": "changed_line"
+        },
+        "impact": {
+          "summary": "small regressions may go unnoticed",
+          "scope": "validation tests"
+        }
+      }
+    ],
+    "want": [{"category": "testing", "severity": "low"}]
+  }
+]

@@ -10,6 +10,19 @@
 - Secondary targets in v1: GitLab and Azure DevOps
 - Hosted profile: local/CI-first
 
+## Product Positioning
+
+- Public promise: open-source, provider-agnostic AI review for pull requests.
+- Product category: PR review, with GitHub, GitLab, and Azure DevOps as
+  supported publishing targets.
+- Provider model: users bring their own AI provider account or ACP-compatible
+  CLI through `runtime.providers`; DiffPal does not require a hosted DiffPal
+  review service.
+- Affordability story: teams keep provider costs and credentials in accounts
+  they own instead of adopting a required per-seat review platform.
+- DiffPal-owned surface: diff collection, structured findings, summaries,
+  inline feedback, artifacts, and merge gates.
+
 ## Host support matrix
 
 | Host | Phase | Primary surfaces |

@@ -70,7 +70,8 @@ Platform auth can be supplied either by config fields or standard CI
 environment variables: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `CI_JOB_TOKEN`,
 `SYSTEM_ACCESSTOKEN`, and `AZURE_DEVOPS_EXT_PAT`.
 
-DiffPal can use any ACP-compatible CLI through `generic_acp`:
+`runtime.providers` is the provider-choice boundary. DiffPal can use any
+ACP-compatible CLI through `generic_acp`:
 
 ```yaml
 runtime:
@@ -89,7 +90,7 @@ Alias provider types are available for common ACP CLIs:
 `opencode_acp`. Hosted provider types include `openai`, `aistudio`, and
 `pool`.
 
-The default public onboarding provider is `codex-acp`. Install it with
+The default public onboarding recipe selects `codex-acp`. Install it with
 `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`
 and authenticate Codex with `OPENAI_API_KEY` in CI.
 
@@ -98,10 +99,17 @@ and authenticate Codex with `OPENAI_API_KEY` in CI.
 comment even if there are no findings.
 
 Validation requires `version: v1`, a `diffpal.provider` key present in
-`runtime.providers`, and a valid `diffpal.gate.block_on` severity.
+`runtime.providers`, and a valid `diffpal.gate.block_on` severity. Changing
+providers means changing the selected `runtime.providers` entry plus the
+matching CI install/auth steps.
 
 `diffpal.review.language` defaults to `en`. `diffpal.review.checks` defaults to
 `security`, `bugs`, `performance`, and `best-practices`; those values can be
 overridden by the `--language` and `--review-checks` review flags. Use
 `diffpal.review.instructions`, `--instructions`, or `--instructions-file` for
 repository-local prompt tuning.
+
+Prompt rollout fields live under `diffpal.review`: `prompt_profile`,
+`strict_evidence`, `strict_injection`, and `allow_nearby_context`. New configs
+should use `prompt_profile: v2` with the strict flags enabled in the CI profile
+first, then make the gate blocking after the review output is stable.

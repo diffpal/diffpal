@@ -10,12 +10,68 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
+
+type inspectionTracker struct {
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func newInspectionTracker() *inspectionTracker {
+	return &inspectionTracker{calls: map[string]int{}}
+}
+
+func (t *inspectionTracker) record(name string) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.calls[name]++
+}
+
+func (t *inspectionTracker) callsList() []string {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]string, 0, len(t.calls))
+	for name := range t.calls {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (t *inspectionTracker) called(name string) bool {
+	if t == nil {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.calls[name] > 0
+}
+
+func (t *reviewToolset) recordToolCall(name string) {
+	if t == nil {
+		return
+	}
+	t.inspection.record(name)
+}
+
+func (t *fileToolset) recordToolCall(name string) {
+	if t == nil {
+		return
+	}
+	t.inspection.record(name)
+}
 
 const (
 	reviewToolMaxEntries       = 200
@@ -30,6 +86,7 @@ type reviewToolOptions struct {
 	BaseSHA      string
 	HeadSHA      string
 	ChangedFiles []ChunkFile
+	Inspection   *inspectionTracker
 }
 
 type reviewToolset struct {
@@ -38,10 +95,12 @@ type reviewToolset struct {
 	headSHA      string
 	changedFiles []ChunkFile
 	changedPaths map[string]struct{}
+	inspection   *inspectionTracker
 }
 
 type fileToolset struct {
-	root string
+	root       string
+	inspection *inspectionTracker
 }
 
 type listFilesArgs struct {
@@ -165,6 +224,7 @@ func newReviewToolset(opts reviewToolOptions) (*reviewToolset, error) {
 	if err != nil {
 		return nil, err
 	}
+	files.inspection = opts.Inspection
 	changed := append([]ChunkFile(nil), opts.ChangedFiles...)
 	sort.Slice(changed, func(i, j int) bool {
 		return changed[i].Path < changed[j].Path
@@ -183,6 +243,7 @@ func newReviewToolset(opts reviewToolOptions) (*reviewToolset, error) {
 		headSHA:      strings.TrimSpace(opts.HeadSHA),
 		changedFiles: changed,
 		changedPaths: paths,
+		inspection:   opts.Inspection,
 	}, nil
 }
 
@@ -202,6 +263,7 @@ func newFileToolset(root string) (*fileToolset, error) {
 }
 
 func (t *reviewToolset) gitChangedFiles(_ tool.Context, _ gitChangedFilesArgs) (gitChangedFilesResult, error) {
+	t.recordToolCall("git_changed_files")
 	return gitChangedFilesResult{
 		BaseSHA:   t.baseSHA,
 		HeadSHA:   t.headSHA,
@@ -212,6 +274,7 @@ func (t *reviewToolset) gitChangedFiles(_ tool.Context, _ gitChangedFilesArgs) (
 }
 
 func (t *reviewToolset) gitDiff(_ tool.Context, args gitDiffArgs) (gitDiffResult, error) {
+	t.recordToolCall("git_diff")
 	path := strings.TrimSpace(args.Path)
 	if path != "" {
 		cleaned, err := cleanReviewPath(path)
@@ -267,6 +330,7 @@ func (t *reviewToolset) gitDiff(_ tool.Context, args gitDiffArgs) (gitDiffResult
 }
 
 func (t *fileToolset) listFiles(_ tool.Context, args listFilesArgs) (listFilesResult, error) {
+	t.recordToolCall("list_files")
 	dir, rel, err := t.resolvePath(args.Path)
 	if err != nil {
 		return listFilesResult{}, err
@@ -307,6 +371,7 @@ func (t *fileToolset) listFiles(_ tool.Context, args listFilesArgs) (listFilesRe
 }
 
 func (t *fileToolset) readFile(_ tool.Context, args readFileArgs) (readFileResult, error) {
+	t.recordToolCall("read_file")
 	path, rel, err := t.resolvePath(args.Path)
 	if err != nil {
 		return readFileResult{}, err
@@ -361,6 +426,7 @@ func (t *fileToolset) readFile(_ tool.Context, args readFileArgs) (readFileResul
 }
 
 func (t *fileToolset) searchFiles(_ tool.Context, args searchFilesArgs) (searchFilesResult, error) {
+	t.recordToolCall("search_files")
 	query := strings.TrimSpace(args.Query)
 	if query == "" {
 		return searchFilesResult{}, fmt.Errorf("query is required")

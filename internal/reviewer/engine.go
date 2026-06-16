@@ -77,17 +77,19 @@ type ChunkInput struct {
 }
 
 type ChunkFinding struct {
-	Category   string  `json:"category"`
-	Severity   string  `json:"severity"`
-	Confidence float64 `json:"confidence"`
-	Path       string  `json:"path"`
-	StartLine  int     `json:"start_line"`
-	EndLine    int     `json:"end_line"`
-	Title      string  `json:"title"`
-	Message    string  `json:"message"`
-	Evidence   string  `json:"evidence"`
-	Impact     string  `json:"impact"`
-	Suggestion string  `json:"suggestion,omitempty"`
+	Category       string                   `json:"category"`
+	Severity       string                   `json:"severity"`
+	Confidence     float64                  `json:"confidence"`
+	Path           string                   `json:"path"`
+	StartLine      int                      `json:"start_line"`
+	EndLine        int                      `json:"end_line"`
+	ChangedSpan    findings.LineSpan        `json:"changed_span"`
+	SupportingSpan *findings.LineSpan       `json:"supporting_span,omitempty"`
+	Title          string                   `json:"title"`
+	Message        string                   `json:"message"`
+	Evidence       findings.FindingEvidence `json:"evidence"`
+	Impact         findings.FindingImpact   `json:"impact"`
+	Suggestion     string                   `json:"suggestion,omitempty"`
 }
 
 type ChunkOutput struct {
@@ -97,6 +99,7 @@ type ChunkOutput struct {
 
 type RuntimeUsage struct {
 	TokenUsage int64
+	Inspection *findings.Inspection
 }
 
 type RuntimeConfig struct {
@@ -186,14 +189,15 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 	chunks := chunkFileChanges(filtered, opts.MaxFilesPerChunk)
 	reviewed := reviewedFiles(filtered)
+	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:       findings.VersionV1,
+		Version:       findings.VersionV2,
 		ReviewID:      reviewID,
 		BaseSHA:       result.BaseSHA,
 		HeadSHA:       result.HeadSHA,
 		Language:      language,
 		ReviewChecks:  append([]string(nil), reviewChecks...),
-		Prompt:        promptpack.ReviewMetadata(),
+		Prompt:        prompt.ReviewMetadata(),
 		ChangeSummary: findings.SemanticChangeSummary(reviewed),
 		Files:         reviewed,
 		Findings:      []findings.Finding{},
@@ -223,9 +227,11 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0, len(chunks))
+	inspection := mergeInspection(nil, inspectionForProvider(runtimeCfg.ProviderID, runtimeCfg.Providers))
 	for i, chunk := range chunks {
 		input := chunkInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, commitMessages, i, len(chunks), chunk)
 		var output ChunkOutput
+		var usage RuntimeUsage
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
 			BaseDelay: 750 * time.Millisecond,
@@ -238,11 +244,12 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 				return reliability.IsTransient(err)
 			},
 		}, func(runCtx context.Context) error {
-			chunkOutput, _, err := runtime.ReviewChunk(runCtx, runtimeCfg, input)
+			chunkOutput, chunkUsage, err := runtime.ReviewChunk(runCtx, runtimeCfg, input)
 			if err != nil {
 				return err
 			}
 			output = chunkOutput
+			usage = chunkUsage
 			return nil
 		})
 		if err != nil {
@@ -251,6 +258,11 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			}
 			return Result{}, err
 		}
+		chunkInspection := mergeInspection(inspectionForProvider(runtimeCfg.ProviderID, runtimeCfg.Providers), usage.Inspection)
+		if err := validateInspection(chunkInspection); err != nil {
+			return Result{}, wrapError(KindInternal, err)
+		}
+		inspection = mergeInspection(inspection, usage.Inspection)
 		summaries = append(summaries, output.ChangeSummary...)
 		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID(), allowedCategories)...)
 	}
@@ -260,6 +272,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
 	}
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
+	bundle.Inspection = inspection
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
 	}
@@ -273,6 +286,62 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		ContextChunks:   len(chunks),
 		TestSummary:     testSummary,
 	}, nil
+}
+
+func inspectionForProvider(providerID string, providers map[string]dpconfig.ProviderConfig) *findings.Inspection {
+	providerCfg, ok := providers[providerID]
+	if !ok {
+		return nil
+	}
+	providerType := strings.ToLower(strings.TrimSpace(providerCfg.Type))
+	required := providerType == "openai" || providerType == "aistudio"
+	return &findings.Inspection{
+		ProviderType: providerType,
+		Required:     required,
+	}
+}
+
+func mergeInspection(base *findings.Inspection, next *findings.Inspection) *findings.Inspection {
+	if base == nil {
+		if next == nil {
+			return nil
+		}
+		copied := *next
+		copied.ToolCalls = append([]string(nil), next.ToolCalls...)
+		return &copied
+	}
+	if next == nil {
+		return base
+	}
+	if base.ProviderType == "" {
+		base.ProviderType = next.ProviderType
+	}
+	base.Required = base.Required || next.Required
+	base.DiffInspected = base.DiffInspected || next.DiffInspected
+	base.ContextInspected = base.ContextInspected || next.ContextInspected
+	seen := make(map[string]struct{}, len(base.ToolCalls)+len(next.ToolCalls))
+	for _, call := range base.ToolCalls {
+		seen[call] = struct{}{}
+	}
+	for _, call := range next.ToolCalls {
+		if _, ok := seen[call]; ok {
+			continue
+		}
+		seen[call] = struct{}{}
+		base.ToolCalls = append(base.ToolCalls, call)
+	}
+	sort.Strings(base.ToolCalls)
+	return base
+}
+
+func validateInspection(inspection *findings.Inspection) error {
+	if inspection == nil || !inspection.Required {
+		return nil
+	}
+	if !inspection.DiffInspected {
+		return fmt.Errorf("hosted provider did not inspect the diff with git_diff")
+	}
+	return nil
 }
 
 func filterReviewableFiles(files []diff.FileChange) []diff.FileChange {
@@ -340,7 +409,7 @@ func chunkInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, re
 		HeadSHA:               headSHA,
 		ChunkIndex:            chunkIndex,
 		ChunkCount:            chunkCount,
-		ReviewTask:            promptpack.ReviewTask(reviewChecks),
+		ReviewTask:            promptpack.DefaultReviewPrompt().ReviewTask(reviewChecks),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
@@ -494,40 +563,54 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	path := strings.TrimSpace(item.Path)
 	title := strings.TrimSpace(item.Title)
 	message := strings.TrimSpace(item.Message)
-	evidence := strings.TrimSpace(item.Evidence)
-	impact := strings.TrimSpace(item.Impact)
 	suggestion := strings.TrimSpace(item.Suggestion)
+	path, startLine, endLine := normalizeFindingLocation(path, item.StartLine, item.EndLine, item.ChangedSpan)
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
 		return findings.Finding{}, false
 	}
-	if path == "" || title == "" || message == "" || evidence == "" || impact == "" {
+	if path == "" || title == "" || message == "" || strings.TrimSpace(item.Evidence.Anchor) == "" || strings.TrimSpace(item.Evidence.ReasoningBasis) == "" || strings.TrimSpace(item.Evidence.Source) == "" || strings.TrimSpace(item.Impact.Summary) == "" || strings.TrimSpace(item.Impact.Scope) == "" {
 		return findings.Finding{}, false
 	}
 	if item.Confidence < 0 || item.Confidence > 1 {
 		return findings.Finding{}, false
 	}
-	if item.StartLine <= 0 || item.EndLine <= 0 || item.StartLine > item.EndLine {
+	if startLine <= 0 || endLine <= 0 || startLine > endLine {
 		return findings.Finding{}, false
 	}
-	if !allowedRange(path, item.StartLine, item.EndLine, allowed) {
+	if !allowedRange(path, startLine, endLine, allowed) {
 		return findings.Finding{}, false
 	}
 
 	return findings.Finding{
-		Category:   category,
-		Severity:   severity,
-		Confidence: item.Confidence,
-		Path:       path,
-		StartLine:  item.StartLine,
-		EndLine:    item.EndLine,
-		Title:      title,
-		Message:    message,
-		Evidence:   evidence,
-		Impact:     impact,
-		Suggestion: suggestion,
-		Provider:   providerID,
+		Category:       category,
+		Severity:       severity,
+		Confidence:     item.Confidence,
+		Path:           path,
+		StartLine:      startLine,
+		EndLine:        endLine,
+		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine},
+		SupportingSpan: item.SupportingSpan,
+		Title:          title,
+		Message:        message,
+		Evidence:       item.Evidence,
+		Impact:         item.Impact,
+		Suggestion:     suggestion,
+		Provider:       providerID,
 	}, true
+}
+
+func normalizeFindingLocation(path string, startLine, endLine int, span findings.LineSpan) (string, int, int) {
+	if strings.TrimSpace(span.Path) != "" {
+		path = strings.TrimSpace(span.Path)
+	}
+	if span.StartLine > 0 {
+		startLine = span.StartLine
+	}
+	if span.EndLine > 0 {
+		endLine = span.EndLine
+	}
+	return path, startLine, endLine
 }
 
 func allowedCategory(category string) bool {
@@ -590,7 +673,7 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 		if left.Message != right.Message {
 			return left.Message < right.Message
 		}
-		return left.Evidence < right.Evidence
+		return left.EvidenceText() < right.EvidenceText()
 	})
 	return out
 }

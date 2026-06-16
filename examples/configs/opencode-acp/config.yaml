@@ -13,6 +13,10 @@ diffpal:
     block_on: high
   review:
     language: en
+    prompt_profile: v2
+    strict_evidence: true
+    strict_injection: true
+    allow_nearby_context: true
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
     checks:
@@ -30,3 +34,8 @@ profiles:
     diffpal:
       gate:
         block_on: high
+      review:
+        prompt_profile: v2
+        strict_evidence: true
+        strict_injection: true
+        allow_nearby_context: true

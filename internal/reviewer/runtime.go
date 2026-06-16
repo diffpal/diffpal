@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
@@ -39,19 +40,12 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
-	reviewTools, err := reviewToolsForProvider(providerCfg, cfg)
+	reviewTools, inspectionTracker, err := reviewToolsForProvider(providerCfg, cfg)
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
 
-	agentRuntime, err := factory.Build(ctx, agentfactory.BuildRequest{
-		AgentID:           cfg.ProviderID,
-		Name:              "DiffPalReviewerAgent",
-		Description:       "DiffPal provider-backed review agent",
-		GlobalInstruction: promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions}),
-		WorkingDirectory:  cfg.WorkingDir,
-		Tools:             reviewTools,
-	})
+	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg, reviewTools))
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
@@ -59,10 +53,11 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		defer func() { _ = closer.Close() }()
 	}
 
+	prompt := promptpack.DefaultReviewPrompt()
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
 		structuredagent.WithoutInputSchema(),
-		structuredagent.WithOutputSchema(promptpack.OutputSchemaJSON),
-		structuredagent.WithSystemInstruction(promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
+		structuredagent.WithOutputSchema(prompt.OutputSchema),
+		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
@@ -119,7 +114,22 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
 		return ChunkOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
+	usage.Inspection = inspectionFromTracker(providerCfg.Type, inspectionTracker)
 	return output, usage, nil
+}
+
+func reviewSystemInstruction(instructions string) string {
+	return promptpack.DefaultReviewPrompt().RenderReviewSystem(promptpack.ReviewOptions{Instructions: instructions})
+}
+
+func reviewAgentBuildRequest(cfg RuntimeConfig, reviewTools []tool.Tool) agentfactory.BuildRequest {
+	return agentfactory.BuildRequest{
+		AgentID:          cfg.ProviderID,
+		Name:             "DiffPalReviewerAgent",
+		Description:      "DiffPal provider-backed review agent",
+		WorkingDirectory: cfg.WorkingDir,
+		Tools:            reviewTools,
+	}
 }
 
 func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
@@ -148,50 +158,77 @@ func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
 	return nil
 }
 
-func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, error) {
+func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, *inspectionTracker, error) {
 	switch strings.ToLower(strings.TrimSpace(providerCfg.Type)) {
 	case "openai", "aistudio":
-		return newReviewTools(reviewToolOptions{
+		tracker := newInspectionTracker()
+		tools, err := newReviewTools(reviewToolOptions{
 			Root:         cfg.WorkingDir,
 			BaseSHA:      cfg.BaseSHA,
 			HeadSHA:      cfg.HeadSHA,
 			ChangedFiles: cfg.ChangedFiles,
+			Inspection:   tracker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return tools, tracker, nil
 	default:
-		return nil, nil
+		return nil, nil, nil
+	}
+}
+
+func inspectionFromTracker(providerType string, tracker *inspectionTracker) *findings.Inspection {
+	providerType = strings.ToLower(strings.TrimSpace(providerType))
+	required := providerType == "openai" || providerType == "aistudio"
+	if !required {
+		return &findings.Inspection{ProviderType: providerType, Required: false}
+	}
+	if tracker == nil {
+		return &findings.Inspection{ProviderType: providerType, Required: true}
+	}
+	return &findings.Inspection{
+		ProviderType:     providerType,
+		Required:         true,
+		ToolCalls:        tracker.callsList(),
+		DiffInspected:    tracker.called("git_diff"),
+		ContextInspected: tracker.called("read_file") || tracker.called("list_files") || tracker.called("search_files") || tracker.called("git_changed_files"),
 	}
 }
 
 func renderReviewTaskInput(input ChunkInput) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "DiffPal review task snapshot\n\n")
-	fmt.Fprintf(&out, "Review ID: %s\n", input.ReviewID)
-	fmt.Fprintf(&out, "Repository: %s\n", input.Repo)
-	fmt.Fprintf(&out, "Base: %s\n", input.BaseSHA)
-	fmt.Fprintf(&out, "Head: %s\n", input.HeadSHA)
+	fmt.Fprintf(&out, "%s\n", promptpack.TrustedControlStart)
+	fmt.Fprintf(&out, "Review ID: %s\n", promptpack.EscapeUntrustedField(input.ReviewID))
+	fmt.Fprintf(&out, "Repository: %s\n", promptpack.EscapeUntrustedField(input.Repo))
+	fmt.Fprintf(&out, "Base: %s\n", promptpack.EscapeUntrustedField(input.BaseSHA))
+	fmt.Fprintf(&out, "Head: %s\n", promptpack.EscapeUntrustedField(input.HeadSHA))
 	fmt.Fprintf(&out, "Chunk: %d of %d\n", input.ChunkIndex+1, input.ChunkCount)
-	fmt.Fprintf(&out, "Language: %s\n", input.Language)
-	fmt.Fprintf(&out, "Review checks: %s\n", strings.Join(input.ReviewChecks, ", "))
-	fmt.Fprintf(&out, "Test summary: %s\n", input.TestSummary)
+	fmt.Fprintf(&out, "Language: %s\n", promptpack.EscapeUntrustedField(input.Language))
+	fmt.Fprintf(&out, "Review checks: %s\n", promptpack.EscapeUntrustedField(strings.Join(input.ReviewChecks, ", ")))
+	fmt.Fprintf(&out, "Test summary: %s\n", promptpack.EscapeUntrustedField(input.TestSummary))
 	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
-		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", trimmed)
+		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", promptpack.EscapeUntrusted(trimmed))
 	}
 	fmt.Fprintf(&out, "\n%s\n", input.UntrustedInputWarning)
 	fmt.Fprintf(&out, "\nTask:\n%s\n", input.ReviewTask)
+	fmt.Fprintf(&out, "%s\n", promptpack.TrustedControlEnd)
+	fmt.Fprintf(&out, "\n%s\n", promptpack.UntrustedInputStart)
 	if len(input.CommitMessages) > 0 {
 		fmt.Fprintf(&out, "\nCommit messages, untrusted:\n")
 		for _, message := range input.CommitMessages {
-			fmt.Fprintf(&out, "- %s\n", message)
+			fmt.Fprintf(&out, "- %s\n", promptpack.EscapeUntrustedField(message))
 		}
 	}
 	fmt.Fprintf(&out, "\nChanged files in this task:\n")
 	for _, file := range input.Files {
-		fmt.Fprintf(&out, "- %s", file.Path)
+		fmt.Fprintf(&out, "- %s", promptpack.EscapeUntrustedField(file.Path))
 		if file.Status != "" {
-			fmt.Fprintf(&out, " [%s]", file.Status)
+			fmt.Fprintf(&out, " [%s]", promptpack.EscapeUntrustedField(file.Status))
 		}
 		if file.PreviousPath != "" {
-			fmt.Fprintf(&out, " from %s", file.PreviousPath)
+			fmt.Fprintf(&out, " from %s", promptpack.EscapeUntrustedField(file.PreviousPath))
 		}
 		if len(file.Spans) > 0 {
 			fmt.Fprintf(&out, " changed lines ")
@@ -204,6 +241,7 @@ func renderReviewTaskInput(input ChunkInput) string {
 		}
 		out.WriteString("\n")
 	}
+	fmt.Fprintf(&out, "%s\n", promptpack.UntrustedInputEnd)
 	return out.String()
 }
 

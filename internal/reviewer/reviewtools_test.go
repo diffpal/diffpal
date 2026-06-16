@@ -141,18 +141,24 @@ func TestReviewToolsetGitDiffIsScopedToChangedFiles(t *testing.T) {
 }
 
 func TestReviewToolsForProviderOnlyInjectsHostedTools(t *testing.T) {
-	hosted, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "openai"}, RuntimeConfig{WorkingDir: t.TempDir()})
+	hosted, tracker, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "openai"}, RuntimeConfig{WorkingDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("reviewToolsForProvider(openai) error = %v", err)
 	}
 	if len(hosted) == 0 {
 		t.Fatal("reviewToolsForProvider(openai) returned no tools")
 	}
-	acp, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "codex_acp"}, RuntimeConfig{WorkingDir: t.TempDir()})
+	if tracker == nil {
+		t.Fatal("reviewToolsForProvider(openai) tracker = nil, want hosted inspection tracker")
+	}
+	acp, tracker, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "codex_acp"}, RuntimeConfig{WorkingDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("reviewToolsForProvider(codex_acp) error = %v", err)
 	}
 	if len(acp) != 0 {
 		t.Fatalf("reviewToolsForProvider(codex_acp) returned %d tools, want none", len(acp))
+	}
+	if tracker != nil {
+		t.Fatal("reviewToolsForProvider(codex_acp) tracker != nil, want no runtime inspection tracker")
 	}
 }
