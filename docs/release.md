@@ -81,7 +81,9 @@ Inject `OPENAI_API_KEY` only inside a job with that guard.
 
 Azure DevOps extension releases are intentionally separate from
 `omnidist-release`. The `azure-devops-release` workflow is triggered by the same
-SemVer tags and owns VSIX packaging plus Marketplace publishing.
+SemVer tags and owns VSIX packaging plus Marketplace publishing. It can also be
+run manually from GitHub Actions when an already-versioned VSIX needs to be
+published or republished.
 
 Before tagging a release that should publish Azure DevOps extensions, update the
 checked-in Azure package and manifest versions:
@@ -107,7 +109,28 @@ npm --prefix tasks/azure-devops run package:dev
 ```
 
 Azure publish job downloads the VSIX artifacts and publishes them only when
-`AZURE_DEVOPS_EXT_PAT` is configured.
+`AZURE_DEVOPS_EXT_PAT` is configured in the protected
+`azure-devops-marketplace` GitHub Environment. Missing credentials fail the
+publish job so a Marketplace release cannot be mistaken for a package-only run.
+
+Manual publish:
+
+1. Open GitHub Actions.
+2. Select `azure-devops-release`.
+3. Run workflow.
+4. Optionally set `version` to the SemVer manifest version to verify.
+5. Choose `channel`: `prod`, `dev`, or `both`.
+
+Tag publish:
+
+```bash
+task release:set-version VERSION=0.1.19
+git add tasks/azure-devops/package.json tasks/azure-devops/package-lock.json \
+  tasks/azure-devops/vss-extension.json tasks/azure-devops/vss-extension.dev.json
+git commit -m "chore: prepare azure devops extension release"
+git tag v0.1.19
+git push origin main v0.1.19
+```
 
 ## Required GitHub setup
 
@@ -116,7 +139,9 @@ Before the first public release:
 - Configure this repository on GitHub and set `origin` to that repository.
 - Add `NPM_PUBLISH_TOKEN` for `.github/workflows/omnidist-release.yml`.
 - Add `AZURE_DEVOPS_EXT_PAT` for `.github/workflows/azure-devops-release.yml`
-  when Azure Marketplace publishing should run.
+  in the `azure-devops-marketplace` Environment when Azure Marketplace
+  publishing should run. The token needs Marketplace extension publish access
+  for publisher `diffpal`.
 - Add `OPENAI_API_KEY` as a protected Environment secret for Codex CLI authentication.
 - Keep all release and review secrets scoped to the minimum permissions, rotate
   them after any suspected exposure, and never print them in workflow logs.
@@ -158,7 +183,8 @@ default `install: true`; provider setup such as `@openai/codex` and
 - `omnidist-release` runs only on SemVer tags and handles DiffPal CLI build,
   npm publish, and GitHub release assets.
 - `azure-devops-release` runs only on SemVer tags and handles Azure DevOps VSIX
-  packaging plus PAT-gated Marketplace publishing.
+  packaging plus PAT-gated Marketplace publishing. It also supports manual
+  dispatch for explicit prod/dev/both Marketplace publishes.
 
 ## Self-review gate
 

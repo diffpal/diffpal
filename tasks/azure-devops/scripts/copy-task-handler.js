@@ -45,6 +45,7 @@ function copyRuntimeDependencies(taskRoot, dependencies) {
     }
     const targetDir = path.join(targetNodeModules, ...dependency.split("/"));
     fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
     fs.cpSync(sourceDir, targetDir, { recursive: true });
   }
 }
