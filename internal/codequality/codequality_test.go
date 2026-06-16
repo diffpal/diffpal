@@ -123,7 +123,7 @@ func TestConvertFingerprintDoesNotDependOnHeadSHA(t *testing.T) {
 		EndLine:   16,
 		Title:     "Long helper",
 		Message:   "helper is difficult to follow",
-		Evidence:  "nested branches",
+		Evidence:  findings.NewEvidence("nested branches"),
 	}
 	first, err := Convert(findings.FindingsBundle{HeadSHA: "head-a", Findings: []findings.Finding{finding}}, "repo")
 	if err != nil {
@@ -150,12 +150,12 @@ func TestConvertFingerprintDoesNotDependOnFindingWording(t *testing.T) {
 		EndLine:   16,
 		Title:     "Long helper",
 		Message:   "helper is difficult to follow",
-		Evidence:  "nested branches",
+		Evidence:  findings.NewEvidence("nested branches"),
 	}
 	secondFinding := firstFinding
 	secondFinding.Title = "Complex helper"
 	secondFinding.Message = "helper has too much branching"
-	secondFinding.Evidence = "different wording"
+	secondFinding.Evidence = findings.NewEvidence("different wording")
 
 	first, err := Convert(findings.FindingsBundle{Findings: []findings.Finding{firstFinding}}, "repo")
 	if err != nil {

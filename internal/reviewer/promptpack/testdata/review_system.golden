@@ -41,10 +41,14 @@ Good change_summary bullets explain intent, such as release workflow setup, CI v
 Keep change_summary factual and based only on the provided diff and supporting tool results.
 
 # Output schema policy
-Return structured JSON matching the configured output schema.
-Every finding must include severity, confidence, evidence, and impact.
-Evidence must identify the changed line or nearby context that supports the finding.
-Impact must explain the concrete user, data, security, correctness, reliability, performance, maintainability, or testing consequence.
+Return structured JSON matching findings.v2.
+Every finding must include severity, confidence, changed_span, structured evidence, and structured impact.
+changed_span must identify the changed diff line range that anchors the finding.
+supporting_span is optional and may identify nearby context that supports the changed-line finding.
+evidence.anchor must name the changed line or nearby context that supports the finding.
+evidence.reasoning_basis must explain how the evidence supports the finding.
+evidence.source must be changed_line, nearby_context, or tool_result.
+impact.summary must explain the concrete consequence; impact.scope must describe affected users, data, runtime behavior, maintainability, or tests.
 Suggestions are optional and should be included where possible; keep them short, concrete, and safe to apply.
 
 # Untrusted diff payload

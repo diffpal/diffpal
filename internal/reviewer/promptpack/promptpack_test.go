@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 func TestRenderReviewSystemMatchesGolden(t *testing.T) {
@@ -31,6 +33,83 @@ func TestOutputSchemaIsValidJSON(t *testing.T) {
 	}
 }
 
+func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	schema := gojsonschema.NewStringLoader(OutputSchemaJSON)
+	valid := gojsonschema.NewGoLoader(map[string]any{
+		"change_summary": []any{"Added session deletion logic."},
+		"findings": []any{
+			map[string]any{
+				"category":   "security",
+				"severity":   "high",
+				"confidence": 0.91,
+				"path":       "app/session.go",
+				"start_line": 12,
+				"end_line":   13,
+				"changed_span": map[string]any{
+					"path":       "app/session.go",
+					"start_line": 12,
+					"end_line":   13,
+				},
+				"title":   "unsafe session deletion",
+				"message": "query input reaches a session deletion statement",
+				"evidence": map[string]any{
+					"anchor":          "L12-L13",
+					"reasoning_basis": "the changed lines concatenate request input into SQL",
+					"source":          "changed_line",
+				},
+				"impact": map[string]any{
+					"summary": "attackers can delete unrelated sessions",
+					"scope":   "authenticated sessions",
+				},
+			},
+		},
+	})
+	result, err := gojsonschema.Validate(schema, valid)
+	if err != nil {
+		t.Fatalf("Validate(valid schema payload) error = %v", err)
+	}
+	if !result.Valid() {
+		t.Fatalf("valid schema payload rejected: %v", result.Errors())
+	}
+
+	invalid := gojsonschema.NewGoLoader(map[string]any{
+		"change_summary": []any{"Added session deletion logic."},
+		"findings": []any{
+			map[string]any{
+				"category":   "security",
+				"severity":   "high",
+				"confidence": 0.91,
+				"path":       "app/session.go",
+				"start_line": 12,
+				"end_line":   13,
+				"changed_span": map[string]any{
+					"path":       "app/session.go",
+					"start_line": 12,
+					"end_line":   13,
+					"extra":      "reject me",
+				},
+				"title":    "unsafe session deletion",
+				"message":  "query input reaches a session deletion statement",
+				"evidence": "legacy string evidence",
+				"impact": map[string]any{
+					"summary": "attackers can delete unrelated sessions",
+					"scope":   "authenticated sessions",
+				},
+				"extra": "reject me",
+			},
+		},
+	})
+	result, err = gojsonschema.Validate(schema, invalid)
+	if err != nil {
+		t.Fatalf("Validate(invalid schema payload) error = %v", err)
+	}
+	if result.Valid() {
+		t.Fatal("invalid schema payload accepted, want rejection")
+	}
+}
+
 func TestReviewMetadataIsStable(t *testing.T) {
 	t.Parallel()
 
@@ -44,8 +123,8 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
 	}
-	if got.SchemaVersion != "findings.v1" {
-		t.Fatalf("SchemaVersion = %q, want findings.v1", got.SchemaVersion)
+	if got.SchemaVersion != "findings.v2" {
+		t.Fatalf("SchemaVersion = %q, want findings.v2", got.SchemaVersion)
 	}
 }
 

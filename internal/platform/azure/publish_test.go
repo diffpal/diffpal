@@ -21,7 +21,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 			Path:       "internal/app/service.go",
 			StartLine:  10,
 			Message:    "possible nil dereference",
-			Evidence:   "client may be nil",
+			Evidence:   findings.NewEvidence("client may be nil"),
 		},
 		{
 			ID:         "fp-update",
@@ -31,7 +31,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 			Path:       "internal/db/query.go",
 			StartLine:  20,
 			Message:    "unsafe SQL concatenation",
-			Evidence:   "query concatenates input",
+			Evidence:   findings.NewEvidence("query concatenates input"),
 		},
 		{
 			ID:         "fp-low",
@@ -78,8 +78,8 @@ func TestThreadBodyIncludesImpactWhenPresent(t *testing.T) {
 		Severity:   "high",
 		Confidence: 0.91,
 		Message:    "unsafe SQL concatenation",
-		Evidence:   "query concatenates input",
-		Impact:     "malicious users can delete unrelated sessions",
+		Evidence:   findings.NewEvidence("query concatenates input"),
+		Impact:     findings.NewImpact("malicious users can delete unrelated sessions"),
 	})
 	if !strings.Contains(body, "Impact: malicious users can delete unrelated sessions") {
 		t.Fatalf("thread body missing impact:\n%s", body)
@@ -130,7 +130,7 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 		Path:       "main.go",
 		StartLine:  12,
 		Message:    "updated issue",
-		Evidence:   "same location",
+		Evidence:   findings.NewEvidence("same location"),
 	}}
 	existing := map[string]string{
 		threadKey("main.go", 12, "security", "fp-old"): "fp-old",

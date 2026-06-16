@@ -77,17 +77,19 @@ type ChunkInput struct {
 }
 
 type ChunkFinding struct {
-	Category   string  `json:"category"`
-	Severity   string  `json:"severity"`
-	Confidence float64 `json:"confidence"`
-	Path       string  `json:"path"`
-	StartLine  int     `json:"start_line"`
-	EndLine    int     `json:"end_line"`
-	Title      string  `json:"title"`
-	Message    string  `json:"message"`
-	Evidence   string  `json:"evidence"`
-	Impact     string  `json:"impact"`
-	Suggestion string  `json:"suggestion,omitempty"`
+	Category       string                   `json:"category"`
+	Severity       string                   `json:"severity"`
+	Confidence     float64                  `json:"confidence"`
+	Path           string                   `json:"path"`
+	StartLine      int                      `json:"start_line"`
+	EndLine        int                      `json:"end_line"`
+	ChangedSpan    findings.LineSpan        `json:"changed_span"`
+	SupportingSpan *findings.LineSpan       `json:"supporting_span,omitempty"`
+	Title          string                   `json:"title"`
+	Message        string                   `json:"message"`
+	Evidence       findings.FindingEvidence `json:"evidence"`
+	Impact         findings.FindingImpact   `json:"impact"`
+	Suggestion     string                   `json:"suggestion,omitempty"`
 }
 
 type ChunkOutput struct {
@@ -187,7 +189,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	chunks := chunkFileChanges(filtered, opts.MaxFilesPerChunk)
 	reviewed := reviewedFiles(filtered)
 	bundle := findings.FindingsBundle{
-		Version:       findings.VersionV1,
+		Version:       findings.VersionV2,
 		ReviewID:      reviewID,
 		BaseSHA:       result.BaseSHA,
 		HeadSHA:       result.HeadSHA,
@@ -494,40 +496,54 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	path := strings.TrimSpace(item.Path)
 	title := strings.TrimSpace(item.Title)
 	message := strings.TrimSpace(item.Message)
-	evidence := strings.TrimSpace(item.Evidence)
-	impact := strings.TrimSpace(item.Impact)
 	suggestion := strings.TrimSpace(item.Suggestion)
+	path, startLine, endLine := normalizeFindingLocation(path, item.StartLine, item.EndLine, item.ChangedSpan)
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
 		return findings.Finding{}, false
 	}
-	if path == "" || title == "" || message == "" || evidence == "" || impact == "" {
+	if path == "" || title == "" || message == "" || strings.TrimSpace(item.Evidence.Anchor) == "" || strings.TrimSpace(item.Evidence.ReasoningBasis) == "" || strings.TrimSpace(item.Evidence.Source) == "" || strings.TrimSpace(item.Impact.Summary) == "" || strings.TrimSpace(item.Impact.Scope) == "" {
 		return findings.Finding{}, false
 	}
 	if item.Confidence < 0 || item.Confidence > 1 {
 		return findings.Finding{}, false
 	}
-	if item.StartLine <= 0 || item.EndLine <= 0 || item.StartLine > item.EndLine {
+	if startLine <= 0 || endLine <= 0 || startLine > endLine {
 		return findings.Finding{}, false
 	}
-	if !allowedRange(path, item.StartLine, item.EndLine, allowed) {
+	if !allowedRange(path, startLine, endLine, allowed) {
 		return findings.Finding{}, false
 	}
 
 	return findings.Finding{
-		Category:   category,
-		Severity:   severity,
-		Confidence: item.Confidence,
-		Path:       path,
-		StartLine:  item.StartLine,
-		EndLine:    item.EndLine,
-		Title:      title,
-		Message:    message,
-		Evidence:   evidence,
-		Impact:     impact,
-		Suggestion: suggestion,
-		Provider:   providerID,
+		Category:       category,
+		Severity:       severity,
+		Confidence:     item.Confidence,
+		Path:           path,
+		StartLine:      startLine,
+		EndLine:        endLine,
+		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine},
+		SupportingSpan: item.SupportingSpan,
+		Title:          title,
+		Message:        message,
+		Evidence:       item.Evidence,
+		Impact:         item.Impact,
+		Suggestion:     suggestion,
+		Provider:       providerID,
 	}, true
+}
+
+func normalizeFindingLocation(path string, startLine, endLine int, span findings.LineSpan) (string, int, int) {
+	if strings.TrimSpace(span.Path) != "" {
+		path = strings.TrimSpace(span.Path)
+	}
+	if span.StartLine > 0 {
+		startLine = span.StartLine
+	}
+	if span.EndLine > 0 {
+		endLine = span.EndLine
+	}
+	return path, startLine, endLine
 }
 
 func allowedCategory(category string) bool {
@@ -590,7 +606,7 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 		if left.Message != right.Message {
 			return left.Message < right.Message
 		}
-		return left.Evidence < right.Evidence
+		return left.EvidenceText() < right.EvidenceText()
 	})
 	return out
 }

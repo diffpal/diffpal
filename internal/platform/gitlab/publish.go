@@ -128,12 +128,12 @@ func discussionBody(f findings.Finding) string {
 		"**Confidence**: " + formatConfidence(f.Confidence),
 		"**Provider**: " + f.Provider,
 	}
-	if f.Evidence != "" {
-		fence := markdownFence(f.Evidence)
-		lines = append(lines, "", "**Evidence:**", fence, f.Evidence, fence)
+	if evidence := f.EvidenceText(); evidence != "" {
+		fence := markdownFence(evidence)
+		lines = append(lines, "", "**Evidence:**", fence, evidence, fence)
 	}
-	if f.Impact != "" {
-		lines = append(lines, "", "**Impact**: "+f.Impact)
+	if impact := f.ImpactText(); impact != "" {
+		lines = append(lines, "", "**Impact**: "+impact)
 	}
 	if f.Suggestion != "" {
 		fence := markdownFence(f.Suggestion)

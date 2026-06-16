@@ -278,11 +278,11 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
 	}
 	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
-	if finding.Evidence != "" {
-		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, finding.Evidence)
+	if evidence := finding.EvidenceText(); evidence != "" {
+		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, evidence)
 	}
-	if finding.Impact != "" {
-		fmt.Fprintf(&out, "%s**Impact**: %s\n", detailPrefix, finding.Impact)
+	if impact := finding.ImpactText(); impact != "" {
+		fmt.Fprintf(&out, "%s**Impact**: %s\n", detailPrefix, impact)
 	}
 	if hasLink {
 		fmt.Fprintf(&out, "%s**Source**:\n%s%s\n", detailPrefix, detailPrefix, link)

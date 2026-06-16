@@ -19,7 +19,7 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 				EndLine:    10,
 				Title:      "nil access",
 				Message:    "possible nil dereference",
-				Evidence:   "cfg.Client may be nil",
+				Evidence:   NewEvidence("cfg.Client may be nil"),
 			},
 		},
 	}
@@ -43,7 +43,7 @@ func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 		EndLine:    10,
 		Title:      "nil access",
 		Message:    "possible nil dereference",
-		Evidence:   "cfg.Client may be nil",
+		Evidence:   NewEvidence("cfg.Client may be nil"),
 	}}
 	Normalize(&secondBundle, "repo-a")
 	if first.ID != secondBundle.Findings[0].ID {
@@ -73,7 +73,7 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 				EndLine:   4,
 				Title:     "t",
 				Message:   "m",
-				Evidence:  "e",
+				Evidence:  NewEvidence("e"),
 			}},
 		},
 		{
@@ -87,7 +87,7 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 				EndLine:   4,
 				Title:     "t",
 				Message:   "m",
-				Evidence:  "e",
+				Evidence:  NewEvidence("e"),
 			}},
 		},
 		{
@@ -101,7 +101,7 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 				EndLine:   4,
 				Title:     "t",
 				Message:   "m",
-				Evidence:  "e",
+				Evidence:  NewEvidence("e"),
 			}},
 		},
 		{
@@ -116,7 +116,7 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 				EndLine:    4,
 				Title:      "t",
 				Message:    "m",
-				Evidence:   "e",
+				Evidence:   NewEvidence("e"),
 			}},
 		},
 		{
@@ -130,7 +130,7 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 				EndLine:   4,
 				Title:     "t",
 				Message:   "m",
-				Evidence:  "e",
+				Evidence:  NewEvidence("e"),
 			}},
 		},
 	}
@@ -139,6 +139,52 @@ func TestValidateRejectsInvalidFindingShapes(t *testing.T) {
 		if err := Validate(tc); err == nil {
 			t.Fatalf("Validate(%+v) error = nil, want validation error", tc)
 		}
+	}
+}
+
+func TestValidateV2RequiresStructuredEvidenceAndImpact(t *testing.T) {
+	t.Parallel()
+
+	valid := FindingsBundle{
+		Version:  VersionV2,
+		ReviewID: "review-v2",
+		Findings: []Finding{{
+			Category:    "security",
+			Severity:    "high",
+			Confidence:  0.9,
+			Path:        "app/session.go",
+			StartLine:   12,
+			EndLine:     13,
+			ChangedSpan: LineSpan{Path: "app/session.go", StartLine: 12, EndLine: 13},
+			Title:       "unsafe session deletion",
+			Message:     "query input reaches a session deletion statement",
+			Evidence: FindingEvidence{
+				Anchor:         "L12-L13",
+				ReasoningBasis: "the changed lines concatenate request input into SQL",
+				Source:         "changed_line",
+			},
+			Impact: FindingImpact{
+				Summary: "attackers can delete unrelated sessions",
+				Scope:   "authenticated sessions",
+			},
+		}},
+	}
+	if err := Validate(valid); err != nil {
+		t.Fatalf("Validate(v2) error = %v", err)
+	}
+
+	missingEvidence := valid
+	missingEvidence.Findings = append([]Finding(nil), valid.Findings...)
+	missingEvidence.Findings[0].Evidence = FindingEvidence{}
+	if err := Validate(missingEvidence); err == nil {
+		t.Fatal("Validate(v2 missing evidence) error = nil, want validation error")
+	}
+
+	missingImpact := valid
+	missingImpact.Findings = append([]Finding(nil), valid.Findings...)
+	missingImpact.Findings[0].Impact = FindingImpact{}
+	if err := Validate(missingImpact); err == nil {
+		t.Fatal("Validate(v2 missing impact) error = nil, want validation error")
 	}
 }
 
@@ -154,7 +200,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			PromptID:      "diffpal.review",
 			PromptVersion: "v1.2.0",
 			Purpose:       "review_changed_diff",
-			SchemaVersion: "findings.v1",
+			SchemaVersion: "findings.v2",
 		},
 		Findings: []Finding{{
 			Category:   "security",
@@ -165,8 +211,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			EndLine:    7,
 			Title:      "xss risk",
 			Message:    "unsafe HTML sink",
-			Evidence:   "innerHTML receives tainted input",
-			Impact:     "attackers can execute script in another user's browser",
+			Evidence:   NewEvidence("innerHTML receives tainted input"),
+			Impact:     NewImpact("attackers can execute script in another user's browser"),
 		}},
 	}
 	if err := WriteBundle(path, bundle, "repo-a"); err != nil {
@@ -176,8 +222,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle() error = %v", err)
 	}
-	if readBack.Version != VersionV1 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV1)
+	if readBack.Version != VersionV2 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV2)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")
@@ -188,8 +234,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if readBack.Prompt.PromptVersion != "v1.2.0" {
 		t.Fatalf("Prompt = %+v, want persisted prompt metadata", readBack.Prompt)
 	}
-	if readBack.Findings[0].Impact != "attackers can execute script in another user's browser" {
-		t.Fatalf("Impact = %q, want persisted impact", readBack.Findings[0].Impact)
+	if readBack.Findings[0].ImpactText() != "attackers can execute script in another user's browser" {
+		t.Fatalf("Impact = %q, want persisted impact", readBack.Findings[0].ImpactText())
 	}
 }
 
@@ -203,7 +249,7 @@ func TestFingerprintPreservesPathCase(t *testing.T) {
 		StartLine: 12,
 		EndLine:   12,
 		Message:   "same message",
-		Evidence:  "same evidence",
+		Evidence:  NewEvidence("same evidence"),
 	}
 	upper := base
 	upper.Path = "internal/app/Service.go"

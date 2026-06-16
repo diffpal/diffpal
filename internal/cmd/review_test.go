@@ -786,7 +786,7 @@ func testReviewResult(reviewID string) reviewer.Result {
 				EndLine:    4,
 				Title:      "example finding",
 				Message:    "example message",
-				Evidence:   "example evidence",
+				Evidence:   findings.NewEvidence("example evidence"),
 				Provider:   "openai-fast",
 				Blocking:   true,
 			}},

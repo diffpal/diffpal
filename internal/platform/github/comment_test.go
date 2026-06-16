@@ -219,7 +219,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 		StartLine:  12,
 		EndLine:    17,
 		Message:    "query concatenates untrusted input",
-		Evidence:   "Line 17 builds SQL by concatenating user input.",
+		Evidence:   findings.NewEvidence("Line 17 builds SQL by concatenating user input."),
 		Suggestion: "Use a parameterized statement.",
 	}}, CommentOptions{
 		Profile: "balanced",

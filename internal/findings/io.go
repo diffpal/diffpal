@@ -16,7 +16,7 @@ func WriteBundle(path string, bundle FindingsBundle, repo string) error {
 	if err := EnsurePath(path); err != nil {
 		return err
 	}
-	bundle.Version = ensureVersion(bundle.Version)
+	bundle.Version = ensureWriteVersion(bundle.Version)
 	Normalize(&bundle, repo)
 	if err := Validate(bundle); err != nil {
 		return err
@@ -73,10 +73,17 @@ func WriteStringBundle(path string, payload string) error {
 }
 
 func FormatBundle(bundle FindingsBundle, repo string) ([]byte, error) {
-	bundle.Version = ensureVersion(bundle.Version)
+	bundle.Version = ensureWriteVersion(bundle.Version)
 	Normalize(&bundle, repo)
 	if err := Validate(bundle); err != nil {
 		return nil, fmt.Errorf("invalid bundle: %w", err)
 	}
 	return json.MarshalIndent(bundle, "", "  ")
+}
+
+func ensureWriteVersion(v string) string {
+	if v == "" {
+		return VersionV2
+	}
+	return v
 }

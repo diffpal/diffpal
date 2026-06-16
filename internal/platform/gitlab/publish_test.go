@@ -74,8 +74,8 @@ func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
 		Severity:   "high",
 		Confidence: 0.9,
 		Message:    "unsafe markdown",
-		Evidence:   "```go\nfmt.Println(\"x\")\n```",
-		Impact:     "reviewers can see the concrete consequence",
+		Evidence:   findings.NewEvidence("```go\nfmt.Println(\"x\")\n```"),
+		Impact:     findings.NewImpact("reviewers can see the concrete consequence"),
 		Suggestion: "````suggestion\nx\n````",
 	})
 

@@ -37,8 +37,8 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 				EndLine:    4,
 				Title:      "behavior changed without guard",
 				Message:    "the modified print path is not guarded by a flag",
-				Evidence:   "line 4 now emits a different string",
-				Impact:     "callers can no longer rely on the previous command output",
+				Evidence:   findings.NewEvidence("line 4 now emits a different string"),
+				Impact:     findings.NewImpact("callers can no longer rely on the previous command output"),
 			}},
 		}},
 	}
@@ -102,8 +102,8 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
 	}
-	if got.Impact != "callers can no longer rely on the previous command output" {
-		t.Fatalf("Impact = %q, want copied provider impact", got.Impact)
+	if got.ImpactText() != "callers can no longer rely on the previous command output" {
+		t.Fatalf("Impact = %q, want copied provider impact", got.ImpactText())
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
 		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
@@ -163,8 +163,8 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					EndLine:    4,
 					Title:      "behavior changed",
 					Message:    "the output changed",
-					Evidence:   "line 4 changed",
-					Impact:     "callers see different behavior",
+					Evidence:   findings.NewEvidence("line 4 changed"),
+					Impact:     findings.NewImpact("callers see different behavior"),
 				},
 				{
 					Category:   "performance",
@@ -175,8 +175,8 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					EndLine:    4,
 					Title:      "performance finding",
 					Message:    "performance should be filtered",
-					Evidence:   "line 4 changed",
-					Impact:     "runtime cost would increase",
+					Evidence:   findings.NewEvidence("line 4 changed"),
+					Impact:     findings.NewImpact("runtime cost would increase"),
 				},
 			},
 		}},
@@ -336,8 +336,8 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 				EndLine:    11,
 				Title:      "Request-controlled shell command execution",
 				Message:    "The handler passes the command query parameter directly to sh -c.",
-				Evidence:   `exec.Command("sh", "-c", command)`,
-				Impact:     "remote callers can execute arbitrary shell commands",
+				Evidence:   findings.NewEvidence(`exec.Command("sh", "-c", command)`),
+				Impact:     findings.NewImpact("remote callers can execute arbitrary shell commands"),
 				Suggestion: "Remove shell execution or dispatch only fixed allowlisted operations.",
 			}},
 		}},
@@ -400,8 +400,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					EndLine:    4,
 					Title:      "output changed",
 					Message:    "the function output changed",
-					Evidence:   "line 4 was edited",
-					Impact:     "callers observe a changed output value",
+					Evidence:   findings.NewEvidence("line 4 was edited"),
+					Impact:     findings.NewImpact("callers observe a changed output value"),
 				},
 				{
 					Category:   "maintainability",
@@ -412,8 +412,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					EndLine:    4,
 					Title:      "output changed",
 					Message:    "the function output changed",
-					Evidence:   "line 4 was edited",
-					Impact:     "callers observe a changed output value",
+					Evidence:   findings.NewEvidence("line 4 was edited"),
+					Impact:     findings.NewImpact("callers observe a changed output value"),
 				},
 				{
 					Category:   "unknown",
@@ -424,8 +424,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					EndLine:    4,
 					Title:      "bad category",
 					Message:    "bad category",
-					Evidence:   "bad category",
-					Impact:     "bad category",
+					Evidence:   findings.NewEvidence("bad category"),
+					Impact:     findings.NewImpact("bad category"),
 				},
 				{
 					Category:   "security",
@@ -436,8 +436,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					EndLine:    1,
 					Title:      "deleted file finding",
 					Message:    "deleted file should be ignored",
-					Evidence:   "file is deleted",
-					Impact:     "deleted file finding should be ignored",
+					Evidence:   findings.NewEvidence("file is deleted"),
+					Impact:     findings.NewImpact("deleted file finding should be ignored"),
 				},
 				{
 					Category:   "maintainability",
@@ -448,7 +448,7 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 					EndLine:    4,
 					Title:      "missing impact",
 					Message:    "provider omitted impact",
-					Evidence:   "line 4 was edited",
+					Evidence:   findings.NewEvidence("line 4 was edited"),
 				},
 			},
 		}},
@@ -505,8 +505,8 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 					EndLine:    4,
 					Title:      "retry recovered",
 					Message:    "the second attempt succeeded",
-					Evidence:   "transient failure was retried",
-					Impact:     "review still completes after a transient provider error",
+					Evidence:   findings.NewEvidence("transient failure was retried"),
+					Impact:     findings.NewImpact("review still completes after a transient provider error"),
 				}},
 			},
 		},
@@ -661,9 +661,9 @@ func runGitCmd(t *testing.T, dir string, args ...string) string {
 
 func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	items := []findings.Finding{
-		{Category: "style", Message: "beta", Evidence: "e2", Path: "b.go", StartLine: 3, EndLine: 3},
-		{Category: "style", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
-		{Category: "style", Message: "alpha", Evidence: "e1", Path: "a.go", StartLine: 2, EndLine: 2},
+		{Category: "style", Message: "beta", Evidence: findings.NewEvidence("e2"), Path: "b.go", StartLine: 3, EndLine: 3},
+		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2},
+		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2},
 	}
 
 	got := dedupeAndSortFindings(items, "repo", "review", "head")

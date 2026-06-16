@@ -131,7 +131,7 @@ prompt contract:
 - `prompt_id`: `diffpal.review`
 - `prompt_version`: `v1.2.0`
 - `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v1`
+- `schema_version`: `findings.v2`
 
 `diffpal.review.instructions`, `--instructions`, and `--instructions-file`
 are appended as repository-local tuning in a dedicated prompt section. DiffPal
