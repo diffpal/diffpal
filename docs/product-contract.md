@@ -23,6 +23,15 @@
 - DiffPal-owned surface: diff collection, structured findings, summaries,
   inline feedback, artifacts, and merge gates.
 
+## Project Goals
+
+- Make AI PR review open, portable, and CI-native.
+- Let teams own provider choice, provider accounts, and costs.
+- Provide consistent review outputs and merge gates across GitHub, GitLab, and
+  Azure DevOps.
+- Avoid a mandatory hosted DiffPal service or required per-seat review
+  platform.
+
 ## Host support matrix
 
 | Host | Phase | Primary surfaces |
