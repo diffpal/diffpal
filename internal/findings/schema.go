@@ -27,6 +27,7 @@ type FindingsBundle struct {
 	Language      string          `json:"language,omitempty"`
 	ReviewChecks  []string        `json:"review_checks,omitempty"`
 	Prompt        *PromptMetadata `json:"prompt,omitempty"`
+	Inspection    *Inspection     `json:"inspection,omitempty"`
 	ChangeSummary []string        `json:"change_summary,omitempty"`
 	Files         []ReviewedFile  `json:"files,omitempty"`
 	Findings      []Finding       `json:"findings"`
@@ -37,6 +38,14 @@ type PromptMetadata struct {
 	PromptVersion string `json:"prompt_version,omitempty"`
 	Purpose       string `json:"purpose,omitempty"`
 	SchemaVersion string `json:"schema_version,omitempty"`
+}
+
+type Inspection struct {
+	ProviderType     string   `json:"provider_type,omitempty"`
+	Required         bool     `json:"required"`
+	ToolCalls        []string `json:"tool_calls,omitempty"`
+	DiffInspected    bool     `json:"diff_inspected"`
+	ContextInspected bool     `json:"context_inspected"`
 }
 
 type ReviewedFile struct {

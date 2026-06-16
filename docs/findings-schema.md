@@ -21,6 +21,12 @@ Optional top-level fields:
   - `prompt_version`
   - `purpose`
   - `schema_version`
+- `inspection` provider inspection metadata:
+  - `provider_type`
+  - `required`
+  - `tool_calls[]`
+  - `diff_inspected`
+  - `context_inspected`
 - `change_summary[]` human-readable overview bullets
 - `files[]` reviewed file list
 
@@ -95,6 +101,17 @@ Stable fingerprint input:
 - structured evidence text hash
 
 `findings.Normalize` computes `finding.id` deterministically from fields above.
+
+## Inspection Metadata
+
+Hosted providers receive DiffPal review tools at runtime. A hosted review result
+is accepted only after `git_diff` was called for the reviewed chunk. Tool usage
+is recorded in `inspection.tool_calls`, with `diff_inspected` set when
+`git_diff` ran.
+
+ACP providers use their native tool surface. DiffPal records
+`inspection.required: false` for those providers because runtime-level proof is
+not available from the wrapper.
 
 ## Compatibility
 

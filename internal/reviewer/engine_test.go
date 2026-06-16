@@ -99,6 +99,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != "v1.2.0" {
 		t.Fatalf("Bundle.Prompt = %+v, want prompt pack metadata", result.Bundle.Prompt)
 	}
+	if result.Bundle.Inspection == nil || !result.Bundle.Inspection.DiffInspected {
+		t.Fatalf("Bundle.Inspection = %+v, want diff inspection metadata", result.Bundle.Inspection)
+	}
 	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
 	}
@@ -107,6 +110,83 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
 		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
+	}
+}
+
+func TestRunWithRuntimeRejectsHostedCleanResultWithoutDiffInspection(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-inspection",
+		ReviewID:         "review-inspection",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+	}, &fakeRuntime{
+		outputs:      []ChunkOutput{{Findings: nil}},
+		noInspection: true,
+	})
+	if err == nil {
+		t.Fatal("RunWithRuntime() error = nil, want missing inspection error")
+	}
+	if !strings.Contains(err.Error(), "did not inspect the diff") {
+		t.Fatalf("RunWithRuntime() error = %v, want missing inspection", err)
+	}
+}
+
+func TestRunWithRuntimeRejectsHostedFindingsWithoutDiffInspection(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-inspection",
+		ReviewID:         "review-inspection",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+	}, &fakeRuntime{
+		outputs: []ChunkOutput{{
+			Findings: []ChunkFinding{{
+				Category:    "correctness",
+				Severity:    "high",
+				Confidence:  0.94,
+				Path:        "main.go",
+				StartLine:   4,
+				EndLine:     4,
+				ChangedSpan: findings.LineSpan{Path: "main.go", StartLine: 4, EndLine: 4},
+				Title:       "behavior changed",
+				Message:     "the output changed",
+				Evidence: findings.FindingEvidence{
+					Anchor:         "L4",
+					ReasoningBasis: "line 4 changed",
+					Source:         "changed_line",
+				},
+				Impact: findings.FindingImpact{
+					Summary: "callers see different behavior",
+					Scope:   "command output",
+				},
+			}},
+		}},
+		noInspection: true,
+	})
+	if err == nil {
+		t.Fatal("RunWithRuntime() error = nil, want missing inspection error")
+	}
+	if !strings.Contains(err.Error(), "did not inspect the diff") {
+		t.Fatalf("RunWithRuntime() error = %v, want missing inspection", err)
 	}
 }
 
@@ -587,10 +667,11 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 }
 
 type fakeRuntime struct {
-	outputs []ChunkOutput
-	errs    []error
-	inputs  []ChunkInput
-	calls   int
+	outputs      []ChunkOutput
+	errs         []error
+	inputs       []ChunkInput
+	calls        int
+	noInspection bool
 }
 
 func (f *fakeRuntime) ReviewChunk(_ context.Context, _ RuntimeConfig, input ChunkInput) (ChunkOutput, RuntimeUsage, error) {
@@ -607,9 +688,22 @@ func (f *fakeRuntime) ReviewChunk(_ context.Context, _ RuntimeConfig, input Chun
 	}
 
 	if idx >= len(f.outputs) {
-		return ChunkOutput{}, RuntimeUsage{}, nil
+		return ChunkOutput{}, f.defaultUsage(), nil
 	}
-	return f.outputs[idx], RuntimeUsage{}, nil
+	return f.outputs[idx], f.defaultUsage(), nil
+}
+
+func (f *fakeRuntime) defaultUsage() RuntimeUsage {
+	if f.noInspection {
+		return RuntimeUsage{}
+	}
+	return RuntimeUsage{Inspection: &findings.Inspection{
+		ProviderType:     "openai",
+		Required:         true,
+		ToolCalls:        []string{"git_changed_files", "git_diff"},
+		DiffInspected:    true,
+		ContextInspected: true,
+	}}
 }
 
 func testConfig() dpconfig.Config {

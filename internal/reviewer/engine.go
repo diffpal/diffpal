@@ -99,6 +99,7 @@ type ChunkOutput struct {
 
 type RuntimeUsage struct {
 	TokenUsage int64
+	Inspection *findings.Inspection
 }
 
 type RuntimeConfig struct {
@@ -225,9 +226,11 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0, len(chunks))
+	inspection := mergeInspection(nil, inspectionForProvider(runtimeCfg.ProviderID, runtimeCfg.Providers))
 	for i, chunk := range chunks {
 		input := chunkInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, commitMessages, i, len(chunks), chunk)
 		var output ChunkOutput
+		var usage RuntimeUsage
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
 			BaseDelay: 750 * time.Millisecond,
@@ -240,11 +243,12 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 				return reliability.IsTransient(err)
 			},
 		}, func(runCtx context.Context) error {
-			chunkOutput, _, err := runtime.ReviewChunk(runCtx, runtimeCfg, input)
+			chunkOutput, chunkUsage, err := runtime.ReviewChunk(runCtx, runtimeCfg, input)
 			if err != nil {
 				return err
 			}
 			output = chunkOutput
+			usage = chunkUsage
 			return nil
 		})
 		if err != nil {
@@ -253,6 +257,11 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			}
 			return Result{}, err
 		}
+		chunkInspection := mergeInspection(inspectionForProvider(runtimeCfg.ProviderID, runtimeCfg.Providers), usage.Inspection)
+		if err := validateInspection(chunkInspection); err != nil {
+			return Result{}, wrapError(KindInternal, err)
+		}
+		inspection = mergeInspection(inspection, usage.Inspection)
 		summaries = append(summaries, output.ChangeSummary...)
 		collected = append(collected, validateChunkFindings(output.Findings, input.Files, cfg.ProviderID(), allowedCategories)...)
 	}
@@ -262,6 +271,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
 	}
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
+	bundle.Inspection = inspection
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
 		return Result{}, wrapError(KindConfig, err)
 	}
@@ -275,6 +285,62 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		ContextChunks:   len(chunks),
 		TestSummary:     testSummary,
 	}, nil
+}
+
+func inspectionForProvider(providerID string, providers map[string]dpconfig.ProviderConfig) *findings.Inspection {
+	providerCfg, ok := providers[providerID]
+	if !ok {
+		return nil
+	}
+	providerType := strings.ToLower(strings.TrimSpace(providerCfg.Type))
+	required := providerType == "openai" || providerType == "aistudio"
+	return &findings.Inspection{
+		ProviderType: providerType,
+		Required:     required,
+	}
+}
+
+func mergeInspection(base *findings.Inspection, next *findings.Inspection) *findings.Inspection {
+	if base == nil {
+		if next == nil {
+			return nil
+		}
+		copied := *next
+		copied.ToolCalls = append([]string(nil), next.ToolCalls...)
+		return &copied
+	}
+	if next == nil {
+		return base
+	}
+	if base.ProviderType == "" {
+		base.ProviderType = next.ProviderType
+	}
+	base.Required = base.Required || next.Required
+	base.DiffInspected = base.DiffInspected || next.DiffInspected
+	base.ContextInspected = base.ContextInspected || next.ContextInspected
+	seen := make(map[string]struct{}, len(base.ToolCalls)+len(next.ToolCalls))
+	for _, call := range base.ToolCalls {
+		seen[call] = struct{}{}
+	}
+	for _, call := range next.ToolCalls {
+		if _, ok := seen[call]; ok {
+			continue
+		}
+		seen[call] = struct{}{}
+		base.ToolCalls = append(base.ToolCalls, call)
+	}
+	sort.Strings(base.ToolCalls)
+	return base
+}
+
+func validateInspection(inspection *findings.Inspection) error {
+	if inspection == nil || !inspection.Required {
+		return nil
+	}
+	if !inspection.DiffInspected {
+		return fmt.Errorf("hosted provider did not inspect the diff with git_diff")
+	}
+	return nil
 }
 
 func filterReviewableFiles(files []diff.FileChange) []diff.FileChange {

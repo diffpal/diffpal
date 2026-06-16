@@ -264,6 +264,11 @@ Hosted providers receive DiffPal's read-only review tools during each review:
 `search_files`. These are request-level tools, not provider config. ACP
 providers keep their own tool surface.
 
+For hosted providers, DiffPal records review tool usage in the findings bundle
+and rejects a result when the provider did not inspect the diff with `git_diff`.
+ACP providers use their native Git and filesystem tools, so DiffPal records that
+runtime inspection proof is not available for that provider class.
+
 ## MCP Servers
 
 DiffPal can pass MCP servers through the Norma runtime to providers that support

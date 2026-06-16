@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
@@ -39,7 +40,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
-	reviewTools, err := reviewToolsForProvider(providerCfg, cfg)
+	reviewTools, inspectionTracker, err := reviewToolsForProvider(providerCfg, cfg)
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
@@ -112,6 +113,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
 		return ChunkOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
+	usage.Inspection = inspectionFromTracker(providerCfg.Type, inspectionTracker)
 	return output, usage, nil
 }
 
@@ -155,17 +157,41 @@ func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
 	return nil
 }
 
-func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, error) {
+func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, *inspectionTracker, error) {
 	switch strings.ToLower(strings.TrimSpace(providerCfg.Type)) {
 	case "openai", "aistudio":
-		return newReviewTools(reviewToolOptions{
+		tracker := newInspectionTracker()
+		tools, err := newReviewTools(reviewToolOptions{
 			Root:         cfg.WorkingDir,
 			BaseSHA:      cfg.BaseSHA,
 			HeadSHA:      cfg.HeadSHA,
 			ChangedFiles: cfg.ChangedFiles,
+			Inspection:   tracker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return tools, tracker, nil
 	default:
-		return nil, nil
+		return nil, nil, nil
+	}
+}
+
+func inspectionFromTracker(providerType string, tracker *inspectionTracker) *findings.Inspection {
+	providerType = strings.ToLower(strings.TrimSpace(providerType))
+	required := providerType == "openai" || providerType == "aistudio"
+	if !required {
+		return &findings.Inspection{ProviderType: providerType, Required: false}
+	}
+	if tracker == nil {
+		return &findings.Inspection{ProviderType: providerType, Required: true}
+	}
+	return &findings.Inspection{
+		ProviderType:     providerType,
+		Required:         true,
+		ToolCalls:        tracker.callsList(),
+		DiffInspected:    tracker.called("git_diff"),
+		ContextInspected: tracker.called("read_file") || tracker.called("list_files") || tracker.called("search_files") || tracker.called("git_changed_files"),
 	}
 }
 
