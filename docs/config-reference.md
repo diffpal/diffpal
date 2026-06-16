@@ -152,6 +152,24 @@ Review checks map to finding categories:
 | `performance` | performance |
 | `best-practices` | maintainability, testing, style |
 
+## Severity Matrix
+
+DiffPal asks providers to classify severity by concrete impact, not confidence
+or preference. The active Prompt Pack uses the same definitions:
+
+- Severity is based on concrete impact, not confidence or preference.
+- critical: changed code can directly cause severe compromise, destructive data loss, privilege bypass, total outage, or unrecoverable corruption.
+- high: changed code can cause an exploitable security flaw, user-visible data corruption, frequent crash, major outage risk, or severe performance regression on a common path.
+- medium: changed code can cause an edge-case correctness failure, intermittent reliability issue, meaningful performance cost, confusing maintainability risk, or missing coverage for important behavior.
+- low: changed code has a localized maintainability, testing, or style issue with clear evidence and a concrete improvement, but no immediate user-visible failure.
+- security: use critical for direct compromise, credential exposure, destructive access, or privilege bypass; high for exploitable vulnerabilities with meaningful impact; medium for plausible weaknesses requiring extra conditions; low for hardening gaps with limited direct exploitability.
+- correctness: use critical for unrecoverable corruption or system-wide wrong behavior; high for common-path wrong results or data corruption; medium for plausible edge-case failures; low for small inconsistencies with bounded impact.
+- reliability: use critical for total outage, deadlock, or unrecoverable resource exhaustion; high for frequent crashes, leaks, or retry storms; medium for intermittent failure modes; low for localized resilience or observability gaps.
+- performance: use critical for regressions that can make the service unavailable or explode cost; high for severe common-path latency, memory, or query regressions; medium for measurable inefficient behavior; low for small avoidable inefficiencies with clear evidence.
+- maintainability: use critical only when the change creates an immediate operational hazard; high when the change makes future safe modification very risky; medium for confusing structure likely to cause defects; low for localized clarity or consistency issues.
+- testing: use critical only when missing validation can allow severe unsafe behavior to ship; high for untested high-risk behavior; medium for missing meaningful coverage of new behavior; low for small missing edge-case coverage.
+- style: use critical, high, or medium only when the issue has a non-style impact and should usually be reclassified; use low for repo-enforced style/readability issues that are actionable.
+
 Override review settings per run:
 
 ```bash

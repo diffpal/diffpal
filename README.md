@@ -209,6 +209,9 @@ DiffPal does not hardcode individual signal slugs:
 | `performance` | performance |
 | `best-practices` | maintainability, testing, style |
 
+Severity is impact-based across all categories. The full critical/high/medium/low
+matrix is in the [config reference](docs/config-reference.md#severity-matrix).
+
 Use `diffpal.review.instructions`, the `instructions` action input, or
 `--instructions-file` for repository-specific review guidance.
 

@@ -49,6 +49,43 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	}
 }
 
+func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
+	t.Parallel()
+
+	system := RenderReviewSystem(ReviewOptions{})
+	docsRaw, err := os.ReadFile("../../../docs/config-reference.md")
+	if err != nil {
+		t.Fatalf("ReadFile(config-reference) error = %v", err)
+	}
+	docs := string(docsRaw)
+	for _, line := range SeverityMatrixLines() {
+		if !strings.Contains(system, line) {
+			t.Fatalf("review system prompt missing severity matrix line %q", line)
+		}
+		if !strings.Contains(docs, line) {
+			t.Fatalf("config reference missing severity matrix line %q", line)
+		}
+	}
+	requiredCoverage := []string{
+		"security: use critical",
+		"security: use critical for direct compromise",
+		"high for exploitable vulnerabilities",
+		"correctness: use critical",
+		"medium for plausible edge-case failures",
+		"reliability: use critical",
+		"medium for intermittent failure modes",
+		"maintainability: use critical",
+		"low for localized clarity",
+		"testing: use critical",
+		"low for small missing edge-case coverage",
+	}
+	for _, phrase := range requiredCoverage {
+		if !strings.Contains(system, phrase) {
+			t.Fatalf("review system prompt missing severity coverage phrase %q", phrase)
+		}
+	}
+}
+
 func TestRenderReviewSystemContainsUntrustedInputWarning(t *testing.T) {
 	t.Parallel()
 
