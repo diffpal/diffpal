@@ -2,6 +2,7 @@ package reviewer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -364,6 +365,103 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 	}
 }
 
+func TestRenderReviewTaskInputEscapesCommitAndPathInjectionFixtures(t *testing.T) {
+	commitMessage := readReviewerFixture(t, "injection/commit_message.txt")
+	path := strings.TrimSpace(readReviewerFixture(t, "injection/path.txt"))
+	input := ChunkInput{
+		ReviewID:              "review-injection",
+		Repo:                  "repo-injection",
+		BaseSHA:               "base",
+		HeadSHA:               "head",
+		Language:              "en",
+		ReviewChecks:          []string{"security"},
+		TestSummary:           "no_tests_in_diff",
+		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
+		UntrustedInputWarning: promptpack.UntrustedInputWarning,
+		UntrustedInputStart:   promptpack.UntrustedInputStart,
+		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
+		CommitMessages:        []string{commitMessage},
+		Files: []ChunkFile{{
+			Path:   path,
+			Status: "modified",
+			Spans:  []ChunkSpan{{Start: 10, End: 12}},
+		}},
+	}
+
+	got := renderReviewTaskInput(input)
+	for _, marker := range []string{
+		promptpack.TrustedControlStart,
+		promptpack.TrustedControlEnd,
+		promptpack.UntrustedInputStart,
+		promptpack.UntrustedInputEnd,
+	} {
+		if count := strings.Count(got, marker); count != 1 {
+			t.Fatalf("renderReviewTaskInput() marker %q count = %d, want 1:\n%s", marker, count, got)
+		}
+	}
+	if strings.Contains(got, path) {
+		t.Fatalf("renderReviewTaskInput() kept raw path delimiter fixture:\n%s", got)
+	}
+	if !strings.Contains(got, "[escaped diffpal trusted control end delimiter]") {
+		t.Fatalf("renderReviewTaskInput() did not escape path delimiter fixture:\n%s", got)
+	}
+	untrustedStart := strings.Index(got, promptpack.UntrustedInputStart)
+	commitIndex := strings.Index(got, strings.TrimSpace(commitMessage))
+	if commitIndex < 0 {
+		t.Fatalf("renderReviewTaskInput() missing escaped commit message fixture:\n%s", got)
+	}
+	if commitIndex < untrustedStart {
+		t.Fatalf("commit message fixture appeared before untrusted section:\n%s", got)
+	}
+}
+
+func TestRunWithRuntimeDoesNotPreloadInjectionFixtureContent(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "docs", "review.md"), "before\n")
+	writeRepoFile(t, filepath.Join(repo, "pkg", "comment.go"), "package pkg\n")
+	writeRepoFile(t, filepath.Join(repo, "testdata", "fixture.txt"), "before\n")
+	runGitCmd(t, repo, "add", ".")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+
+	docsFixture := readReviewerFixture(t, "injection/docs.md")
+	commentFixture := readReviewerFixture(t, "injection/comment.go.txt")
+	testFixture := readReviewerFixture(t, "injection/test_fixture.txt")
+	writeRepoFile(t, filepath.Join(repo, "docs", "review.md"), docsFixture+"\n")
+	writeRepoFile(t, filepath.Join(repo, "pkg", "comment.go"), "package pkg\n\n"+commentFixture+"\n")
+	writeRepoFile(t, filepath.Join(repo, "testdata", "fixture.txt"), testFixture+"\n")
+
+	runtime := &fakeRuntime{outputs: []ChunkOutput{{Findings: nil}}}
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:       repo,
+		Repo:             "repo-injection-fixtures",
+		ReviewID:         "review-injection-fixtures",
+		MaxFiles:         20,
+		ContextLines:     3,
+		MaxPatchChars:    12000,
+		MaxFilesPerChunk: 20,
+		BlockOn:          "high",
+		ReviewChecks:     []string{"best-practices"},
+		Instructions:     "Report actionable documentation, comment, and fixture review issues.",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %d, want 1", len(runtime.inputs))
+	}
+	snapshot := renderReviewTaskInput(runtime.inputs[0])
+	for _, fixture := range []string{docsFixture, commentFixture, testFixture} {
+		if strings.Contains(snapshot, strings.TrimSpace(fixture)) {
+			t.Fatalf("task snapshot preloaded untrusted fixture content %q:\n%s", strings.TrimSpace(fixture), snapshot)
+		}
+	}
+	for _, path := range []string{"docs/review.md", "pkg/comment.go", "testdata/fixture.txt"} {
+		if !strings.Contains(snapshot, path) {
+			t.Fatalf("task snapshot missing changed file path %q:\n%s", path, snapshot)
+		}
+	}
+}
+
 func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T) {
 	repo := newGitRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "internal", "platformapi"), 0o755); err != nil {
@@ -561,6 +659,38 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 	}
 }
 
+func TestReviewEvalFixturesValidateExpectedCategoriesAndSeverity(t *testing.T) {
+	raw, err := os.ReadFile("testdata/evals/review_eval_cases.json")
+	if err != nil {
+		t.Fatalf("ReadFile(eval fixtures) error = %v", err)
+	}
+	var cases []reviewEvalFixture
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatalf("Unmarshal(eval fixtures) error = %v", err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("eval fixtures empty")
+	}
+	files := []ChunkFile{{
+		Path:  "src/app.go",
+		Spans: []ChunkSpan{{Start: 10, End: 12}},
+	}}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.Name, func(t *testing.T) {
+			got := validateChunkFindings(tc.Findings, files, "fixture-provider", categoriesForReviewChecks(tc.ReviewChecks))
+			if len(got) != len(tc.Want) {
+				t.Fatalf("validateChunkFindings() returned %d findings, want %d: %+v", len(got), len(tc.Want), got)
+			}
+			for i, want := range tc.Want {
+				if got[i].Category != want.Category || got[i].Severity != want.Severity {
+					t.Fatalf("finding[%d] = %s/%s, want %s/%s", i, got[i].Category, got[i].Severity, want.Category, want.Severity)
+				}
+			}
+		})
+	}
+}
+
 func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 	repo := newGitRepo(t)
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
@@ -666,6 +796,18 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 	}
 }
 
+type reviewEvalFixture struct {
+	Name         string              `json:"name"`
+	ReviewChecks []string            `json:"review_checks"`
+	Findings     []ChunkFinding      `json:"findings"`
+	Want         []reviewEvalFinding `json:"want"`
+}
+
+type reviewEvalFinding struct {
+	Category string `json:"category"`
+	Severity string `json:"severity"`
+}
+
 type fakeRuntime struct {
 	outputs      []ChunkOutput
 	errs         []error
@@ -704,6 +846,15 @@ func (f *fakeRuntime) defaultUsage() RuntimeUsage {
 		DiffInspected:    true,
 		ContextInspected: true,
 	}}
+}
+
+func readReviewerFixture(t *testing.T, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", name, err)
+	}
+	return string(raw)
 }
 
 func testConfig() dpconfig.Config {

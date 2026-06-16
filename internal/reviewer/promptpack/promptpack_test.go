@@ -9,7 +9,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func TestRenderReviewSystemMatchesGolden(t *testing.T) {
+func TestRenderReviewSystemWithInstructionsMatchesGolden(t *testing.T) {
 	t.Parallel()
 
 	raw, err := os.ReadFile("testdata/review_system.golden")
@@ -21,6 +21,57 @@ func TestRenderReviewSystemMatchesGolden(t *testing.T) {
 	})
 	if got != strings.TrimRight(string(raw), "\n") {
 		t.Fatalf("RenderReviewSystem() mismatch\nwant:\n%s\n\ngot:\n%s", string(raw), got)
+	}
+}
+
+func TestRenderReviewSystemWithoutInstructionsMatchesGolden(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("testdata/review_system_empty.golden")
+	if err != nil {
+		t.Fatalf("ReadFile(golden) error = %v", err)
+	}
+	got := RenderReviewSystem(ReviewOptions{})
+	if got != strings.TrimRight(string(raw), "\n") {
+		t.Fatalf("RenderReviewSystem(empty) mismatch\nwant:\n%s\n\ngot:\n%s", string(raw), got)
+	}
+	if strings.Contains(got, "Repository-local custom instructions") {
+		t.Fatalf("RenderReviewSystem(empty) unexpectedly includes custom instructions:\n%s", got)
+	}
+}
+
+func TestReviewTaskMatchesGoldens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		checks []string
+		golden string
+	}{
+		{
+			name:   "security",
+			checks: []string{"security"},
+			golden: "testdata/review_task_security.golden",
+		},
+		{
+			name:   "all checks",
+			checks: []string{"security", "bugs", "performance", "best-practices"},
+			golden: "testdata/review_task_all_checks.golden",
+		},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			raw, err := os.ReadFile(tc.golden)
+			if err != nil {
+				t.Fatalf("ReadFile(%s) error = %v", tc.golden, err)
+			}
+			got := ReviewTask(tc.checks)
+			if got != strings.TrimRight(string(raw), "\n") {
+				t.Fatalf("ReviewTask(%v) mismatch\nwant:\n%s\n\ngot:\n%s", tc.checks, string(raw), got)
+			}
+		})
 	}
 }
 

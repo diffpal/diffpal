@@ -1,0 +1,1 @@
+Perform a code review of the task snapshot. Inspect the Git diff and nearby code with available tools before producing findings. Produce structured findings for actionable issues in the requested review checks: security, bugs, performance, best-practices. A clean result is valid only after inspecting the changed files for those checks.
