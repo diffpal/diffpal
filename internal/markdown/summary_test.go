@@ -211,6 +211,7 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 				EndLine:    17,
 				Message:    "query concatenates untrusted input",
 				Evidence:   "Line 17 builds SQL by concatenating user input.",
+				Impact:     "malicious users can delete sessions for other accounts.",
 				Suggestion: "Use a parameterized statement.",
 			},
 		},
@@ -230,6 +231,7 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 	assertContains(t, got, "- **High security** `L12-L17`: query concatenates untrusted input")
 	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
 	assertContains(t, got, "  - **Evidence**: Line 17 builds SQL by concatenating user input.")
+	assertContains(t, got, "  - **Impact**: malicious users can delete sessions for other accounts.")
 	assertContains(t, got, "  - **Suggestion**: Use a parameterized statement.")
 }
 

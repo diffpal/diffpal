@@ -8,18 +8,36 @@ ACP-compatible CLI, use the generic ACP config instead:
 For other provider recipes or CI systems, use the examples matrix:
 [`examples/README.md`](../examples/README.md).
 
-## 1. Add Config
+## 1. Generate Config
 
-Copy the Codex API-key config, or replace it with the generic ACP config for
-your own provider CLI:
+Run the onboarding wizard scaffold:
 
 ```bash
-mkdir -p .config/diffpal
-cp examples/configs/codex-api-key/config.yaml .config/diffpal/config.yaml
+npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
 ```
 
-Or generate a starter config locally with `diffpal init` and compare it with
-[`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml).
+This creates `.config/diffpal/config.yaml` with:
+
+- Codex ACP as the review provider
+- `diffpal.gate.block_on: high`
+- the standard review checks
+- a visible `profiles.ci` profile
+- a GitHub platform block
+
+The command keeps existing files unless you pass `--force`.
+
+Other setup recipes:
+
+| Setup | Use when |
+| --- | --- |
+| `codex-api-key` | CI authenticates Codex with `OPENAI_API_KEY`. |
+| `codex-subscription` | CI restores local Codex subscription auth. |
+| `copilot-github-token` | CI authenticates Copilot with a fine-grained GitHub token. |
+| `generic-acp` | You already have another ACP-compatible CLI. |
+
+If you prefer manual setup, copy
+[`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml)
+or another recipe from [`examples/configs`](../examples/configs).
 
 ## 2. Add Secret
 
@@ -79,3 +97,15 @@ stay separate.
 - GitLab CI: [`examples/ci/gitlab`](../examples/ci/gitlab)
 - Azure Pipelines: [`examples/ci/azure-pipelines`](../examples/ci/azure-pipelines)
 - Provider configs: [`examples/configs`](../examples/configs)
+
+## Planned Wizard Flow
+
+`diffpal init --wizard` is the supported entry point for one-command onboarding.
+The first implementation generates config safely. The intended full flow is:
+
+- detect GitHub Actions, GitLab CI, or Azure Pipelines config
+- choose a provider setup recipe
+- choose or name the review profile
+- choose gate behavior
+- generate `.config/diffpal/config.yaml`
+- optionally generate or patch CI configuration after confirmation

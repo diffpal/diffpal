@@ -7,50 +7,31 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 )
 
 const providerIntegrationTimeout = 2 * time.Minute
 
 func unsafeHandlerInput() ChunkInput {
 	return ChunkInput{
-		ReviewID:     "integration-review",
-		Repo:         "diffpal/diffpal",
-		BaseSHA:      "base",
-		HeadSHA:      "head",
-		ChunkIndex:   0,
-		ChunkCount:   1,
-		ReviewTask:   reviewTask([]string{"security"}),
-		Language:     "en",
-		ReviewChecks: []string{"security"},
-		TestSummary:  "no_tests_in_diff",
+		ReviewID:              "integration-review",
+		Repo:                  "diffpal/diffpal",
+		BaseSHA:               "base",
+		HeadSHA:               "head",
+		ChunkIndex:            0,
+		ChunkCount:            1,
+		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
+		UntrustedInputWarning: promptpack.UntrustedInputWarning,
+		UntrustedInputStart:   promptpack.UntrustedInputStart,
+		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
+		Language:              "en",
+		ReviewChecks:          []string{"security"},
+		TestSummary:           "no_tests_in_diff",
 		Files: []ChunkFile{{
-			Path:      "internal/platformapi/admin_debug.go",
-			Signature: "func AdminDebugHandler(db *sql.DB) http.HandlerFunc",
-			Snippet: strings.Join([]string{
-				"package platformapi",
-				"",
-				"import (",
-				`	"database/sql"`,
-				`	"net/http"`,
-				`	"os/exec"`,
-				`	"path/filepath"`,
-				")",
-				"",
-				"func AdminDebugHandler(db *sql.DB) http.HandlerFunc {",
-				"	return func(w http.ResponseWriter, r *http.Request) {",
-				`		user := r.URL.Query().Get("user")`,
-				`		command := r.URL.Query().Get("command")`,
-				`		file := r.URL.Query().Get("file")`,
-				`		productionToken := "prod-root-token-please-flag"`,
-				"",
-				`		_, _ = db.Exec("DELETE FROM sessions WHERE user = '" + user + "'")`,
-				`		_ = exec.Command("sh", "-c", command).Run()`,
-				`		http.ServeFile(w, r, filepath.Join("/tmp/diffpal-user-files", file))`,
-				`		_, _ = w.Write([]byte(productionToken))`,
-				"	}",
-				"}",
-			}, "\n"),
-			Spans: []ChunkSpan{{Start: 12, End: 20}},
+			Path:   "internal/platformapi/admin_debug.go",
+			Status: "modified",
+			Spans:  []ChunkSpan{{Start: 12, End: 20}},
 		}},
 	}
 }

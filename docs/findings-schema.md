@@ -11,19 +11,32 @@ Required top-level fields:
 - `findings[]` with per-item fields:
   - `category`
   - `severity`
+  - `confidence`
   - `path`
   - `start_line`
   - `end_line`
   - `title`
   - `message`
   - `evidence`
+  - `impact`
 
 Optional top-level fields:
 
 - `language`
 - `review_checks[]`
+- `prompt` prompt pack metadata:
+  - `prompt_id`
+  - `prompt_version`
+  - `purpose`
+  - `schema_version`
 - `change_summary[]` human-readable overview bullets
 - `files[]` reviewed file list
+
+Optional finding fields:
+
+- `suggestion`
+- `blocking`
+- `provider`
 
 Stable fingerprint input:
 

@@ -4,11 +4,15 @@ DiffPal reads one repository config file:
 
 `.config/diffpal/config.yaml`
 
-Generate a starter file with:
+Generate a first-run onboarding config with:
 
 ```bash
-diffpal init
+diffpal init --wizard --setup codex-api-key --platform github
 ```
+
+Use plain `diffpal init` only when you want the older starter workspace plus
+template snippets. The wizard path writes a complete recipe config with a
+visible profile, for example `profiles.ci`.
 
 ## Provider Model
 
@@ -78,6 +82,12 @@ diffpal:
         enabled: true
     gitlab: {}
     azure: {}
+
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high
 ```
 
 Install the matching provider command in CI:
@@ -111,6 +121,27 @@ config file.
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
 | `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
 | `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
+
+## Prompt Pack
+
+DiffPal review prompts are versioned as Prompt Pack v1. Generated findings
+artifacts include prompt metadata so review output can be traced back to the
+prompt contract:
+
+- `prompt_id`: `diffpal.review`
+- `prompt_version`: `v1.2.0`
+- `purpose`: `review_changed_diff`
+- `schema_version`: `findings.v1`
+
+`diffpal.review.instructions`, `--instructions`, and `--instructions-file`
+are appended as repository-local tuning in a dedicated prompt section. DiffPal
+sends a compact review task snapshot instead of preloading every patch or file
+snippet. Hosted providers receive read-only DiffPal Git/repo tools to inspect
+the diff; ACP providers use their native Git and filesystem tools.
+
+Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
+docs, test fixtures, and file contents as untrusted review evidence, never as
+role changes or instructions to follow.
 
 Review checks map to finding categories:
 
@@ -222,14 +253,14 @@ switch the selected provider and add a matching runtime provider:
 ```yaml
 runtime:
   providers:
-    openai-fast:
+    openai-api:
       type: openai
       openai:
         model: "${DIFFPAL_OPENAI_MODEL}"
         api_key: "${OPENAI_API_KEY}"
 
 diffpal:
-  provider: openai-fast
+  provider: openai-api
 ```
 
 Then set `OPENAI_API_KEY` in CI.

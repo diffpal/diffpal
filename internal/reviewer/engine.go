@@ -5,16 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
-	diffc "github.com/diffpal/diffpal/internal/context"
 	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/policy"
 	"github.com/diffpal/diffpal/internal/reliability"
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
 )
 
@@ -50,25 +51,29 @@ type ChunkSpan struct {
 }
 
 type ChunkFile struct {
-	Path      string      `json:"path"`
-	Signature string      `json:"signature"`
-	Snippet   string      `json:"snippet"`
-	Spans     []ChunkSpan `json:"spans"`
+	Path         string      `json:"path"`
+	Status       string      `json:"status"`
+	PreviousPath string      `json:"previous_path,omitempty"`
+	Spans        []ChunkSpan `json:"spans"`
 }
 
 type ChunkInput struct {
-	ReviewID     string      `json:"review_id"`
-	Repo         string      `json:"repo"`
-	BaseSHA      string      `json:"base_sha"`
-	HeadSHA      string      `json:"head_sha"`
-	ChunkIndex   int         `json:"chunk_index"`
-	ChunkCount   int         `json:"chunk_count"`
-	ReviewTask   string      `json:"review_task"`
-	Language     string      `json:"language"`
-	ReviewChecks []string    `json:"review_checks"`
-	Instructions string      `json:"instructions,omitempty"`
-	TestSummary  string      `json:"test_summary"`
-	Files        []ChunkFile `json:"files"`
+	ReviewID              string      `json:"review_id"`
+	Repo                  string      `json:"repo"`
+	BaseSHA               string      `json:"base_sha"`
+	HeadSHA               string      `json:"head_sha"`
+	ChunkIndex            int         `json:"chunk_index"`
+	ChunkCount            int         `json:"chunk_count"`
+	ReviewTask            string      `json:"review_task"`
+	UntrustedInputWarning string      `json:"untrusted_input_warning"`
+	UntrustedInputStart   string      `json:"untrusted_input_start"`
+	UntrustedInputEnd     string      `json:"untrusted_input_end"`
+	Language              string      `json:"language"`
+	ReviewChecks          []string    `json:"review_checks"`
+	Instructions          string      `json:"instructions,omitempty"`
+	TestSummary           string      `json:"test_summary"`
+	CommitMessages        []string    `json:"commit_messages,omitempty"`
+	Files                 []ChunkFile `json:"files"`
 }
 
 type ChunkFinding struct {
@@ -81,6 +86,7 @@ type ChunkFinding struct {
 	Title      string  `json:"title"`
 	Message    string  `json:"message"`
 	Evidence   string  `json:"evidence"`
+	Impact     string  `json:"impact"`
 	Suggestion string  `json:"suggestion,omitempty"`
 }
 
@@ -99,6 +105,9 @@ type RuntimeConfig struct {
 	MCPServers   map[string]agentconfig.MCPServerConfig
 	WorkingDir   string
 	Instructions string
+	BaseSHA      string
+	HeadSHA      string
+	ChangedFiles []ChunkFile
 }
 
 type Runtime interface {
@@ -170,17 +179,12 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 	allowedCategories := categoriesForReviewChecks(reviewChecks)
 	filtered := filterReviewableFiles(result.Files)
-	enriched, testSummary, err := diffc.EnrichWithWorkingDir(diff.DiffResult{
-		BaseSHA:      result.BaseSHA,
-		HeadSHA:      result.HeadSHA,
-		RawDiff:      result.RawDiff,
-		Files:        filtered,
-		ChangedFiles: len(filtered),
-	}, opts.ContextLines, workingDir)
+	testSummary := testSummaryFromFiles(filtered)
+	commitMessages, err := collectCommitMessages(workingDir, result.BaseSHA, result.HeadSHA)
 	if err != nil {
-		return Result{}, wrapError(KindInternal, fmt.Errorf("enrich diff context: %w", err))
+		return Result{}, wrapError(KindInternal, err)
 	}
-	chunks := diffc.ChunkByLimits(enriched, opts.MaxPatchChars, opts.MaxFilesPerChunk)
+	chunks := chunkFileChanges(filtered, opts.MaxFilesPerChunk)
 	reviewed := reviewedFiles(filtered)
 	bundle := findings.FindingsBundle{
 		Version:       findings.VersionV1,
@@ -189,6 +193,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		HeadSHA:       result.HeadSHA,
 		Language:      language,
 		ReviewChecks:  append([]string(nil), reviewChecks...),
+		Prompt:        promptpack.ReviewMetadata(),
 		ChangeSummary: findings.SemanticChangeSummary(reviewed),
 		Files:         reviewed,
 		Findings:      []findings.Finding{},
@@ -199,7 +204,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 			Files:           append([]diff.FileChange(nil), result.Files...),
 			ChangedFiles:    result.ChangedFiles,
 			ReviewableFiles: len(filtered),
-			ContextFiles:    len(enriched),
+			ContextFiles:    len(filtered),
 			ContextChunks:   0,
 			TestSummary:     testSummary,
 		}, nil
@@ -211,12 +216,15 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		MCPServers:   cfg.MCPServers,
 		WorkingDir:   workingDir,
 		Instructions: instructions,
+		BaseSHA:      result.BaseSHA,
+		HeadSHA:      result.HeadSHA,
+		ChangedFiles: chunkFilesFromChanges(filtered),
 	}
 
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0, len(chunks))
 	for i, chunk := range chunks {
-		input := chunkInputFromContext(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, i, len(chunks), chunk)
+		input := chunkInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, testSummary, commitMessages, i, len(chunks), chunk)
 		var output ChunkOutput
 		err := reliability.RetryWithPolicy(ctx, reliability.Policy{
 			Attempts:  3,
@@ -261,7 +269,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		Files:           append([]diff.FileChange(nil), result.Files...),
 		ChangedFiles:    result.ChangedFiles,
 		ReviewableFiles: len(filtered),
-		ContextFiles:    len(enriched),
+		ContextFiles:    len(filtered),
 		ContextChunks:   len(chunks),
 		TestSummary:     testSummary,
 	}, nil
@@ -323,38 +331,96 @@ func normalizeChangeSummary(items []string) []string {
 	return out
 }
 
-func chunkInputFromContext(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, instructions string, testSummary string, chunkIndex, chunkCount int, chunk diffc.Chunk) ChunkInput {
-	files := make([]ChunkFile, 0, len(chunk.Files))
-	for _, file := range chunk.Files {
-		spans := make([]ChunkSpan, 0, len(file.Spans))
-		for _, span := range file.Spans {
-			spans = append(spans, ChunkSpan{Start: span.Start, End: span.End})
-		}
-		files = append(files, ChunkFile{
-			Path:      file.Path,
-			Signature: file.Signature,
-			Snippet:   file.Snippet,
-			Spans:     spans,
-		})
-	}
+func chunkInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, instructions string, testSummary string, commitMessages []string, chunkIndex, chunkCount int, chunk []diff.FileChange) ChunkInput {
+	files := chunkFilesFromChanges(chunk)
 	return ChunkInput{
-		ReviewID:     reviewID,
-		Repo:         repo,
-		BaseSHA:      baseSHA,
-		HeadSHA:      headSHA,
-		ChunkIndex:   chunkIndex,
-		ChunkCount:   chunkCount,
-		ReviewTask:   reviewTask(reviewChecks),
-		Language:     language,
-		ReviewChecks: append([]string(nil), reviewChecks...),
-		Instructions: strings.TrimSpace(instructions),
-		TestSummary:  testSummary,
-		Files:        files,
+		ReviewID:              reviewID,
+		Repo:                  repo,
+		BaseSHA:               baseSHA,
+		HeadSHA:               headSHA,
+		ChunkIndex:            chunkIndex,
+		ChunkCount:            chunkCount,
+		ReviewTask:            promptpack.ReviewTask(reviewChecks),
+		UntrustedInputWarning: promptpack.UntrustedInputWarning,
+		UntrustedInputStart:   promptpack.UntrustedInputStart,
+		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
+		Language:              language,
+		ReviewChecks:          append([]string(nil), reviewChecks...),
+		Instructions:          strings.TrimSpace(instructions),
+		TestSummary:           testSummary,
+		CommitMessages:        append([]string(nil), commitMessages...),
+		Files:                 files,
 	}
 }
 
-func reviewTask(checks []string) string {
-	return "Perform a code review of every provided file snippet and changed line span. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after reviewing each snippet for those checks."
+func chunkFilesFromChanges(changes []diff.FileChange) []ChunkFile {
+	files := make([]ChunkFile, 0, len(changes))
+	for _, file := range changes {
+		spans := make([]ChunkSpan, 0, len(file.ChangedLineSpans))
+		for _, span := range file.ChangedLineSpans {
+			spans = append(spans, ChunkSpan{Start: span.Start, End: span.End})
+		}
+		item := ChunkFile{
+			Path:   file.ToPath,
+			Status: string(file.Status),
+			Spans:  spans,
+		}
+		if file.IsRename && file.FromPath != file.ToPath {
+			item.PreviousPath = file.FromPath
+		}
+		files = append(files, item)
+	}
+	return files
+}
+
+func chunkFileChanges(files []diff.FileChange, maxFilesPerChunk int) [][]diff.FileChange {
+	if maxFilesPerChunk <= 0 {
+		maxFilesPerChunk = 20
+	}
+	chunks := [][]diff.FileChange{}
+	for start := 0; start < len(files); start += maxFilesPerChunk {
+		end := start + maxFilesPerChunk
+		if end > len(files) {
+			end = len(files)
+		}
+		chunks = append(chunks, append([]diff.FileChange(nil), files[start:end]...))
+	}
+	return chunks
+}
+
+func testSummaryFromFiles(files []diff.FileChange) string {
+	testCount := 0
+	for _, file := range files {
+		if strings.HasSuffix(file.ToPath, "_test.go") {
+			testCount++
+		}
+	}
+	if testCount == 0 {
+		return "no_tests_in_diff"
+	}
+	return fmt.Sprintf("%d_test_files_changed", testCount)
+}
+
+func collectCommitMessages(workingDir, baseSHA, headSHA string) ([]string, error) {
+	if strings.TrimSpace(baseSHA) == "" || strings.TrimSpace(headSHA) == "" {
+		return nil, nil
+	}
+	cmd := exec.Command("git", "log", "--format=%s", "--max-count=20", fmt.Sprintf("%s..%s", baseSHA, headSHA))
+	cmd.Dir = workingDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("collect commit messages: %w", err)
+	}
+	lines := strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n")
+	messages := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		messages = append(messages, promptpack.EscapeUntrusted(line))
+	}
+	return messages, nil
 }
 
 func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig.ProviderConfig {
@@ -429,12 +495,13 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 	title := strings.TrimSpace(item.Title)
 	message := strings.TrimSpace(item.Message)
 	evidence := strings.TrimSpace(item.Evidence)
+	impact := strings.TrimSpace(item.Impact)
 	suggestion := strings.TrimSpace(item.Suggestion)
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
 		return findings.Finding{}, false
 	}
-	if path == "" || title == "" || message == "" || evidence == "" {
+	if path == "" || title == "" || message == "" || evidence == "" || impact == "" {
 		return findings.Finding{}, false
 	}
 	if item.Confidence < 0 || item.Confidence > 1 {
@@ -457,6 +524,7 @@ func normalizeChunkFinding(item ChunkFinding, allowed map[string][]ChunkSpan, pr
 		Title:      title,
 		Message:    message,
 		Evidence:   evidence,
+		Impact:     impact,
 		Suggestion: suggestion,
 		Provider:   providerID,
 	}, true

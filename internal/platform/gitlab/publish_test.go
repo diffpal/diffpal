@@ -75,9 +75,13 @@ func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
 		Confidence: 0.9,
 		Message:    "unsafe markdown",
 		Evidence:   "```go\nfmt.Println(\"x\")\n```",
+		Impact:     "reviewers can see the concrete consequence",
 		Suggestion: "````suggestion\nx\n````",
 	})
 
+	if !strings.Contains(body, "**Impact**: reviewers can see the concrete consequence") {
+		t.Fatalf("body missing impact:\n%s", body)
+	}
 	if !strings.Contains(body, "`````\n````suggestion\nx\n````\n`````") {
 		t.Fatalf("suggestion fence was not lengthened safely:\n%s", body)
 	}
