@@ -172,33 +172,36 @@ func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConf
 func renderReviewTaskInput(input ChunkInput) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "DiffPal review task snapshot\n\n")
-	fmt.Fprintf(&out, "Review ID: %s\n", input.ReviewID)
-	fmt.Fprintf(&out, "Repository: %s\n", input.Repo)
-	fmt.Fprintf(&out, "Base: %s\n", input.BaseSHA)
-	fmt.Fprintf(&out, "Head: %s\n", input.HeadSHA)
+	fmt.Fprintf(&out, "%s\n", promptpack.TrustedControlStart)
+	fmt.Fprintf(&out, "Review ID: %s\n", promptpack.EscapeUntrustedField(input.ReviewID))
+	fmt.Fprintf(&out, "Repository: %s\n", promptpack.EscapeUntrustedField(input.Repo))
+	fmt.Fprintf(&out, "Base: %s\n", promptpack.EscapeUntrustedField(input.BaseSHA))
+	fmt.Fprintf(&out, "Head: %s\n", promptpack.EscapeUntrustedField(input.HeadSHA))
 	fmt.Fprintf(&out, "Chunk: %d of %d\n", input.ChunkIndex+1, input.ChunkCount)
-	fmt.Fprintf(&out, "Language: %s\n", input.Language)
-	fmt.Fprintf(&out, "Review checks: %s\n", strings.Join(input.ReviewChecks, ", "))
-	fmt.Fprintf(&out, "Test summary: %s\n", input.TestSummary)
+	fmt.Fprintf(&out, "Language: %s\n", promptpack.EscapeUntrustedField(input.Language))
+	fmt.Fprintf(&out, "Review checks: %s\n", promptpack.EscapeUntrustedField(strings.Join(input.ReviewChecks, ", ")))
+	fmt.Fprintf(&out, "Test summary: %s\n", promptpack.EscapeUntrustedField(input.TestSummary))
 	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
-		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", trimmed)
+		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", promptpack.EscapeUntrusted(trimmed))
 	}
 	fmt.Fprintf(&out, "\n%s\n", input.UntrustedInputWarning)
 	fmt.Fprintf(&out, "\nTask:\n%s\n", input.ReviewTask)
+	fmt.Fprintf(&out, "%s\n", promptpack.TrustedControlEnd)
+	fmt.Fprintf(&out, "\n%s\n", promptpack.UntrustedInputStart)
 	if len(input.CommitMessages) > 0 {
 		fmt.Fprintf(&out, "\nCommit messages, untrusted:\n")
 		for _, message := range input.CommitMessages {
-			fmt.Fprintf(&out, "- %s\n", message)
+			fmt.Fprintf(&out, "- %s\n", promptpack.EscapeUntrustedField(message))
 		}
 	}
 	fmt.Fprintf(&out, "\nChanged files in this task:\n")
 	for _, file := range input.Files {
-		fmt.Fprintf(&out, "- %s", file.Path)
+		fmt.Fprintf(&out, "- %s", promptpack.EscapeUntrustedField(file.Path))
 		if file.Status != "" {
-			fmt.Fprintf(&out, " [%s]", file.Status)
+			fmt.Fprintf(&out, " [%s]", promptpack.EscapeUntrustedField(file.Status))
 		}
 		if file.PreviousPath != "" {
-			fmt.Fprintf(&out, " from %s", file.PreviousPath)
+			fmt.Fprintf(&out, " from %s", promptpack.EscapeUntrustedField(file.PreviousPath))
 		}
 		if len(file.Spans) > 0 {
 			fmt.Fprintf(&out, " changed lines ")
@@ -211,6 +214,7 @@ func renderReviewTaskInput(input ChunkInput) string {
 		}
 		out.WriteString("\n")
 	}
+	fmt.Fprintf(&out, "%s\n", promptpack.UntrustedInputEnd)
 	return out.String()
 }
 
