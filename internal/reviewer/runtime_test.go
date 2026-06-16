@@ -67,7 +67,7 @@ func TestRenderReviewTaskInputSeparatesTrustedControlAndUntrustedEvidence(t *tes
 	trustedEnd := strings.Index(got, promptpack.TrustedControlEnd)
 	untrustedStart := strings.Index(got, promptpack.UntrustedInputStart)
 	untrustedEnd := strings.Index(got, promptpack.UntrustedInputEnd)
-	if !(trustedStart >= 0 && trustedStart < trustedEnd && trustedEnd < untrustedStart && untrustedStart < untrustedEnd) {
+	if trustedStart < 0 || trustedStart >= trustedEnd || trustedEnd >= untrustedStart || untrustedStart >= untrustedEnd {
 		t.Fatalf("renderReviewTaskInput() has invalid section order:\n%s", got)
 	}
 	untrustedSection := got[untrustedStart:untrustedEnd]
