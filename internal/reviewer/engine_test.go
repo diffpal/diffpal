@@ -674,3 +674,102 @@ func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 		t.Fatalf("sorted paths = %q, %q; want a.go then b.go", got[0].Path, got[1].Path)
 	}
 }
+
+func TestNormalizeChunkFindingAllowsNearbySupportingContext(t *testing.T) {
+	allowed := map[string][]ChunkSpan{
+		"app/config.go": {{Start: 22, End: 22}},
+	}
+	item := ChunkFinding{
+		Category:    "correctness",
+		Severity:    "medium",
+		Confidence:  0.86,
+		Path:        "app/config.go",
+		StartLine:   22,
+		EndLine:     22,
+		ChangedSpan: findings.LineSpan{Path: "app/config.go", StartLine: 22, EndLine: 22},
+		SupportingSpan: &findings.LineSpan{
+			Path:      "app/config.go",
+			StartLine: 8,
+			EndLine:   12,
+		},
+		Title:   "default no longer matches parser behavior",
+		Message: "the changed default conflicts with the parser branch above",
+		Evidence: findings.FindingEvidence{
+			Anchor:         "L22",
+			ReasoningBasis: "the changed default is interpreted by the nearby parser branch",
+			Source:         "nearby_context",
+		},
+		Impact: findings.FindingImpact{
+			Summary: "edge-case configs can be parsed incorrectly",
+			Scope:   "configuration loading",
+		},
+	}
+
+	got, ok := normalizeChunkFinding(item, allowed, "provider-a")
+	if !ok {
+		t.Fatal("normalizeChunkFinding() rejected finding with changed anchor and nearby supporting context")
+	}
+	if got.SupportingSpan == nil || got.SupportingSpan.StartLine != 8 {
+		t.Fatalf("SupportingSpan = %+v, want nearby context", got.SupportingSpan)
+	}
+}
+
+func TestNormalizeChunkFindingAcceptsChangedOnlyAnchor(t *testing.T) {
+	allowed := map[string][]ChunkSpan{
+		"app/config.go": {{Start: 22, End: 22}},
+	}
+	item := ChunkFinding{
+		Category:    "correctness",
+		Severity:    "medium",
+		Confidence:  0.86,
+		Path:        "app/config.go",
+		StartLine:   22,
+		EndLine:     22,
+		ChangedSpan: findings.LineSpan{Path: "app/config.go", StartLine: 22, EndLine: 22},
+		Title:       "changed default is invalid",
+		Message:     "the changed default is not accepted by the parser",
+		Evidence: findings.FindingEvidence{
+			Anchor:         "L22",
+			ReasoningBasis: "the changed line sets an unsupported value",
+			Source:         "changed_line",
+		},
+		Impact: findings.FindingImpact{
+			Summary: "configs using this default fail",
+			Scope:   "configuration loading",
+		},
+	}
+
+	if _, ok := normalizeChunkFinding(item, allowed, "provider-a"); !ok {
+		t.Fatal("normalizeChunkFinding() rejected changed-only finding")
+	}
+}
+
+func TestNormalizeChunkFindingRejectsUnchangedOnlyAnchor(t *testing.T) {
+	allowed := map[string][]ChunkSpan{
+		"app/config.go": {{Start: 22, End: 22}},
+	}
+	item := ChunkFinding{
+		Category:    "correctness",
+		Severity:    "medium",
+		Confidence:  0.86,
+		Path:        "app/config.go",
+		StartLine:   8,
+		EndLine:     12,
+		ChangedSpan: findings.LineSpan{Path: "app/config.go", StartLine: 8, EndLine: 12},
+		Title:       "parser branch is confusing",
+		Message:     "the finding is anchored only to unchanged nearby context",
+		Evidence: findings.FindingEvidence{
+			Anchor:         "L8-L12",
+			ReasoningBasis: "only unchanged context supports this finding",
+			Source:         "nearby_context",
+		},
+		Impact: findings.FindingImpact{
+			Summary: "the issue lacks a changed-line anchor",
+			Scope:   "review validation",
+		},
+	}
+
+	if _, ok := normalizeChunkFinding(item, allowed, "provider-a"); ok {
+		t.Fatal("normalizeChunkFinding() accepted finding anchored only to unchanged context")
+	}
+}

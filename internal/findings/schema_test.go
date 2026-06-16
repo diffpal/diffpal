@@ -188,6 +188,39 @@ func TestValidateV2RequiresStructuredEvidenceAndImpact(t *testing.T) {
 	}
 }
 
+func TestValidateV2AllowsSupportingContextWithChangedAnchor(t *testing.T) {
+	t.Parallel()
+
+	bundle := FindingsBundle{
+		Version:  VersionV2,
+		ReviewID: "review-context",
+		Findings: []Finding{{
+			Category:       "correctness",
+			Severity:       "medium",
+			Confidence:     0.86,
+			Path:           "app/config.go",
+			StartLine:      22,
+			EndLine:        22,
+			ChangedSpan:    LineSpan{Path: "app/config.go", StartLine: 22, EndLine: 22},
+			SupportingSpan: &LineSpan{Path: "app/config.go", StartLine: 8, EndLine: 12},
+			Title:          "default no longer matches parser behavior",
+			Message:        "the changed default conflicts with the parser branch above",
+			Evidence: FindingEvidence{
+				Anchor:         "L22",
+				ReasoningBasis: "the changed default is interpreted by the nearby parser branch",
+				Source:         "nearby_context",
+			},
+			Impact: FindingImpact{
+				Summary: "edge-case configs can be parsed incorrectly",
+				Scope:   "configuration loading",
+			},
+		}},
+	}
+	if err := Validate(bundle); err != nil {
+		t.Fatalf("Validate(v2 supporting context) error = %v", err)
+	}
+}
+
 func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	t.Parallel()
 

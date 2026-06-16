@@ -181,7 +181,7 @@ func Validate(bundle FindingsBundle) error {
 				return err
 			}
 			if f.SupportingSpan != nil {
-				if err := validateLineSpan("finding.supporting_span", *f.SupportingSpan, false); err != nil {
+				if err := validateLineSpan("finding.supporting_span", *f.SupportingSpan, true); err != nil {
 					return err
 				}
 			}
