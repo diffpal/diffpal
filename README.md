@@ -13,9 +13,15 @@ gates. Teams bring their own AI provider or ACP-compatible CLI, so there is no
 mandatory hosted DiffPal review service and no required per-seat review
 platform.
 
-DiffPal owns diff collection, finding schema validation, summary rendering,
-inline publishing, CI artifacts, and gate decisions. Your provider owns the
-model, tool loop, account, and credentials.
+DiffPal exists to make AI code review something teams control, not another
+review platform they rent. It runs in your CI, uses the AI provider you choose,
+and turns every pull request into clear summaries, actionable inline feedback,
+review artifacts, and merge gates.
+
+Bring your own provider account, keep your costs and credentials with you, and
+keep the review workflow in your repository. DiffPal's goal is to make AI PR
+review portable, affordable, and enforceable across GitHub, GitLab, and Azure
+DevOps.
 
 | Works with | Publishes | Gates on |
 | --- | --- | --- |
@@ -33,9 +39,9 @@ pull request diff
   -> platform publisher and CI artifacts
 ```
 
-DiffPal owns the PR review workflow around the model call. The selected
-provider supplies the review intelligence, while DiffPal keeps output shape,
-publishing, artifacts, and merge policy consistent across hosts.
+DiffPal coordinates the review workflow around the model call. Your provider
+supplies the review intelligence; DiffPal keeps PR feedback, artifacts, and
+merge policy consistent across hosts.
 
 Review instructions are produced by DiffPal's versioned Prompt Pack. Findings
 artifacts include the prompt id, prompt version, purpose, and findings schema
@@ -45,10 +51,10 @@ and [findings schema](docs/findings-schema.md) for the current metadata.
 
 ## Bring Your Own Provider
 
-Provider choice is a config boundary: `diffpal.provider` selects an entry under
-`runtime.providers`. Use Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted
-API provider, an ordered provider pool, or any CLI that can start an ACP stdio
-server.
+DiffPal decouples AI review from any one vendor or hosted service. Choose
+Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an ordered
+provider pool, or any ACP-compatible CLI without rebuilding your PR review
+workflow.
 
 That model keeps cost and account control in your provider account. DiffPal
 does not require a hosted review service or per-seat platform subscription to
