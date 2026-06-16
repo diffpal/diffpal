@@ -31,6 +31,8 @@ jobs:
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default build
       - name: Stage artifacts
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm stage
+      - name: Normalize npm bin ownership
+        run: node ./tools/omnidist/normalize-npm-bin.js
       - name: Verify artifacts
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
       - name: Pack staged artifacts
