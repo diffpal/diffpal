@@ -33,6 +33,12 @@ logic. Your provider owns the model, tool loop, account, and credentials. That
 split keeps CI setup predictable while still letting you choose the agent stack
 your team already trusts.
 
+Review instructions are produced by DiffPal's versioned Prompt Pack. Findings
+artifacts include the prompt id, prompt version, purpose, and findings schema
+version, so a review can be traced back to the exact prompt contract that
+generated it. See the [config reference](docs/config-reference.md#prompt-pack)
+and [findings schema](docs/findings-schema.md) for the current metadata.
+
 ## Quick Start: GitHub Actions
 
 This is the fastest production-shaped setup: DiffPal installs itself through the
