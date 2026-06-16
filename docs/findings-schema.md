@@ -30,6 +30,22 @@ Optional top-level fields:
 - `change_summary[]` human-readable overview bullets
 - `files[]` reviewed file list
 
+## Prompt Versioning
+
+Prompt metadata is resolved from the versioned prompt registry in
+`internal/reviewer/promptpack`. The current default review prompt is:
+
+- `prompt_id`: `diffpal.review`
+- `prompt_version`: `v1.2.0`
+- `purpose`: `review_changed_diff`
+- `schema_version`: `findings.v2`
+
+Prompt body, output schema, and task instructions are treated as a versioned
+product surface. When changing the prompt contract, add a new registered prompt
+version, update prompt snapshot tests, document the schema impact here, and add
+a changelog entry. Do not silently change `prompt_version` metadata without a
+matching prompt registry and golden-test update.
+
 Required finding fields:
 
 - `category`

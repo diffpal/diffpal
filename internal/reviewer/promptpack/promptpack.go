@@ -21,6 +21,31 @@ const (
 	UntrustedInputEnd   = "<<<DIFFPAL_UNTRUSTED_INPUT_END>>>"
 )
 
+type Prompt struct {
+	Metadata     findings.PromptMetadata
+	OutputSchema string
+	renderSystem func(ReviewOptions) string
+	renderTask   func([]string) string
+}
+
+var reviewPromptV1_2 = Prompt{
+	Metadata: findings.PromptMetadata{
+		PromptID:      ReviewPromptID,
+		PromptVersion: ReviewPromptVersion,
+		Purpose:       ReviewPurpose,
+		SchemaVersion: ReviewSchemaVersion,
+	},
+	OutputSchema: OutputSchemaJSON,
+	renderSystem: renderReviewSystemV1_2,
+	renderTask:   reviewTaskV1_2,
+}
+
+var registry = map[string]map[string]Prompt{
+	ReviewPromptID: {
+		ReviewPromptVersion: reviewPromptV1_2,
+	},
+}
+
 const OutputSchemaJSON = `{
   "type": "object",
   "properties": {
@@ -96,16 +121,45 @@ type ReviewOptions struct {
 	Instructions string
 }
 
-func ReviewMetadata() *findings.PromptMetadata {
-	return &findings.PromptMetadata{
-		PromptID:      ReviewPromptID,
-		PromptVersion: ReviewPromptVersion,
-		Purpose:       ReviewPurpose,
-		SchemaVersion: ReviewSchemaVersion,
+func Lookup(id, version string) (Prompt, bool) {
+	versions, ok := registry[id]
+	if !ok {
+		return Prompt{}, false
 	}
+	prompt, ok := versions[version]
+	return prompt, ok
+}
+
+func DefaultReviewPrompt() Prompt {
+	prompt, ok := Lookup(ReviewPromptID, ReviewPromptVersion)
+	if !ok {
+		panic("diffpal default review prompt is not registered")
+	}
+	return prompt
+}
+
+func (p Prompt) ReviewMetadata() *findings.PromptMetadata {
+	metadata := p.Metadata
+	return &metadata
+}
+
+func (p Prompt) RenderReviewSystem(opts ReviewOptions) string {
+	return p.renderSystem(opts)
+}
+
+func (p Prompt) ReviewTask(checks []string) string {
+	return p.renderTask(checks)
+}
+
+func ReviewMetadata() *findings.PromptMetadata {
+	return DefaultReviewPrompt().ReviewMetadata()
 }
 
 func ReviewTask(checks []string) string {
+	return DefaultReviewPrompt().ReviewTask(checks)
+}
+
+func reviewTaskV1_2(checks []string) string {
 	return "Perform a code review of the task snapshot. Inspect the Git diff and nearby code with available tools before producing findings. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after inspecting the changed files for those checks."
 }
 
@@ -134,6 +188,10 @@ func EscapeUntrustedField(value string) string {
 }
 
 func RenderReviewSystem(opts ReviewOptions) string {
+	return DefaultReviewPrompt().RenderReviewSystem(opts)
+}
+
+func renderReviewSystemV1_2(opts ReviewOptions) string {
 	sections := []string{
 		providerInstructions(),
 		reviewPolicy(),

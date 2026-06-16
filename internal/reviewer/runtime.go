@@ -53,10 +53,11 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		defer func() { _ = closer.Close() }()
 	}
 
+	prompt := promptpack.DefaultReviewPrompt()
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
 		structuredagent.WithoutInputSchema(),
-		structuredagent.WithOutputSchema(promptpack.OutputSchemaJSON),
-		structuredagent.WithSystemInstruction(reviewSystemInstruction(cfg.Instructions)),
+		structuredagent.WithOutputSchema(prompt.OutputSchema),
+		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
@@ -118,7 +119,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 }
 
 func reviewSystemInstruction(instructions string) string {
-	return promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: instructions})
+	return promptpack.DefaultReviewPrompt().RenderReviewSystem(promptpack.ReviewOptions{Instructions: instructions})
 }
 
 func reviewAgentBuildRequest(cfg RuntimeConfig, reviewTools []tool.Tool) agentfactory.BuildRequest {

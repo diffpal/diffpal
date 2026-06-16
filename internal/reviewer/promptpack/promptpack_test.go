@@ -164,7 +164,7 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 func TestReviewMetadataIsStable(t *testing.T) {
 	t.Parallel()
 
-	got := ReviewMetadata()
+	got := DefaultReviewPrompt().ReviewMetadata()
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
@@ -176,6 +176,28 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	}
 	if got.SchemaVersion != "findings.v2" {
 		t.Fatalf("SchemaVersion = %q, want findings.v2", got.SchemaVersion)
+	}
+}
+
+func TestPromptRegistryResolvesDefaultReviewPrompt(t *testing.T) {
+	t.Parallel()
+
+	prompt, ok := Lookup(ReviewPromptID, ReviewPromptVersion)
+	if !ok {
+		t.Fatalf("Lookup(%q, %q) failed", ReviewPromptID, ReviewPromptVersion)
+	}
+	metadata := prompt.ReviewMetadata()
+	if metadata.PromptID != ReviewPromptID || metadata.PromptVersion != ReviewPromptVersion {
+		t.Fatalf("registry metadata = %+v, want %s/%s", metadata, ReviewPromptID, ReviewPromptVersion)
+	}
+	if metadata.Purpose != ReviewPurpose || metadata.SchemaVersion != ReviewSchemaVersion {
+		t.Fatalf("registry metadata = %+v, want purpose/schema %s/%s", metadata, ReviewPurpose, ReviewSchemaVersion)
+	}
+	if prompt.OutputSchema != OutputSchemaJSON {
+		t.Fatal("registry output schema does not match current schema")
+	}
+	if ReviewMetadata().PromptVersion != metadata.PromptVersion {
+		t.Fatalf("ReviewMetadata() = %+v, want registry metadata %+v", ReviewMetadata(), metadata)
 	}
 }
 

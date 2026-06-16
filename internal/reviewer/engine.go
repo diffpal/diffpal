@@ -189,6 +189,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 	chunks := chunkFileChanges(filtered, opts.MaxFilesPerChunk)
 	reviewed := reviewedFiles(filtered)
+	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
 		Version:       findings.VersionV2,
 		ReviewID:      reviewID,
@@ -196,7 +197,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		HeadSHA:       result.HeadSHA,
 		Language:      language,
 		ReviewChecks:  append([]string(nil), reviewChecks...),
-		Prompt:        promptpack.ReviewMetadata(),
+		Prompt:        prompt.ReviewMetadata(),
 		ChangeSummary: findings.SemanticChangeSummary(reviewed),
 		Files:         reviewed,
 		Findings:      []findings.Finding{},
@@ -408,7 +409,7 @@ func chunkInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, re
 		HeadSHA:               headSHA,
 		ChunkIndex:            chunkIndex,
 		ChunkCount:            chunkCount,
-		ReviewTask:            promptpack.ReviewTask(reviewChecks),
+		ReviewTask:            promptpack.DefaultReviewPrompt().ReviewTask(reviewChecks),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
