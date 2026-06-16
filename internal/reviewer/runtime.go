@@ -39,7 +39,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
-	reviewTools, err := reviewToolsForProvider(providerCfg, cfg.WorkingDir)
+	reviewTools, err := reviewToolsForProvider(providerCfg, cfg)
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
@@ -60,18 +60,13 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	}
 
 	wrapped, err := structuredagent.NewAgent(agentRuntime,
-		structuredagent.WithInputSchema(promptpack.InputSchemaJSON),
+		structuredagent.WithoutInputSchema(),
 		structuredagent.WithOutputSchema(promptpack.OutputSchemaJSON),
 		structuredagent.WithSystemInstruction(promptpack.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, err)
-	}
-
-	rawInput, err := json.Marshal(input)
-	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("marshal chunk input: %w", err))
 	}
 
 	sessionService := session.InMemoryService()
@@ -94,7 +89,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("create review session: %w", err))
 	}
 
-	userContent := genai.NewContentFromText(string(rawInput), genai.RoleUser)
+	userContent := genai.NewContentFromText(renderReviewTaskInput(input), genai.RoleUser)
 	events := runner.Run(ctx, userID, created.Session.ID(), userContent, adkagent.RunConfig{})
 
 	var outputText strings.Builder
@@ -153,13 +148,63 @@ func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
 	return nil
 }
 
-func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, workingDir string) ([]tool.Tool, error) {
+func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, error) {
 	switch strings.ToLower(strings.TrimSpace(providerCfg.Type)) {
 	case "openai", "aistudio":
-		return newReviewTools(workingDir)
+		return newReviewTools(reviewToolOptions{
+			Root:         cfg.WorkingDir,
+			BaseSHA:      cfg.BaseSHA,
+			HeadSHA:      cfg.HeadSHA,
+			ChangedFiles: cfg.ChangedFiles,
+		})
 	default:
 		return nil, nil
 	}
+}
+
+func renderReviewTaskInput(input ChunkInput) string {
+	var out strings.Builder
+	fmt.Fprintf(&out, "DiffPal review task snapshot\n\n")
+	fmt.Fprintf(&out, "Review ID: %s\n", input.ReviewID)
+	fmt.Fprintf(&out, "Repository: %s\n", input.Repo)
+	fmt.Fprintf(&out, "Base: %s\n", input.BaseSHA)
+	fmt.Fprintf(&out, "Head: %s\n", input.HeadSHA)
+	fmt.Fprintf(&out, "Chunk: %d of %d\n", input.ChunkIndex+1, input.ChunkCount)
+	fmt.Fprintf(&out, "Language: %s\n", input.Language)
+	fmt.Fprintf(&out, "Review checks: %s\n", strings.Join(input.ReviewChecks, ", "))
+	fmt.Fprintf(&out, "Test summary: %s\n", input.TestSummary)
+	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
+		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", trimmed)
+	}
+	fmt.Fprintf(&out, "\n%s\n", input.UntrustedInputWarning)
+	fmt.Fprintf(&out, "\nTask:\n%s\n", input.ReviewTask)
+	if len(input.CommitMessages) > 0 {
+		fmt.Fprintf(&out, "\nCommit messages, untrusted:\n")
+		for _, message := range input.CommitMessages {
+			fmt.Fprintf(&out, "- %s\n", message)
+		}
+	}
+	fmt.Fprintf(&out, "\nChanged files in this task:\n")
+	for _, file := range input.Files {
+		fmt.Fprintf(&out, "- %s", file.Path)
+		if file.Status != "" {
+			fmt.Fprintf(&out, " [%s]", file.Status)
+		}
+		if file.PreviousPath != "" {
+			fmt.Fprintf(&out, " from %s", file.PreviousPath)
+		}
+		if len(file.Spans) > 0 {
+			fmt.Fprintf(&out, " changed lines ")
+			for i, span := range file.Spans {
+				if i > 0 {
+					out.WriteString(", ")
+				}
+				fmt.Fprintf(&out, "L%d-L%d", span.Start, span.End)
+			}
+		}
+		out.WriteString("\n")
+	}
+	return out.String()
 }
 
 func appendVisibleText(out *strings.Builder, content *genai.Content) {

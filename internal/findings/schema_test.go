@@ -152,7 +152,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 		HeadSHA:  "head-a",
 		Prompt: &PromptMetadata{
 			PromptID:      "diffpal.review",
-			PromptVersion: "v1.1.0",
+			PromptVersion: "v1.2.0",
 			Purpose:       "review_changed_diff",
 			SchemaVersion: "findings.v1",
 		},
@@ -185,7 +185,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if readBack.Findings[0].ReviewID != "review-a" {
 		t.Fatalf("ReviewID = %q, want review-a", readBack.Findings[0].ReviewID)
 	}
-	if readBack.Prompt.PromptVersion != "v1.1.0" {
+	if readBack.Prompt.PromptVersion != "v1.2.0" {
 		t.Fatalf("Prompt = %+v, want persisted prompt metadata", readBack.Prompt)
 	}
 	if readBack.Findings[0].Impact != "attackers can execute script in another user's browser" {

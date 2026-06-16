@@ -3,7 +3,11 @@ package reviewer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 )
 
 func TestFileToolsetListReadAndSearch(t *testing.T) {
@@ -84,5 +88,71 @@ func TestFileToolsetRejectsSymlinkEscape(t *testing.T) {
 	}
 	if _, err := tools.readFile(nil, readFileArgs{Path: "secret.txt"}); err == nil {
 		t.Fatal("readFile() error = nil, want symlink escape rejection")
+	}
+}
+
+func TestReviewToolsetGitDiffIsScopedToChangedFiles(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "app.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	writeRepoFile(t, filepath.Join(repo, "other.go"), "package main\n")
+	runGitCmd(t, repo, "add", ".")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	base := runGitCmd(t, repo, "rev-parse", "HEAD")
+	writeRepoFile(t, filepath.Join(repo, "app.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+	runGitCmd(t, repo, "add", "app.go")
+	runGitCmd(t, repo, "commit", "-m", "change app")
+	head := runGitCmd(t, repo, "rev-parse", "HEAD")
+
+	ts, err := newReviewToolset(reviewToolOptions{
+		Root:    repo,
+		BaseSHA: base,
+		HeadSHA: head,
+		ChangedFiles: []ChunkFile{{
+			Path:   "app.go",
+			Status: "modified",
+			Spans:  []ChunkSpan{{Start: 4, End: 4}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("newReviewToolset() error = %v", err)
+	}
+
+	changed, err := ts.gitChangedFiles(nil, gitChangedFilesArgs{})
+	if err != nil {
+		t.Fatalf("gitChangedFiles() error = %v", err)
+	}
+	if len(changed.Files) != 1 || changed.Files[0].Path != "app.go" || !changed.Untrusted {
+		t.Fatalf("gitChangedFiles() = %+v, want app.go untrusted metadata", changed)
+	}
+
+	got, err := ts.gitDiff(nil, gitDiffArgs{Path: "app.go"})
+	if err != nil {
+		t.Fatalf("gitDiff() error = %v", err)
+	}
+	if !strings.Contains(got.Diff, `println("after")`) || !strings.Contains(got.Diff, promptpack.UntrustedInputStart) {
+		t.Fatalf("gitDiff() = %+v, want untrusted diff with changed line", got)
+	}
+	if _, err := ts.gitDiff(nil, gitDiffArgs{Path: "other.go"}); err == nil {
+		t.Fatal("gitDiff(other.go) error = nil, want unchanged path rejection")
+	}
+	if _, err := ts.gitDiff(nil, gitDiffArgs{Path: "../app.go"}); err == nil {
+		t.Fatal("gitDiff(../app.go) error = nil, want traversal rejection")
+	}
+}
+
+func TestReviewToolsForProviderOnlyInjectsHostedTools(t *testing.T) {
+	hosted, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "openai"}, RuntimeConfig{WorkingDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("reviewToolsForProvider(openai) error = %v", err)
+	}
+	if len(hosted) == 0 {
+		t.Fatal("reviewToolsForProvider(openai) returned no tools")
+	}
+	acp, err := reviewToolsForProvider(dpconfig.ProviderConfig{Type: "codex_acp"}, RuntimeConfig{WorkingDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("reviewToolsForProvider(codex_acp) error = %v", err)
+	}
+	if len(acp) != 0 {
+		t.Fatalf("reviewToolsForProvider(codex_acp) returned %d tools, want none", len(acp))
 	}
 }

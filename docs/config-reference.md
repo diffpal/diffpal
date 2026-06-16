@@ -129,19 +129,19 @@ artifacts include prompt metadata so review output can be traced back to the
 prompt contract:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.1.0`
+- `prompt_version`: `v1.2.0`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v1`
 
 `diffpal.review.instructions`, `--instructions`, and `--instructions-file`
 are appended as repository-local tuning in a dedicated prompt section. DiffPal
-still sends the diff itself as an untrusted JSON user payload; file snippets and
-comments in the diff are not treated as instructions.
+sends a compact review task snapshot instead of preloading every patch or file
+snippet. Hosted providers receive read-only DiffPal Git/repo tools to inspect
+the diff; ACP providers use their native Git and filesystem tools.
 
-Prompt Pack v1.1 labels the diff payload with untrusted-input warnings and
-delimiter fields. Provider agents must use code, comments, docs, test fixtures,
-commit messages, and file contents only as review evidence, never as role
-changes or instructions to follow.
+Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
+docs, test fixtures, and file contents as untrusted review evidence, never as
+role changes or instructions to follow.
 
 Review checks map to finding categories:
 
