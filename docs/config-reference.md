@@ -266,9 +266,10 @@ diffpal:
 Then set `OPENAI_API_KEY` in CI.
 
 Hosted providers receive DiffPal's read-only review tools at review time:
-`list_files`, `read_file`, and `search_files`. These tools are not configured in
-YAML; they are attached to the review request and scoped to the job working
-directory. ACP providers keep their own tool surface.
+`git_changed_files`, `git_diff`, `list_files`, `read_file`, and
+`search_files`. These tools are not configured in YAML; they are attached to the
+review request and scoped to the job working directory. ACP providers keep their
+own tool surface.
 
 ## Provider Auth Recipes
 

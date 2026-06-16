@@ -68,6 +68,9 @@ func TestDiagnoseProviderConfigHostedAndPool(t *testing.T) {
 	if !strings.Contains(joined, "hosted provider openai-fast expects OPENAI_API_KEY") {
 		t.Fatalf("diagnoseProviderConfig() missing hosted auth warning:\n%s", joined)
 	}
+	if !strings.Contains(joined, "hosted provider openai-fast review tools: git_changed_files, git_diff, list_files, read_file, search_files") {
+		t.Fatalf("diagnoseProviderConfig() missing hosted tool capabilities:\n%s", joined)
+	}
 	if !strings.Contains(joined, "pool provider pool configured with 1 entries") {
 		t.Fatalf("diagnoseProviderConfig() missing pool summary:\n%s", joined)
 	}

@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const hostedReviewToolCapabilities = "git_changed_files, git_diff, list_files, read_file, search_files"
+
 func newDoctorCommand() *cobra.Command {
 	doctor := &cobra.Command{
 		Use:   "doctor",
@@ -101,6 +103,7 @@ func diagnoseProviderConfig(cfg config.Config) []string {
 		providerCfg := cfg.Providers[key]
 		switch providerCfg.Type {
 		case "openai", "aistudio":
+			issues = append(issues, fmt.Sprintf("ok: hosted provider %s review tools: %s", key, hostedReviewToolCapabilities))
 			if tokenEnv := hostedAPIKeyEnv(providerCfg.Type); tokenEnv != "" {
 				if os.Getenv(tokenEnv) == "" {
 					issues = append(issues, fmt.Sprintf("warn: hosted provider %s expects %s", key, tokenEnv))
