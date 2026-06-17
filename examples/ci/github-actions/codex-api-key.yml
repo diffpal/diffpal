@@ -11,6 +11,8 @@ concurrency:
 jobs:
   review:
     name: review
+    # Provider credentials are only exposed to same-repository PRs.
+    # Fork PRs should run no-secret CI only.
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:

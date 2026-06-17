@@ -95,6 +95,30 @@ Use a same-repository PR guard before exposing provider secrets:
 if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
 ```
 
+GitHub Actions settings checklist for fork PRs:
+
+- Set fork workflow approval to the strictest option you can tolerate, ideally
+  approval for all external contributors. This controls whether outside
+  contributors' fork workflows run automatically; it does not release provider
+  secrets to fork code.
+- Do not enable settings that send secrets or write tokens to fork pull request
+  workflows.
+- Keep explicit minimal `permissions`; start with `contents: read` for no-secret
+  PR CI and grant `pull-requests: write` or `checks: write` only to jobs that
+  need to publish feedback.
+- Prefer GitHub-hosted runners for untrusted PRs. Self-hosted runners can be
+  persistently affected by untrusted workflow code.
+- Pin third-party actions to full commit SHAs where practical, especially in
+  secret-bearing jobs.
+
+`pull_request_target` runs from the default branch of the base repository and is
+useful for trusted automation such as labeling or commenting. It always runs in
+the base repository context, so do not combine it with checking out the PR head
+or running fork code such as package installs, tests, build scripts, hooks, or
+provider CLIs. Fork PRs should run no-secret CI only; provider-backed DiffPal
+review is for same-repository PRs, trusted branches, or maintainer-controlled
+automation that does not execute fork code.
+
 What you should see:
 
 - `diffpal-checks` check run on the PR head commit.

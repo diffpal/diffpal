@@ -55,10 +55,22 @@ secrets into artifacts/logs. Use GitHub Environment secrets with required
 reviewers for publish credentials.
 Concrete controls:
 
-- Run `diffpal` only for same-repository pull requests; do not expose
-  `OPENAI_API_KEY` to forked PRs or `pull_request_target` workflows.
+- Run `diffpal` with provider credentials only for same-repository pull
+  requests; do not expose `OPENAI_API_KEY`, `CODEX_AUTH_JSON_B64`, or other
+  provider credentials to forked PR code.
+- For public repositories, require approval for external fork workflow runs
+  where possible. This controls whether outside contributors' fork workflows run
+  automatically; it does not release provider secrets to fork code. Keep fork PR
+  workflows no-secret.
+- For private or internal repositories, do not enable GitHub settings that send
+  write tokens or secrets to pull requests from forks unless every fork author
+  and every line of code being run is trusted.
 - Keep workflow `permissions` minimal for each job and avoid unpinned
   third-party actions in jobs that can read release or review secrets.
+- Prefer GitHub-hosted runners for untrusted PRs. Do not run fork PR workflows
+  with secrets on self-hosted runners.
+- Pin third-party actions to full commit SHAs where practical; full SHAs are the
+  immutable option.
 - Leave `ACTIONS_STEP_DEBUG` and shell tracing disabled for secret-bearing
   jobs.
 - Use protected GitHub Environments with required reviewers for publish jobs
@@ -78,6 +90,12 @@ jobs:
 ```
 
 Inject `OPENAI_API_KEY` only inside a job with that guard.
+
+`pull_request_target` runs from the default branch of the base repository and is
+useful for trusted automation such as labeling or commenting. Do not combine it
+with checking out the PR head or running fork code such as package installs,
+tests, build scripts, hooks, or provider CLIs; that pattern can expose
+privileged tokens or secrets to untrusted code.
 
 4. Publish npm artifacts with token auth from `NPM_PUBLISH_TOKEN`.
 5. Create GitHub release notes from `CHANGELOG.md` (if present) or auto-generated notes.
