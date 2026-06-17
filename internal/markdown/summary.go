@@ -65,10 +65,10 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 		out.WriteString("No reviewable files were recorded.\n")
 		return out.String()
 	}
-	out.WriteString("| File | Status | Notes |\n")
-	out.WriteString("| --- | --- | --- |\n")
+	out.WriteString("| File | Change | Review | Notes |\n")
+	out.WriteString("| --- | --- | --- | --- |\n")
 	for _, row := range rows {
-		fmt.Fprintf(&out, "| `%s` | %s | %s |\n", escapeTable(row.Path), row.Status, escapeTable(row.Notes))
+		fmt.Fprintf(&out, "| `%s` | %s | %s | %s |\n", escapeTable(row.Path), row.Change, row.Review, escapeTable(row.Notes))
 	}
 	out.WriteString("\n")
 
@@ -81,10 +81,9 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	for _, path := range sortedKeys(byPath) {
 		fmt.Fprintf(&out, "### %s\n\n", path)
 		for _, finding := range byPath[path] {
-			out.WriteString(RenderFindingDetail(finding, FindingDetailOptions{
-				ListItem: true,
-				Snippet:  snippetForFinding(opts.Snippets, finding),
-				Link:     linkForFinding(opts.Links, finding),
+			out.WriteString(renderSummaryFindingDetail(finding, summaryFindingDetailOptions{
+				Snippet: snippetForFinding(opts.Snippets, finding),
+				Link:    linkForFinding(opts.Links, finding),
 			}))
 		}
 		out.WriteString("\n")
@@ -145,29 +144,68 @@ func changeSummaryItems(bundle findings.FindingsBundle) []string {
 
 type feedbackRow struct {
 	Path   string
-	Status string
+	Change string
+	Review string
 	Notes  string
 }
 
 func feedbackRows(bundle findings.FindingsBundle, items []findings.Finding) []feedbackRow {
 	byPath := groupByPath(items)
 	paths := reviewedPaths(bundle, byPath)
+	changes := reviewedChanges(bundle)
 	rows := make([]feedbackRow, 0, len(paths))
 	for _, path := range paths {
 		findingsForFile := byPath[path]
-		status := "Passed"
+		review := "Passed"
 		notes := "No actionable findings."
 		if len(findingsForFile) > 0 {
 			if countBlocking(findingsForFile) > 0 {
-				status = "Blocked"
+				review = "Blocked"
 			} else {
-				status = "Needs attention"
+				review = "Needs attention"
 			}
 			notes = severityNotes(findingsForFile)
 		}
-		rows = append(rows, feedbackRow{Path: path, Status: status, Notes: notes})
+		rows = append(rows, feedbackRow{
+			Path:   path,
+			Change: changeLabel(changes[path]),
+			Review: review,
+			Notes:  notes,
+		})
 	}
 	return rows
+}
+
+func reviewedChanges(bundle findings.FindingsBundle) map[string]string {
+	out := make(map[string]string, len(bundle.Files))
+	for _, file := range bundle.Files {
+		path := strings.TrimSpace(file.Path)
+		if path == "" {
+			continue
+		}
+		if _, ok := out[path]; ok {
+			continue
+		}
+		out[path] = file.Status
+	}
+	return out
+}
+
+func changeLabel(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "added":
+		return "Added"
+	case "modified":
+		return "Modified"
+	case "deleted":
+		return "Deleted"
+	case "renamed":
+		return "Renamed"
+	case "copied":
+		return "Copied"
+	default:
+		return "Changed"
+	}
 }
 
 func reviewedPaths(bundle findings.FindingsBundle, byPath map[string][]findings.Finding) []string {
@@ -261,6 +299,38 @@ type FindingDetailOptions struct {
 	ListItem bool
 	Snippet  CodeSnippet
 	Link     string
+}
+
+type summaryFindingDetailOptions struct {
+	Snippet CodeSnippet
+	Link    string
+}
+
+func renderSummaryFindingDetail(finding findings.Finding, opts summaryFindingDetailOptions) string {
+	out := strings.Builder{}
+	fmt.Fprintf(&out, "#### %s", findingHeading(finding, false))
+	if finding.StartLine > 0 {
+		fmt.Fprintf(&out, " - %s", lineRange(finding.StartLine, finding.EndLine))
+	}
+	out.WriteString("\n\n")
+	fmt.Fprintf(&out, "%s\n\n", firstNonEmpty(finding.Message, finding.Title))
+	if impact := finding.ImpactText(); impact != "" {
+		fmt.Fprintf(&out, "**Impact:** %s\n\n", impact)
+	}
+	if finding.Suggestion != "" {
+		fmt.Fprintf(&out, "**Fix:** %s\n\n", finding.Suggestion)
+	}
+	if evidence := finding.EvidenceText(); evidence != "" {
+		fmt.Fprintf(&out, "**Evidence:** %s\n\n", evidence)
+	}
+	if link := strings.TrimSpace(opts.Link); link != "" {
+		fmt.Fprintf(&out, "**Source:** [View changed lines](%s)\n\n", link)
+	}
+	if opts.Snippet.Code != "" {
+		writeCodeFence(&out, opts.Snippet, "")
+		out.WriteString("\n")
+	}
+	return out.String()
 }
 
 func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) string {

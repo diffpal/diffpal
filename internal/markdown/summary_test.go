@@ -20,9 +20,9 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 			"Changed service request handling and database query behavior.",
 		},
 		Files: []findings.ReviewedFile{
-			{Path: "internal/app/service.go"},
-			{Path: "internal/db/query.go"},
-			{Path: "internal/web/handler.go"},
+			{Path: "internal/app/service.go", Status: "modified"},
+			{Path: "internal/db/query.go", Status: "modified"},
+			{Path: "internal/web/handler.go", Status: "added"},
 		},
 		Findings: []findings.Finding{
 			{
@@ -84,15 +84,19 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertNotContains(t, got, "- Blocking findings: 3")
 	assertNotContains(t, got, "- Review checks: bugs, performance, best-practices")
 	assertContains(t, got, "## Feedback on Files")
-	assertContains(t, got, "| `internal/app/service.go` | Blocked | critical: 1, low: 1 |")
-	assertContains(t, got, "| `internal/db/query.go` | Blocked | high: 2 |")
-	assertContains(t, got, "| `internal/web/handler.go` | Passed | No actionable findings. |")
+	assertContains(t, got, "| File | Change | Review | Notes |")
+	assertContains(t, got, "| `internal/app/service.go` | Modified | Blocked | critical: 1, low: 1 |")
+	assertContains(t, got, "| `internal/db/query.go` | Modified | Blocked | high: 2 |")
+	assertContains(t, got, "| `internal/web/handler.go` | Added | Passed | No actionable findings. |")
 	assertContains(t, got, "## Detailed Comments")
 	assertContains(t, got, "### internal/app/service.go")
-	assertContains(t, got, "- **Critical correctness** `L8`: possible nil dereference")
-	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
+	assertContains(t, got, "#### Critical correctness - L8\n\npossible nil dereference")
+	assertContains(t, got, "**Evidence:** cfg.Client.Do(req)")
 	assertContains(t, got, "### internal/db/query.go")
-	assertContains(t, got, "- **High security** `L20`: query concatenates untrusted input")
+	assertContains(t, got, "#### High security - L20\n\nquery concatenates untrusted input")
+	assertNotContains(t, got, "- **Critical correctness**")
+	assertNotContains(t, got, "  - **Evidence**")
+	assertNotContains(t, got, "**Confidence:**")
 }
 
 func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
@@ -104,7 +108,7 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 			"Refined application service behavior without actionable review findings.",
 		},
 		Files: []findings.ReviewedFile{
-			{Path: "internal/app/service.go"},
+			{Path: "internal/app/service.go", Status: "modified"},
 		},
 	})
 
@@ -112,10 +116,41 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	assertContains(t, got, "- Refined application service behavior without actionable review findings.")
 	assertNotContains(t, got, "review_id: review-empty")
 	assertContains(t, got, "DiffPal found no actionable issues in the reviewed diff.")
-	assertContains(t, got, "| `internal/app/service.go` | Passed | No actionable findings. |")
+	assertContains(t, got, "| `internal/app/service.go` | Modified | Passed | No actionable findings. |")
 	if strings.Contains(got, "## Detailed Comments") {
 		t.Fatalf("empty summary includes detailed comments:\n%s", got)
 	}
+}
+
+func TestRenderSummaryShowsFileChangeLabels(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummary(findings.FindingsBundle{
+		ReviewID: "review-change-labels",
+		Files: []findings.ReviewedFile{
+			{Path: "added.go", Status: "added"},
+			{Path: "copied.go", Status: "copied"},
+			{Path: "deleted.go", Status: "deleted"},
+			{Path: "modified.go", Status: "modified"},
+			{Path: "renamed.go", Status: "renamed"},
+			{Path: "unknown.go", Status: "unexpected"},
+		},
+		Findings: []findings.Finding{
+			{
+				Severity: "medium",
+				Path:     "finding-only.go",
+				Message:  "finding path was not recorded in reviewed files",
+			},
+		},
+	})
+
+	assertContains(t, got, "| `added.go` | Added | Passed | No actionable findings. |")
+	assertContains(t, got, "| `copied.go` | Copied | Passed | No actionable findings. |")
+	assertContains(t, got, "| `deleted.go` | Deleted | Passed | No actionable findings. |")
+	assertContains(t, got, "| `modified.go` | Modified | Passed | No actionable findings. |")
+	assertContains(t, got, "| `renamed.go` | Renamed | Passed | No actionable findings. |")
+	assertContains(t, got, "| `unknown.go` | Changed | Passed | No actionable findings. |")
+	assertContains(t, got, "| `finding-only.go` | Changed | Needs attention | medium: 1 |")
 }
 
 func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
@@ -228,11 +263,12 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "- **High security** `L12-L17`: query concatenates untrusted input")
-	assertContains(t, got, "  ```go\n  user := r.URL.Query().Get(\"user\")\n  _, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n  ```")
-	assertContains(t, got, "  - **Evidence**: Line 17 builds SQL by concatenating user input.")
-	assertContains(t, got, "  - **Impact**: malicious users can delete sessions for other accounts.")
-	assertContains(t, got, "  - **Suggestion**: Use a parameterized statement.")
+	assertContains(t, got, "#### High security - L12-L17\n\nquery concatenates untrusted input")
+	assertContains(t, got, "**Impact:** malicious users can delete sessions for other accounts.")
+	assertContains(t, got, "**Fix:** Use a parameterized statement.")
+	assertContains(t, got, "**Evidence:** Line 17 builds SQL by concatenating user input.")
+	assertContains(t, got, "```go\nuser := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n```")
+	assertNotContains(t, got, "**Confidence:**")
 }
 
 func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
@@ -257,8 +293,8 @@ func TestRenderSummaryFallsBackWhenSnippetMissing(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "- **Medium correctness** `L4`: possible nil dereference")
-	assertContains(t, got, "  - **Evidence**: cfg.Client.Do(req)")
+	assertContains(t, got, "#### Medium correctness - L4\n\npossible nil dereference")
+	assertContains(t, got, "**Evidence:** cfg.Client.Do(req)")
 	assertNotContains(t, got, "```")
 }
 
@@ -285,10 +321,9 @@ func TestRenderSummaryUsesReadableLinkedFindingHeader(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "- **High security**: query concatenates untrusted input")
-	assertContains(t, got, "  - **Evidence**: line 17 concatenates the user query parameter into SQL")
-	assertContains(t, got, "  - **Source**:")
-	assertContains(t, got, "  - https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17")
+	assertContains(t, got, "#### High security - L12-L17\n\nquery concatenates untrusted input")
+	assertContains(t, got, "**Evidence:** line 17 concatenates the user query parameter into SQL")
+	assertContains(t, got, "**Source:** [View changed lines](https://github.com/acme/diffpal/blob/head-a/internal/platformapi/admin_debug.go#L12-L17)")
 	assertNotContains(t, got, "**[high][")
 }
 
@@ -313,7 +348,7 @@ func TestRenderSummaryUsesLongerFenceForBackticks(t *testing.T) {
 		}),
 	})
 
-	assertContains(t, got, "  ````markdown\n  ```go\n  fmt.Println(\"x\")\n  ```\n  ````")
+	assertContains(t, got, "````markdown\n```go\nfmt.Println(\"x\")\n```\n````")
 }
 
 func assertContains(t *testing.T, got string, want string) {
