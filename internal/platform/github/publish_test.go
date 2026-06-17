@@ -173,6 +173,9 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 		ReviewID: "review-summary",
 		BaseSHA:  "base-b",
 		HeadSHA:  "head-b",
+		Files: []findings.ReviewedFile{
+			{Path: "internal/db/query.go", Status: "modified"},
+		},
 		Findings: []findings.Finding{
 			{
 				Severity:  "critical",
@@ -187,7 +190,7 @@ func TestCheckRunSummaryUsesMarkdownGrouping(t *testing.T) {
 	summary := CheckRunSummary(bundle)
 	assertStringContains(t, summary, "# DiffPal Review Summary", "title")
 	assertStringContains(t, summary, "## Feedback on Files", "file feedback section")
-	assertStringContains(t, summary, "| `internal/db/query.go` | Needs attention | critical: 1 |", "file feedback row")
+	assertStringContains(t, summary, "| `internal/db/query.go` | Modified | Needs attention | critical: 1 |", "file feedback row")
 	assertStringContains(t, summary, "## Detailed Comments", "detailed comments")
 }
 
