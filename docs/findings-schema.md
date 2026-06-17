@@ -36,7 +36,7 @@ Prompt metadata is resolved from the versioned prompt registry in
 `internal/reviewer/promptpack`. The current default review prompt is:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.0`
+- `prompt_version`: `v1.2.1`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 
@@ -120,14 +120,12 @@ Stable fingerprint input:
 
 ## Inspection Metadata
 
-Hosted providers receive DiffPal review tools at runtime. A hosted review result
-is accepted only after `git_diff` was called for the reviewed chunk. Tool usage
-is recorded in `inspection.tool_calls`, with `diff_inspected` set when
-`git_diff` ran.
+Providers inspect the requested base/head diff and supporting code through their
+available Git and filesystem tooling. DiffPal no longer requires provider-facing
+review tool telemetry before accepting structured output.
 
-ACP providers use their native tool surface. DiffPal records
-`inspection.required: false` for those providers because runtime-level proof is
-not available from the wrapper.
+The `inspection` object remains in the bundle schema for compatibility with
+older bundles and debug runtimes that can still emit inspection metadata.
 
 ## Compatibility
 

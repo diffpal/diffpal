@@ -17,6 +17,7 @@ steps:
     displayName: Install Codex provider
 
   - script: |
+      # Generate CODEX_AUTH_JSON_B64 with examples/README.md#generate-codex_auth_json_b64.
       mkdir -p "$HOME/.codex"
       printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
       chmod 600 "$HOME/.codex/auth.json"

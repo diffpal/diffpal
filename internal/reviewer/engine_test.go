@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
@@ -25,11 +26,11 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
 
 	runtime := &fakeRuntime{
-		outputs: []ChunkOutput{{
+		outputs: []ReviewOutput{{
 			ChangeSummary: []string{
 				"Changed the command output behavior used by the sample entrypoint.",
 			},
-			Findings: []ChunkFinding{{
+			Findings: []ReviewFinding{{
 				Category:   "correctness",
 				Severity:   "high",
 				Confidence: 0.94,
@@ -45,14 +46,11 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-a",
-		ReviewID:         "review-a",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
+		WorkingDir: repo,
+		Repo:       "repo-a",
+		ReviewID:   "review-a",
+		MaxFiles:   20,
+		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -69,14 +67,8 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if !strings.Contains(runtime.inputs[0].ReviewTask, "Perform a code review") {
 		t.Fatalf("runtime input review task = %q, want explicit review task", runtime.inputs[0].ReviewTask)
 	}
-	if result.ChangedFiles != 1 || result.ReviewableFiles != 1 {
-		t.Fatalf("file counts = changed %d reviewable %d, want 1/1", result.ChangedFiles, result.ReviewableFiles)
-	}
-	if result.ContextChunks != 1 {
-		t.Fatalf("ContextChunks = %d, want 1", result.ContextChunks)
-	}
-	if result.TestSummary != "no_tests_in_diff" {
-		t.Fatalf("TestSummary = %q, want no_tests_in_diff", result.TestSummary)
+	if result.ChangedFiles != 1 {
+		t.Fatalf("ChangedFiles = %d, want 1", result.ChangedFiles)
 	}
 	if len(result.Bundle.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
@@ -97,11 +89,8 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if result.Bundle.Language != "en" {
 		t.Fatalf("Bundle.Language = %q, want en", result.Bundle.Language)
 	}
-	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != "v1.2.0" {
+	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != "v1.2.1" {
 		t.Fatalf("Bundle.Prompt = %+v, want prompt pack metadata", result.Bundle.Prompt)
-	}
-	if result.Bundle.Inspection == nil || !result.Bundle.Inspection.DiffInspected {
-		t.Fatalf("Bundle.Inspection = %+v, want diff inspection metadata", result.Bundle.Inspection)
 	}
 	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
 		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
@@ -111,83 +100,6 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "main.go" {
 		t.Fatalf("Bundle.Files = %v, want main.go", result.Bundle.Files)
-	}
-}
-
-func TestRunWithRuntimeRejectsHostedCleanResultWithoutDiffInspection(t *testing.T) {
-	repo := newGitRepo(t)
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
-	runGitCmd(t, repo, "add", "main.go")
-	runGitCmd(t, repo, "commit", "-m", "initial")
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
-
-	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-inspection",
-		ReviewID:         "review-inspection",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-	}, &fakeRuntime{
-		outputs:      []ChunkOutput{{Findings: nil}},
-		noInspection: true,
-	})
-	if err == nil {
-		t.Fatal("RunWithRuntime() error = nil, want missing inspection error")
-	}
-	if !strings.Contains(err.Error(), "did not inspect the diff") {
-		t.Fatalf("RunWithRuntime() error = %v, want missing inspection", err)
-	}
-}
-
-func TestRunWithRuntimeRejectsHostedFindingsWithoutDiffInspection(t *testing.T) {
-	repo := newGitRepo(t)
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
-	runGitCmd(t, repo, "add", "main.go")
-	runGitCmd(t, repo, "commit", "-m", "initial")
-	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
-
-	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-inspection",
-		ReviewID:         "review-inspection",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-	}, &fakeRuntime{
-		outputs: []ChunkOutput{{
-			Findings: []ChunkFinding{{
-				Category:    "correctness",
-				Severity:    "high",
-				Confidence:  0.94,
-				Path:        "main.go",
-				StartLine:   4,
-				EndLine:     4,
-				ChangedSpan: findings.LineSpan{Path: "main.go", StartLine: 4, EndLine: 4},
-				Title:       "behavior changed",
-				Message:     "the output changed",
-				Evidence: findings.FindingEvidence{
-					Anchor:         "L4",
-					ReasoningBasis: "line 4 changed",
-					Source:         "changed_line",
-				},
-				Impact: findings.FindingImpact{
-					Summary: "callers see different behavior",
-					Scope:   "command output",
-				},
-			}},
-		}},
-		noInspection: true,
-	})
-	if err == nil {
-		t.Fatal("RunWithRuntime() error = nil, want missing inspection error")
-	}
-	if !strings.Contains(err.Error(), "did not inspect the diff") {
-		t.Fatalf("RunWithRuntime() error = %v, want missing inspection", err)
 	}
 }
 
@@ -202,16 +114,13 @@ func TestRunWithRuntimeFallsBackToSemanticChangeSummary(t *testing.T) {
 	writeRepoFile(t, filepath.Join(repo, "docs", "quickstart.md"), "after\n")
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-a",
-		ReviewID:         "review-a",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
+		WorkingDir: repo,
+		Repo:       "repo-a",
+		ReviewID:   "review-a",
+		MaxFiles:   20,
+		BlockOn:    "high",
 	}, &fakeRuntime{
-		outputs: []ChunkOutput{{Findings: nil}},
+		outputs: []ReviewOutput{{Findings: nil}},
 	})
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -233,8 +142,8 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
 
 	runtime := &fakeRuntime{
-		outputs: []ChunkOutput{{
-			Findings: []ChunkFinding{
+		outputs: []ReviewOutput{{
+			Findings: []ReviewFinding{
 				{
 					Category:   "correctness",
 					Severity:   "high",
@@ -264,16 +173,13 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-checks",
-		ReviewID:         "review-checks",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-		Language:         "Russian",
-		ReviewChecks:     []string{"bugs"},
+		WorkingDir:   repo,
+		Repo:         "repo-checks",
+		ReviewID:     "review-checks",
+		MaxFiles:     20,
+		BlockOn:      "high",
+		Language:     "Russian",
+		ReviewChecks: []string{"bugs"},
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -318,28 +224,25 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 	}, "\n")+"\n")
 
 	runtime := &fakeRuntime{
-		outputs: []ChunkOutput{{Findings: nil}},
+		outputs: []ReviewOutput{{Findings: nil}},
 	}
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-injection",
-		ReviewID:         "review-injection",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-		ReviewChecks:     []string{"best-practices"},
-		Instructions:     "Report actionable documentation review issues.",
+		WorkingDir:   repo,
+		Repo:         "repo-injection",
+		ReviewID:     "review-injection",
+		MaxFiles:     20,
+		BlockOn:      "high",
+		ReviewChecks: []string{"best-practices"},
+		Instructions: "Report actionable documentation review issues.",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
 	}
-	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptVersion != "v1.2.0" {
-		t.Fatalf("Bundle.Prompt = %+v, want prompt v1.2.0", result.Bundle.Prompt)
+	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptVersion != "v1.2.1" {
+		t.Fatalf("Bundle.Prompt = %+v, want prompt v1.2.1", result.Bundle.Prompt)
 	}
-	if len(runtime.inputs) != 1 || len(runtime.inputs[0].Files) != 1 {
-		t.Fatalf("runtime input = %+v, want one input file", runtime.inputs)
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime input = %+v, want one input", runtime.inputs)
 	}
 	input := runtime.inputs[0]
 	if input.UntrustedInputWarning != promptpack.UntrustedInputWarning {
@@ -356,36 +259,23 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 			t.Fatalf("initial task snapshot contains file-content injection phrase %q:\n%s", injection, renderReviewTaskInput(input))
 		}
 	}
-	file := input.Files[0]
-	if file.Path != "docs/review.md" || file.Status != "modified" {
-		t.Fatalf("file metadata = %+v, want modified docs/review.md", file)
-	}
-	if len(file.Spans) == 0 {
-		t.Fatalf("file spans = nil, want changed line spans")
-	}
 }
 
 func TestRenderReviewTaskInputEscapesCommitAndPathInjectionFixtures(t *testing.T) {
 	commitMessage := readReviewerFixture(t, "injection/commit_message.txt")
 	path := strings.TrimSpace(readReviewerFixture(t, "injection/path.txt"))
-	input := ChunkInput{
+	input := ReviewInput{
 		ReviewID:              "review-injection",
 		Repo:                  "repo-injection",
 		BaseSHA:               "base",
 		HeadSHA:               "head",
 		Language:              "en",
 		ReviewChecks:          []string{"security"},
-		TestSummary:           "no_tests_in_diff",
 		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
 		CommitMessages:        []string{commitMessage},
-		Files: []ChunkFile{{
-			Path:   path,
-			Status: "modified",
-			Spans:  []ChunkSpan{{Start: 10, End: 12}},
-		}},
 	}
 
 	got := renderReviewTaskInput(input)
@@ -402,8 +292,8 @@ func TestRenderReviewTaskInputEscapesCommitAndPathInjectionFixtures(t *testing.T
 	if strings.Contains(got, path) {
 		t.Fatalf("renderReviewTaskInput() kept raw path delimiter fixture:\n%s", got)
 	}
-	if !strings.Contains(got, "[escaped diffpal trusted control end delimiter]") {
-		t.Fatalf("renderReviewTaskInput() did not escape path delimiter fixture:\n%s", got)
+	if strings.Contains(got, "Changed files in this task") {
+		t.Fatalf("renderReviewTaskInput() included changed file list:\n%s", got)
 	}
 	untrustedStart := strings.Index(got, promptpack.UntrustedInputStart)
 	commitIndex := strings.Index(got, strings.TrimSpace(commitMessage))
@@ -430,18 +320,15 @@ func TestRunWithRuntimeDoesNotPreloadInjectionFixtureContent(t *testing.T) {
 	writeRepoFile(t, filepath.Join(repo, "pkg", "comment.go"), "package pkg\n\n"+commentFixture+"\n")
 	writeRepoFile(t, filepath.Join(repo, "testdata", "fixture.txt"), testFixture+"\n")
 
-	runtime := &fakeRuntime{outputs: []ChunkOutput{{Findings: nil}}}
+	runtime := &fakeRuntime{outputs: []ReviewOutput{{Findings: nil}}}
 	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-injection-fixtures",
-		ReviewID:         "review-injection-fixtures",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-		ReviewChecks:     []string{"best-practices"},
-		Instructions:     "Report actionable documentation, comment, and fixture review issues.",
+		WorkingDir:   repo,
+		Repo:         "repo-injection-fixtures",
+		ReviewID:     "review-injection-fixtures",
+		MaxFiles:     20,
+		BlockOn:      "high",
+		ReviewChecks: []string{"best-practices"},
+		Instructions: "Report actionable documentation, comment, and fixture review issues.",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -456,9 +343,69 @@ func TestRunWithRuntimeDoesNotPreloadInjectionFixtureContent(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"docs/review.md", "pkg/comment.go", "testdata/fixture.txt"} {
-		if !strings.Contains(snapshot, path) {
-			t.Fatalf("task snapshot missing changed file path %q:\n%s", path, snapshot)
+		if strings.Contains(snapshot, path) {
+			t.Fatalf("task snapshot preloaded changed file path %q:\n%s", path, snapshot)
 		}
+	}
+}
+
+func TestRunWithRuntimeReviewsDeleteOnlyDiffWithoutPreloadingFileList(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "gone.go"), "package main\n\nfunc gone() {}\n")
+	runGitCmd(t, repo, "add", "gone.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	if err := os.Remove(filepath.Join(repo, "gone.go")); err != nil {
+		t.Fatalf("Remove(gone.go) error = %v", err)
+	}
+
+	runtime := &fakeRuntime{
+		outputs: []ReviewOutput{{
+			ChangeSummary: []string{"Removed an obsolete Go entrypoint file."},
+			Findings: []ReviewFinding{{
+				Category:   "maintainability",
+				Severity:   "medium",
+				Confidence: 0.9,
+				Path:       "gone.go",
+				StartLine:  1,
+				EndLine:    1,
+				Title:      "deleted file finding",
+				Message:    "deleted file findings cannot be anchored to head lines",
+				Evidence:   findings.NewEvidence("gone.go was deleted"),
+				Impact:     findings.NewImpact("deleted file findings should be ignored"),
+			}},
+		}},
+	}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir: repo,
+		Repo:       "repo-delete-only",
+		ReviewID:   "review-delete-only",
+		MaxFiles:   20,
+		BlockOn:    "high",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %d, want 1", len(runtime.inputs))
+	}
+	if result.ChangedFiles != 1 {
+		t.Fatalf("ChangedFiles = %d, want 1", result.ChangedFiles)
+	}
+	snapshot := renderReviewTaskInput(runtime.inputs[0])
+	for _, forbidden := range []string{"Changed files in this task", "gone.go", "deleted", "L0-L0", "func gone"} {
+		if strings.Contains(snapshot, forbidden) {
+			t.Fatalf("task snapshot contains %q:\n%s", forbidden, snapshot)
+		}
+	}
+	if !strings.Contains(snapshot, "Base: ") || !strings.Contains(snapshot, "Head: ") {
+		t.Fatalf("task snapshot missing base/head metadata:\n%s", snapshot)
+	}
+	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Removed an obsolete Go entrypoint file." {
+		t.Fatalf("ChangeSummary = %v", result.Bundle.ChangeSummary)
+	}
+	if len(result.Bundle.Findings) != 0 {
+		t.Fatalf("len(Findings) = %d, want deleted-file finding dropped", len(result.Bundle.Findings))
 	}
 }
 
@@ -503,9 +450,9 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 	writeRepoFile(t, filepath.Join(repo, "internal", "platformapi", "admin_debug.go"), unsafeHandler)
 
 	runtime := &fakeRuntime{
-		outputs: []ChunkOutput{{
+		outputs: []ReviewOutput{{
 			ChangeSummary: []string{"Added a debug HTTP handler that executes request-provided commands."},
-			Findings: []ChunkFinding{{
+			Findings: []ReviewFinding{{
 				Category:   "security",
 				Severity:   "critical",
 				Confidence: 0.98,
@@ -522,16 +469,13 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-security",
-		ReviewID:         "review-security",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
-		ReviewChecks:     []string{"security"},
-		Instructions:     "Focus on externally reachable handlers.",
+		WorkingDir:   repo,
+		Repo:         "repo-security",
+		ReviewID:     "review-security",
+		MaxFiles:     20,
+		BlockOn:      "high",
+		ReviewChecks: []string{"security"},
+		Instructions: "Focus on externally reachable handlers.",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -567,8 +511,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 	}
 
 	runtime := &fakeRuntime{
-		outputs: []ChunkOutput{{
-			Findings: []ChunkFinding{
+		outputs: []ReviewOutput{{
+			Findings: []ReviewFinding{
 				{
 					Category:   "maintainability",
 					Severity:   "medium",
@@ -633,14 +577,11 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-b",
-		ReviewID:         "review-b",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
+		WorkingDir: repo,
+		Repo:       "repo-b",
+		ReviewID:   "review-b",
+		MaxFiles:   20,
+		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -648,8 +589,8 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 	if result.ChangedFiles != 2 {
 		t.Fatalf("ChangedFiles = %d, want 2", result.ChangedFiles)
 	}
-	if result.ReviewableFiles != 1 {
-		t.Fatalf("ReviewableFiles = %d, want 1", result.ReviewableFiles)
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %+v, want one review input", runtime.inputs)
 	}
 	if len(result.Bundle.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
@@ -671,16 +612,16 @@ func TestReviewEvalFixturesValidateExpectedCategoriesAndSeverity(t *testing.T) {
 	if len(cases) == 0 {
 		t.Fatal("eval fixtures empty")
 	}
-	files := []ChunkFile{{
-		Path:  "src/app.go",
-		Spans: []ChunkSpan{{Start: 10, End: 12}},
+	files := []diff.FileChange{{
+		ToPath:           "src/app.go",
+		ChangedLineSpans: []diff.LineSpan{{Start: 10, End: 12}},
 	}}
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
-			got := validateChunkFindings(tc.Findings, files, "fixture-provider", categoriesForReviewChecks(tc.ReviewChecks))
+			got := validateReviewFindings(tc.Findings, files, "fixture-provider", categoriesForReviewChecks(tc.ReviewChecks))
 			if len(got) != len(tc.Want) {
-				t.Fatalf("validateChunkFindings() returned %d findings, want %d: %+v", len(got), len(tc.Want), got)
+				t.Fatalf("validateReviewFindings() returned %d findings, want %d: %+v", len(got), len(tc.Want), got)
 			}
 			for i, want := range tc.Want {
 				if got[i].Category != want.Category || got[i].Severity != want.Severity {
@@ -703,10 +644,10 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 			wrapError(KindTransient, errors.New("429 rate limit")),
 			nil,
 		},
-		outputs: []ChunkOutput{
+		outputs: []ReviewOutput{
 			{},
 			{
-				Findings: []ChunkFinding{{
+				Findings: []ReviewFinding{{
 					Category:   "testing",
 					Severity:   "low",
 					Confidence: 0.5,
@@ -723,14 +664,11 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-c",
-		ReviewID:         "review-c",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
+		WorkingDir: repo,
+		Repo:       "repo-c",
+		ReviewID:   "review-c",
+		MaxFiles:   20,
+		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -776,14 +714,11 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:       repo,
-		Repo:             "repo-d",
-		ReviewID:         "review-d",
-		MaxFiles:         20,
-		ContextLines:     3,
-		MaxPatchChars:    12000,
-		MaxFilesPerChunk: 20,
-		BlockOn:          "high",
+		WorkingDir: repo,
+		Repo:       "repo-d",
+		ReviewID:   "review-d",
+		MaxFiles:   20,
+		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -799,7 +734,7 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 type reviewEvalFixture struct {
 	Name         string              `json:"name"`
 	ReviewChecks []string            `json:"review_checks"`
-	Findings     []ChunkFinding      `json:"findings"`
+	Findings     []ReviewFinding     `json:"findings"`
 	Want         []reviewEvalFinding `json:"want"`
 }
 
@@ -809,14 +744,13 @@ type reviewEvalFinding struct {
 }
 
 type fakeRuntime struct {
-	outputs      []ChunkOutput
-	errs         []error
-	inputs       []ChunkInput
-	calls        int
-	noInspection bool
+	outputs []ReviewOutput
+	errs    []error
+	inputs  []ReviewInput
+	calls   int
 }
 
-func (f *fakeRuntime) ReviewChunk(_ context.Context, _ RuntimeConfig, input ChunkInput) (ChunkOutput, RuntimeUsage, error) {
+func (f *fakeRuntime) Review(_ context.Context, _ RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {
 	f.inputs = append(f.inputs, input)
 	idx := f.calls
 	f.calls++
@@ -826,26 +760,17 @@ func (f *fakeRuntime) ReviewChunk(_ context.Context, _ RuntimeConfig, input Chun
 		err = f.errs[idx]
 	}
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, err
+		return ReviewOutput{}, RuntimeUsage{}, err
 	}
 
 	if idx >= len(f.outputs) {
-		return ChunkOutput{}, f.defaultUsage(), nil
+		return ReviewOutput{}, f.defaultUsage(), nil
 	}
 	return f.outputs[idx], f.defaultUsage(), nil
 }
 
 func (f *fakeRuntime) defaultUsage() RuntimeUsage {
-	if f.noInspection {
-		return RuntimeUsage{}
-	}
-	return RuntimeUsage{Inspection: &findings.Inspection{
-		ProviderType:     "openai",
-		Required:         true,
-		ToolCalls:        []string{"git_changed_files", "git_diff"},
-		DiffInspected:    true,
-		ContextInspected: true,
-	}}
+	return RuntimeUsage{}
 }
 
 func readReviewerFixture(t *testing.T, name string) string {
@@ -920,11 +845,11 @@ func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	}
 }
 
-func TestNormalizeChunkFindingAllowsNearbySupportingContext(t *testing.T) {
-	allowed := map[string][]ChunkSpan{
+func TestNormalizeReviewFindingAllowsNearbySupportingContext(t *testing.T) {
+	allowed := map[string][]changedSpan{
 		"app/config.go": {{Start: 22, End: 22}},
 	}
-	item := ChunkFinding{
+	item := ReviewFinding{
 		Category:    "correctness",
 		Severity:    "medium",
 		Confidence:  0.86,
@@ -950,20 +875,20 @@ func TestNormalizeChunkFindingAllowsNearbySupportingContext(t *testing.T) {
 		},
 	}
 
-	got, ok := normalizeChunkFinding(item, allowed, "provider-a")
+	got, ok := normalizeReviewFinding(item, allowed, "provider-a")
 	if !ok {
-		t.Fatal("normalizeChunkFinding() rejected finding with changed anchor and nearby supporting context")
+		t.Fatal("normalizeReviewFinding() rejected finding with changed anchor and nearby supporting context")
 	}
 	if got.SupportingSpan == nil || got.SupportingSpan.StartLine != 8 {
 		t.Fatalf("SupportingSpan = %+v, want nearby context", got.SupportingSpan)
 	}
 }
 
-func TestNormalizeChunkFindingAcceptsChangedOnlyAnchor(t *testing.T) {
-	allowed := map[string][]ChunkSpan{
+func TestNormalizeReviewFindingAcceptsChangedOnlyAnchor(t *testing.T) {
+	allowed := map[string][]changedSpan{
 		"app/config.go": {{Start: 22, End: 22}},
 	}
-	item := ChunkFinding{
+	item := ReviewFinding{
 		Category:    "correctness",
 		Severity:    "medium",
 		Confidence:  0.86,
@@ -984,16 +909,16 @@ func TestNormalizeChunkFindingAcceptsChangedOnlyAnchor(t *testing.T) {
 		},
 	}
 
-	if _, ok := normalizeChunkFinding(item, allowed, "provider-a"); !ok {
-		t.Fatal("normalizeChunkFinding() rejected changed-only finding")
+	if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); !ok {
+		t.Fatal("normalizeReviewFinding() rejected changed-only finding")
 	}
 }
 
-func TestNormalizeChunkFindingRejectsUnchangedOnlyAnchor(t *testing.T) {
-	allowed := map[string][]ChunkSpan{
+func TestNormalizeReviewFindingRejectsUnchangedOnlyAnchor(t *testing.T) {
+	allowed := map[string][]changedSpan{
 		"app/config.go": {{Start: 22, End: 22}},
 	}
-	item := ChunkFinding{
+	item := ReviewFinding{
 		Category:    "correctness",
 		Severity:    "medium",
 		Confidence:  0.86,
@@ -1014,7 +939,7 @@ func TestNormalizeChunkFindingRejectsUnchangedOnlyAnchor(t *testing.T) {
 		},
 	}
 
-	if _, ok := normalizeChunkFinding(item, allowed, "provider-a"); ok {
-		t.Fatal("normalizeChunkFinding() accepted finding anchored only to unchanged context")
+	if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); ok {
+		t.Fatal("normalizeReviewFinding() accepted finding anchored only to unchanged context")
 	}
 }

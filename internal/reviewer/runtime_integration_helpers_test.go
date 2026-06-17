@@ -13,26 +13,18 @@ import (
 
 const providerIntegrationTimeout = 2 * time.Minute
 
-func unsafeHandlerInput() ChunkInput {
-	return ChunkInput{
+func unsafeHandlerInput() ReviewInput {
+	return ReviewInput{
 		ReviewID:              "integration-review",
 		Repo:                  "diffpal/diffpal",
 		BaseSHA:               "base",
 		HeadSHA:               "head",
-		ChunkIndex:            0,
-		ChunkCount:            1,
 		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
 		Language:              "en",
 		ReviewChecks:          []string{"security"},
-		TestSummary:           "no_tests_in_diff",
-		Files: []ChunkFile{{
-			Path:   "internal/platformapi/admin_debug.go",
-			Status: "modified",
-			Spans:  []ChunkSpan{{Start: 12, End: 20}},
-		}},
 	}
 }
 

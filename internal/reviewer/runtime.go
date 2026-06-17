@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
-	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
@@ -16,38 +15,32 @@ import (
 	adkagent "google.golang.org/adk/agent"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
-	"google.golang.org/adk/tool"
 	"google.golang.org/genai"
 )
 
 type ADKRuntime struct{}
 
-func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input ChunkInput) (ChunkOutput, RuntimeUsage, error) {
+func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {
 	if strings.TrimSpace(cfg.ProviderID) == "" {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, fmt.Errorf("provider id is required"))
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, fmt.Errorf("provider id is required"))
 	}
 	providerCfg, ok := cfg.Providers[cfg.ProviderID]
 	if !ok {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, fmt.Errorf("unknown provider %q", cfg.ProviderID))
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, fmt.Errorf("unknown provider %q", cfg.ProviderID))
 	}
 
 	if err := validateHostedProviderConfig(providerCfg); err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
 
 	factory := agentfactory.New(cfg.Providers, mcpregistry.New(cfg.MCPServers))
 	sessionState, err := factory.BuildSessionState(cfg.ProviderID, cfg.WorkingDir)
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
-	reviewTools, inspectionTracker, err := reviewToolsForProvider(providerCfg, cfg)
+	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg))
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
-	}
-
-	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg, reviewTools))
-	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
 	if closer, ok := agentRuntime.(interface{ Close() error }); ok {
 		defer func() { _ = closer.Close() }()
@@ -61,7 +54,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		structuredagent.WithOutputValidationRetries(1),
 	)
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, err)
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindInternal, err)
 	}
 
 	sessionService := session.InMemoryService()
@@ -71,7 +64,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		SessionService: sessionService,
 	})
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("create adk runner: %w", err))
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("create adk runner: %w", err))
 	}
 
 	userID := "diffpal-user"
@@ -81,7 +74,7 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 		State:   sessionState,
 	})
 	if err != nil {
-		return ChunkOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("create review session: %w", err))
+		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindInternal, fmt.Errorf("create review session: %w", err))
 	}
 
 	userContent := genai.NewContentFromText(renderReviewTaskInput(input), genai.RoleUser)
@@ -92,9 +85,9 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 	for ev, runErr := range events {
 		if runErr != nil {
 			if isTransientProviderError(runErr) {
-				return ChunkOutput{}, usage, wrapError(KindTransient, runErr)
+				return ReviewOutput{}, usage, wrapError(KindTransient, runErr)
 			}
-			return ChunkOutput{}, usage, wrapError(KindInternal, runErr)
+			return ReviewOutput{}, usage, wrapError(KindInternal, runErr)
 		}
 		if ev == nil {
 			continue
@@ -107,14 +100,13 @@ func (ADKRuntime) ReviewChunk(ctx context.Context, cfg RuntimeConfig, input Chun
 
 	trimmed := strings.TrimSpace(outputText.String())
 	if trimmed == "" {
-		return ChunkOutput{}, usage, wrapError(KindInternal, fmt.Errorf("provider returned no structured output"))
+		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("provider returned no structured output"))
 	}
 
-	var output ChunkOutput
+	var output ReviewOutput
 	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
-		return ChunkOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
+		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
-	usage.Inspection = inspectionFromTracker(providerCfg.Type, inspectionTracker)
 	return output, usage, nil
 }
 
@@ -122,13 +114,12 @@ func reviewSystemInstruction(instructions string) string {
 	return promptpack.DefaultReviewPrompt().RenderReviewSystem(promptpack.ReviewOptions{Instructions: instructions})
 }
 
-func reviewAgentBuildRequest(cfg RuntimeConfig, reviewTools []tool.Tool) agentfactory.BuildRequest {
+func reviewAgentBuildRequest(cfg RuntimeConfig) agentfactory.BuildRequest {
 	return agentfactory.BuildRequest{
 		AgentID:          cfg.ProviderID,
 		Name:             "DiffPalReviewerAgent",
 		Description:      "DiffPal provider-backed review agent",
 		WorkingDirectory: cfg.WorkingDir,
-		Tools:            reviewTools,
 	}
 }
 
@@ -158,45 +149,7 @@ func validateHostedProviderConfig(cfg dpconfig.ProviderConfig) error {
 	return nil
 }
 
-func reviewToolsForProvider(providerCfg dpconfig.ProviderConfig, cfg RuntimeConfig) ([]tool.Tool, *inspectionTracker, error) {
-	switch strings.ToLower(strings.TrimSpace(providerCfg.Type)) {
-	case "openai", "aistudio":
-		tracker := newInspectionTracker()
-		tools, err := newReviewTools(reviewToolOptions{
-			Root:         cfg.WorkingDir,
-			BaseSHA:      cfg.BaseSHA,
-			HeadSHA:      cfg.HeadSHA,
-			ChangedFiles: cfg.ChangedFiles,
-			Inspection:   tracker,
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		return tools, tracker, nil
-	default:
-		return nil, nil, nil
-	}
-}
-
-func inspectionFromTracker(providerType string, tracker *inspectionTracker) *findings.Inspection {
-	providerType = strings.ToLower(strings.TrimSpace(providerType))
-	required := providerType == "openai" || providerType == "aistudio"
-	if !required {
-		return &findings.Inspection{ProviderType: providerType, Required: false}
-	}
-	if tracker == nil {
-		return &findings.Inspection{ProviderType: providerType, Required: true}
-	}
-	return &findings.Inspection{
-		ProviderType:     providerType,
-		Required:         true,
-		ToolCalls:        tracker.callsList(),
-		DiffInspected:    tracker.called("git_diff"),
-		ContextInspected: tracker.called("read_file") || tracker.called("list_files") || tracker.called("search_files") || tracker.called("git_changed_files"),
-	}
-}
-
-func renderReviewTaskInput(input ChunkInput) string {
+func renderReviewTaskInput(input ReviewInput) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "DiffPal review task snapshot\n\n")
 	fmt.Fprintf(&out, "%s\n", promptpack.TrustedControlStart)
@@ -204,10 +157,8 @@ func renderReviewTaskInput(input ChunkInput) string {
 	fmt.Fprintf(&out, "Repository: %s\n", promptpack.EscapeUntrustedField(input.Repo))
 	fmt.Fprintf(&out, "Base: %s\n", promptpack.EscapeUntrustedField(input.BaseSHA))
 	fmt.Fprintf(&out, "Head: %s\n", promptpack.EscapeUntrustedField(input.HeadSHA))
-	fmt.Fprintf(&out, "Chunk: %d of %d\n", input.ChunkIndex+1, input.ChunkCount)
 	fmt.Fprintf(&out, "Language: %s\n", promptpack.EscapeUntrustedField(input.Language))
 	fmt.Fprintf(&out, "Review checks: %s\n", promptpack.EscapeUntrustedField(strings.Join(input.ReviewChecks, ", ")))
-	fmt.Fprintf(&out, "Test summary: %s\n", promptpack.EscapeUntrustedField(input.TestSummary))
 	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
 		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", promptpack.EscapeUntrusted(trimmed))
 	}
@@ -220,26 +171,6 @@ func renderReviewTaskInput(input ChunkInput) string {
 		for _, message := range input.CommitMessages {
 			fmt.Fprintf(&out, "- %s\n", promptpack.EscapeUntrustedField(message))
 		}
-	}
-	fmt.Fprintf(&out, "\nChanged files in this task:\n")
-	for _, file := range input.Files {
-		fmt.Fprintf(&out, "- %s", promptpack.EscapeUntrustedField(file.Path))
-		if file.Status != "" {
-			fmt.Fprintf(&out, " [%s]", promptpack.EscapeUntrustedField(file.Status))
-		}
-		if file.PreviousPath != "" {
-			fmt.Fprintf(&out, " from %s", promptpack.EscapeUntrustedField(file.PreviousPath))
-		}
-		if len(file.Spans) > 0 {
-			fmt.Fprintf(&out, " changed lines ")
-			for i, span := range file.Spans {
-				if i > 0 {
-					out.WriteString(", ")
-				}
-				fmt.Fprintf(&out, "L%d-L%d", span.Start, span.End)
-			}
-		}
-		out.WriteString("\n")
 	}
 	fmt.Fprintf(&out, "%s\n", promptpack.UntrustedInputEnd)
 	return out.String()

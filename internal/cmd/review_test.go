@@ -32,9 +32,6 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 		if opts.MaxFiles != 200 {
 			t.Fatalf("MaxFiles = %d, want 200 default", opts.MaxFiles)
 		}
-		if opts.ContextLines != 20 {
-			t.Fatalf("ContextLines = %d, want 20 default", opts.ContextLines)
-		}
 		if opts.Language != "en" {
 			t.Fatalf("Language = %q, want en from config", opts.Language)
 		}
@@ -795,10 +792,7 @@ func testReviewResult(reviewID string) reviewer.Result {
 			FromPath: "main.go",
 			ToPath:   "main.go",
 		}},
-		ChangedFiles:  1,
-		ContextFiles:  1,
-		ContextChunks: 1,
-		TestSummary:   "no_tests_in_diff",
+		ChangedFiles: 1,
 	}
 }
 

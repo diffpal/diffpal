@@ -84,9 +84,6 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 	cmd.Flags().String("base", "", "Base revision")
 	cmd.Flags().String("head", "", "Head revision")
 	cmd.Flags().Int("max-files", 0, "Maximum files from diff")
-	cmd.Flags().Int("context-lines", 0, "Context lines to enrich each changed file")
-	cmd.Flags().Int("max-patch-chars", 12000, "Maximum context characters per chunk")
-	cmd.Flags().Int("max-files-per-chunk", 20, "Maximum files per context chunk")
 	cmd.Flags().String("language", "", "Language for generated review findings")
 	cmd.Flags().String("review-checks", "", "Comma-separated checks to run: security, bugs, performance, best-practices")
 	cmd.Flags().String("instructions", "", "Additional review instructions for local prompt tuning")
@@ -243,9 +240,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	maxFiles, _ := cmd.Flags().GetInt("max-files")
-	contextLines, _ := cmd.Flags().GetInt("context-lines")
-	maxPatchChars, _ := cmd.Flags().GetInt("max-patch-chars")
-	maxFilesPerChunk, _ := cmd.Flags().GetInt("max-files-per-chunk")
 	language, _ := cmd.Flags().GetString("language")
 	reviewChecksSpec, _ := cmd.Flags().GetString("review-checks")
 	instructionsFlag, _ := cmd.Flags().GetString("instructions")
@@ -267,15 +261,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	}
 	if !cmd.Flags().Changed("max-files") {
 		maxFiles = config.DefaultReviewMaxFiles
-	}
-	if !cmd.Flags().Changed("context-lines") {
-		contextLines = config.DefaultReviewContextLines
-	}
-	if !cmd.Flags().Changed("max-patch-chars") {
-		maxPatchChars = config.DefaultReviewMaxPatchChars
-	}
-	if !cmd.Flags().Changed("max-files-per-chunk") {
-		maxFilesPerChunk = config.DefaultReviewMaxFilesPerChunk
 	}
 	if !cmd.Flags().Changed("language") {
 		language = cfg.ReviewLanguage()
@@ -320,18 +305,15 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		runCtx = context.Background()
 	}
 	result, err := run(runCtx, cfg, reviewer.Options{
-		Repo:             repo,
-		ReviewID:         reviewID,
-		BaseSHA:          base,
-		HeadSHA:          head,
-		MaxFiles:         maxFiles,
-		ContextLines:     contextLines,
-		MaxPatchChars:    maxPatchChars,
-		MaxFilesPerChunk: maxFilesPerChunk,
-		BlockOn:          blockOn,
-		Language:         language,
-		ReviewChecks:     reviewChecks,
-		Instructions:     instructions,
+		Repo:         repo,
+		ReviewID:     reviewID,
+		BaseSHA:      base,
+		HeadSHA:      head,
+		MaxFiles:     maxFiles,
+		BlockOn:      blockOn,
+		Language:     language,
+		ReviewChecks: reviewChecks,
+		Instructions: instructions,
 	})
 	if err != nil {
 		return reviewExecution{}, reviewExitError(err)
@@ -340,7 +322,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return reviewExecution{}, withExitCode(5, err)
 	}
 	if !reviewDryRun(cmd) {
-		if err := emitReviewSummary(cmd, result, contextLines, outPath); err != nil {
+		if err := emitReviewSummary(cmd, result, outPath); err != nil {
 			return reviewExecution{}, err
 		}
 	}
@@ -385,21 +367,7 @@ func joinReviewInstructions(items ...string) string {
 	return strings.Join(out, "\n\n")
 }
 
-func emitReviewSummary(cmd *cobra.Command, result reviewer.Result, contextLines int, outPath string) error {
-	if contextLines > 0 {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "context_files=%d\n", result.ContextFiles)
-		if err != nil {
-			return withExitCode(5, err)
-		}
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "context_chunks=%d\n", result.ContextChunks)
-		if err != nil {
-			return withExitCode(5, err)
-		}
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "test_summary=%s\n", result.TestSummary)
-		if err != nil {
-			return withExitCode(5, err)
-		}
-	}
+func emitReviewSummary(cmd *cobra.Command, result reviewer.Result, outPath string) error {
 	if result.Bundle.Prompt != nil && result.Bundle.Prompt.PromptID != "" {
 		_, err := fmt.Fprintf(cmd.OutOrStdout(), "prompt_id=%s\n", result.Bundle.Prompt.PromptID)
 		if err != nil {

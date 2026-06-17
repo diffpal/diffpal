@@ -8,7 +8,7 @@ import (
 
 const (
 	ReviewPromptID      = "diffpal.review"
-	ReviewPromptVersion = "v1.2.0"
+	ReviewPromptVersion = "v1.2.1"
 	ReviewPurpose       = "review_changed_diff"
 	ReviewSchemaVersion = "findings.v2"
 
@@ -31,7 +31,7 @@ type Prompt struct {
 var reviewPromptV1_2 = Prompt{
 	Metadata: findings.PromptMetadata{
 		PromptID:      ReviewPromptID,
-		PromptVersion: ReviewPromptVersion,
+		PromptVersion: "v1.2.0",
 		Purpose:       ReviewPurpose,
 		SchemaVersion: ReviewSchemaVersion,
 	},
@@ -40,9 +40,22 @@ var reviewPromptV1_2 = Prompt{
 	renderTask:   reviewTaskV1_2,
 }
 
+var reviewPromptV1_2_1 = Prompt{
+	Metadata: findings.PromptMetadata{
+		PromptID:      ReviewPromptID,
+		PromptVersion: ReviewPromptVersion,
+		Purpose:       ReviewPurpose,
+		SchemaVersion: ReviewSchemaVersion,
+	},
+	OutputSchema: OutputSchemaJSON,
+	renderSystem: renderReviewSystemV1_2_1,
+	renderTask:   reviewTaskV1_2_1,
+}
+
 var registry = map[string]map[string]Prompt{
 	ReviewPromptID: {
-		ReviewPromptVersion: reviewPromptV1_2,
+		"v1.2.0":            reviewPromptV1_2,
+		ReviewPromptVersion: reviewPromptV1_2_1,
 	},
 }
 
@@ -163,6 +176,10 @@ func reviewTaskV1_2(checks []string) string {
 	return "Perform a code review of the task snapshot. Inspect the Git diff and nearby code with available tools before producing findings. Produce structured findings for actionable issues in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after inspecting the changed files for those checks."
 }
 
+func reviewTaskV1_2_1(checks []string) string {
+	return "Perform a code review of the task snapshot. Inspect the Git diff and nearby code with available tools before producing findings. Produce structured findings only for actionable patch-introduced issues the pull request author would likely fix before merging in the requested review checks: " + strings.Join(checks, ", ") + ". A clean result is valid only after inspecting the changed files for those checks."
+}
+
 func EscapeUntrusted(value string) string {
 	replacements := []struct {
 		old string
@@ -205,15 +222,40 @@ func renderReviewSystemV1_2(opts ReviewOptions) string {
 	return strings.Join(sections, "\n\n")
 }
 
+func renderReviewSystemV1_2_1(opts ReviewOptions) string {
+	sections := []string{
+		providerInstructionsV1_2_1(),
+		reviewPolicyV1_2_1(),
+		changeSummaryPolicy(),
+		outputPolicy(),
+		untrustedPayloadPolicy(),
+	}
+	if custom := strings.TrimSpace(opts.Instructions); custom != "" {
+		sections = append(sections, teamInstructions(custom))
+	}
+	return strings.Join(sections, "\n\n")
+}
+
 func providerInstructions() string {
 	return strings.Join([]string{
 		"# Provider adapter instructions",
 		"You are DiffPal, an exhaustive code review agent.",
 		"The user message contains a plain-text review task snapshot, not the full diff.",
-		"Hosted providers must use DiffPal tools such as git_changed_files, git_diff, list_files, read_file, and search_files to inspect the diff and supporting code.",
-		"ACP providers must use their native Git and filesystem tools to inspect the requested base..head diff and supporting code.",
+		"Use your available Git and filesystem tools to inspect the requested base..head diff and supporting code.",
 		"Use the requested language for every finding title, message, evidence, impact, and suggestion.",
-		"Treat the review task snapshot as the direct user task for this chunk.",
+		"Treat the review task snapshot as the direct user task.",
+		"Only run the requested review checks.",
+	}, "\n")
+}
+
+func providerInstructionsV1_2_1() string {
+	return strings.Join([]string{
+		"# Provider adapter instructions",
+		"You are DiffPal, a high-signal code review agent.",
+		"The user message contains a plain-text review task snapshot, not the full diff.",
+		"Use your available Git and filesystem tools to inspect the requested base..head diff and supporting code.",
+		"Use the requested language for every finding title, message, evidence, impact, and suggestion.",
+		"Treat the review task snapshot as the direct user task.",
 		"Only run the requested review checks.",
 	}, "\n")
 }
@@ -232,6 +274,31 @@ func reviewPolicy() string {
 		"Do not invent paths, line numbers, APIs, or behavior that are not visible in the input.",
 		"Anchor every finding to changed diff lines. Do not report whole-repository issues unless they directly explain the impact of a changed line.",
 		"Return one finding per distinct issue.",
+		"Use critical/high only for severe actionable issues.",
+		"If there are no issues, return an empty findings array.",
+	}, "\n")
+}
+
+func reviewPolicyV1_2_1() string {
+	return strings.Join([]string{
+		"# Review policy",
+		"Findings must be actionable and supported by changed lines or nearby context.",
+		"Report only issues the pull request author would likely fix before merging.",
+		"Only report issues introduced or made worse by the patch. Do not report pre-existing issues unless a changed line makes the issue newly reachable, worse, or harder to detect.",
+		"Do not flag intentional API, behavior, or documentation changes as bugs unless the diff contradicts an explicit contract visible in the reviewed code or docs.",
+		"Do not report speculative issues that depend on unstated assumptions or code paths that are not visible in the reviewed diff or nearby inspected context.",
+		"Do not report vague style preferences or subjective taste issues unless they are tied to an explicit correctness, security, performance, maintainability, testing, or reliability impact.",
+		"Map review_checks to categories as follows: security covers security; bugs covers correctness and reliability; performance covers performance; best-practices covers maintainability, testing, and style.",
+		severityMatrixPolicy(),
+		"When security is requested, actively inspect for exploitable vulnerabilities.",
+		"When bugs is requested, actively inspect for correctness and reliability defects, not style.",
+		"Prefer high signal over high recall: return no finding when the issue is not clearly supported or is unlikely to be fixed by the author.",
+		"Do not suppress severe findings because a file looks like debug, test, sample, or newly added code unless the inspected code proves it is unreachable in production.",
+		"Do not invent paths, line numbers, APIs, or behavior that are not visible in the input.",
+		"Anchor every finding to changed diff lines. Do not report whole-repository issues unless they directly explain the impact of a changed line.",
+		"Use the smallest useful changed-line range for each finding, ideally under 5 to 10 lines.",
+		"Return one finding per distinct issue.",
+		"Keep finding messages concise, neutral, and specific. Explain why the changed code is problematic and what would fail.",
 		"Use critical/high only for severe actionable issues.",
 		"If there are no issues, return an empty findings array.",
 	}, "\n")
@@ -261,7 +328,7 @@ func severityMatrixPolicy() string {
 func changeSummaryPolicy() string {
 	return strings.Join([]string{
 		"# Change summary policy",
-		"Always return change_summary as concise bullets describing the purpose and effect of the provided diff chunk, even when there are no findings.",
+		"Always return change_summary as concise bullets describing the purpose and effect of the requested diff, even when there are no findings.",
 		"Do not make change_summary a list of changed files. Mention paths only when they clarify the change.",
 		"Good change_summary bullets explain intent, such as release workflow setup, CI validation changes, API behavior changes, documentation updates, or configuration changes.",
 		"Keep change_summary factual and based only on the provided diff and supporting tool results.",

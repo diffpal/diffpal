@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
 )
 
@@ -17,7 +18,7 @@ func TestADKRuntimeCodexACPReviewFindsUnsafeHandler(t *testing.T) {
 	defer cancel()
 
 	input := unsafeHandlerInput()
-	output, _, err := ADKRuntime{}.ReviewChunk(ctx, RuntimeConfig{
+	output, _, err := ADKRuntime{}.Review(ctx, RuntimeConfig{
 		ProviderID: "codex-acp",
 		Providers: map[string]dpconfig.ProviderConfig{
 			"codex-acp": {
@@ -33,14 +34,18 @@ func TestADKRuntimeCodexACPReviewFindsUnsafeHandler(t *testing.T) {
 	}, input)
 	if err != nil {
 		maybeSkipProviderIntegration(t, err)
-		t.Fatalf("ReviewChunk(codex_acp) error = %v", err)
+		t.Fatalf("Review(codex_acp) error = %v", err)
 	}
 
 	if len(output.Findings) == 0 {
-		t.Fatalf("ReviewChunk(codex_acp) returned no findings; summary=%v", output.ChangeSummary)
+		t.Fatalf("Review(codex_acp) returned no findings; summary=%v", output.ChangeSummary)
 	}
-	valid := validateChunkFindings(output.Findings, input.Files, "codex-acp", categoriesForReviewChecks([]string{"security"}))
+	files := []diff.FileChange{{
+		ToPath:           "internal/platformapi/admin_debug.go",
+		ChangedLineSpans: []diff.LineSpan{{Start: 12, End: 20}},
+	}}
+	valid := validateReviewFindings(output.Findings, files, "codex-acp", categoriesForReviewChecks([]string{"security"}))
 	if len(valid) == 0 {
-		t.Fatalf("ReviewChunk(codex_acp) returned no valid security findings: %+v", output.Findings)
+		t.Fatalf("Review(codex_acp) returned no valid security findings: %+v", output.Findings)
 	}
 }
