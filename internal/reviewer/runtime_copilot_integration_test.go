@@ -18,7 +18,7 @@ func TestADKRuntimeCopilotACPProviderErrorPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), providerIntegrationTimeout)
 	defer cancel()
 
-	_, _, err := ADKRuntime{}.ReviewChunk(ctx, RuntimeConfig{
+	_, _, err := ADKRuntime{}.Review(ctx, RuntimeConfig{
 		ProviderID: "copilot-acp",
 		Providers: map[string]dpconfig.ProviderConfig{
 			"copilot-acp": {
@@ -29,17 +29,17 @@ func TestADKRuntimeCopilotACPProviderErrorPath(t *testing.T) {
 		WorkingDir: ".",
 	}, unsafeHandlerInput())
 	if err == nil {
-		t.Fatal("ReviewChunk(copilot_acp invalid model) error = nil, want provider error")
+		t.Fatal("Review(copilot_acp invalid model) error = nil, want provider error")
 	}
 
 	var reviewErr *Error
 	if !errors.As(err, &reviewErr) {
-		t.Fatalf("ReviewChunk(copilot_acp) error type = %T, want *reviewer.Error: %v", err, err)
+		t.Fatalf("Review(copilot_acp) error type = %T, want *reviewer.Error: %v", err, err)
 	}
 	if reviewErr.Kind != KindTransient && reviewErr.Kind != KindInternal {
-		t.Fatalf("ReviewChunk(copilot_acp) error kind = %q, want transient or internal: %v", reviewErr.Kind, err)
+		t.Fatalf("Review(copilot_acp) error kind = %q, want transient or internal: %v", reviewErr.Kind, err)
 	}
 	if strings.TrimSpace(reviewErr.Error()) == "" {
-		t.Fatal("ReviewChunk(copilot_acp) returned empty provider error")
+		t.Fatal("Review(copilot_acp) returned empty provider error")
 	}
 }

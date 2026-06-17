@@ -39,9 +39,11 @@ SemVer applies to CLI, Go module, and Action major compatibility tags.
 - `.artifacts/diffpal/summary.md` — markdown summary
 - `.artifacts/diffpal/diffpal.sarif` — SARIF output
 - `@diffpal/diffpal` — npm-distributed CLI package
-- `diffpal/action` — GitHub Action wrapper
-- `dist/diffpal.vsix` — Azure DevOps extension package
-- `dist/diffpal-dev.vsix` — Azure DevOps development extension package
+- `diffpal/action` — GitHub Action wrapper in the separate action repository
+
+GitHub Action release metadata is maintained in the separate `diffpal/action`
+repository. Azure DevOps VSIX artifacts are named `dist/diffpal.vsix` and
+`dist/diffpal-dev.vsix` in the separate `diffpal-azure-devops` repository.
 
 ## Tagging policy
 

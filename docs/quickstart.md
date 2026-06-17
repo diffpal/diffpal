@@ -37,6 +37,9 @@ Other setup recipes:
 | `copilot-github-token` | CI authenticates Copilot with a fine-grained GitHub token. |
 | `generic-acp` | You already have another ACP-compatible CLI. |
 
+For `codex-subscription`, generate `CODEX_AUTH_JSON_B64` with the command
+recipe in [`examples/README.md`](../examples/README.md#generate-codex_auth_json_b64).
+
 If you prefer manual setup, copy
 [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml)
 or another recipe from [`examples/configs`](../examples/configs).

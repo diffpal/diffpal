@@ -34,22 +34,12 @@ type debugRuntime struct {
 	taskSnapshot string
 }
 
-func (r *debugRuntime) ReviewChunk(_ context.Context, cfg RuntimeConfig, input ChunkInput) (ChunkOutput, RuntimeUsage, error) {
+func (r *debugRuntime) Review(_ context.Context, _ RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {
 	r.taskSnapshot = renderReviewTaskInput(input)
-	return ChunkOutput{
+	return ReviewOutput{
 			ChangeSummary: []string{"Debug harness rendered the review task without contacting a provider."},
-			Findings:      []ChunkFinding{},
+			Findings:      []ReviewFinding{},
 		},
-		RuntimeUsage{Inspection: debugInspection(cfg)},
+		RuntimeUsage{},
 		nil
-}
-
-func debugInspection(cfg RuntimeConfig) *findings.Inspection {
-	inspection := inspectionForProvider(cfg.ProviderID, cfg.Providers)
-	if inspection == nil || !inspection.Required {
-		return inspection
-	}
-	inspection.ToolCalls = []string{"git_diff"}
-	inspection.DiffInspected = true
-	return inspection
 }

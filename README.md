@@ -18,10 +18,9 @@ review platform they rent. It runs in your CI, uses the AI provider you choose,
 and turns every pull request into clear summaries, actionable inline feedback,
 review artifacts, and merge gates.
 
-Bring your own provider account, keep your costs and credentials with you, and
-keep the review workflow in your repository. DiffPal's goal is to make AI PR
-review portable, affordable, and enforceable across GitHub, GitLab, and Azure
-DevOps.
+Use the provider path that already works for your team and keep the review
+workflow in your repository. DiffPal's goal is to make AI PR review portable,
+affordable, and enforceable across GitHub, GitLab, and Azure DevOps.
 
 | Works with | Publishes | Gates on |
 | --- | --- | --- |
@@ -56,9 +55,9 @@ Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an ordered
 provider pool, or any ACP-compatible CLI without rebuilding your PR review
 workflow.
 
-That model keeps cost and account control in your provider account. DiffPal
-does not require a hosted review service or per-seat platform subscription to
-collect diffs, publish PR feedback, write artifacts, or enforce merge gates.
+That model keeps cost control with your team. DiffPal does not require a hosted
+review service or per-seat platform subscription to collect diffs, publish PR
+feedback, write artifacts, or enforce merge gates.
 
 ## Quick Start: GitHub Actions
 
@@ -117,13 +116,25 @@ DiffPal.
 | GitLab CI | [`examples/ci/gitlab`](examples/ci/gitlab) | MR summary, discussions, Code Quality, SARIF |
 | Azure Pipelines | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) | PR summary thread, PR threads, PR status |
 
+## GitHub Action
+
+GitHub Actions users can install the
+[DiffPal Review action](https://github.com/marketplace/actions/diffpal-review)
+with `uses: diffpal/action@v1`. The action source and release automation live in
+the separate [diffpal/action](https://github.com/diffpal/action) repository.
+
+The action installs `@diffpal/diffpal` by default, then runs
+`diffpal review github`. You still own provider setup and authentication in the
+workflow, so switching provider recipes does not require switching PR review
+platforms.
+
 ## Azure DevOps Marketplace Extension
 
 Azure Pipelines users can install the public
 [DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
 from the Azure DevOps Marketplace and add the `DiffPalReview@1` task to PR
 validation pipelines. Extension source and release automation live in the
-separate [diffpal-azure-devops](https://github.com/diffpal/azure-devops)
+separate [diffpal-azure-devops](https://github.com/diffpal/diffpal-azure-devops)
 repository.
 
 The task installs `@diffpal/diffpal` by default, then runs `diffpal review ado`.
@@ -132,8 +143,7 @@ You still need a committed DiffPal config, a provider credential such as
 checkout. See the [Azure Pipelines setup guide](docs/ci-examples.md#azure-pipelines)
 for copy-paste examples.
 
-GitHub Actions users can use the
-[DiffPal Review action](https://github.com/marketplace/actions/diffpal-review):
+Example GitHub Actions workflow:
 
 ```yaml
 name: diffpal
@@ -270,6 +280,9 @@ Ready-made config recipes. These are the same names accepted by
 | Copilot fine-grained PAT | [`examples/configs/copilot-github-token/config.yaml`](examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 | OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
 
+For Codex subscription auth, generate a fresh `CODEX_AUTH_JSON_B64` value with
+the command recipe in [`examples/README.md`](examples/README.md#generate-codex_auth_json_b64).
+
 Use `generic_acp` for any CLI that can start an ACP stdio server:
 
 ```yaml
@@ -298,15 +311,10 @@ authenticated:
 | `openai`, `aistudio` | Hosted API providers |
 | `pool` | Ordered provider failover |
 
-Hosted providers receive DiffPal's read-only review tools during each review:
-`git_changed_files`, `git_diff`, `list_files`, `read_file`, and
-`search_files`. These are request-level tools, not provider config. ACP
-providers keep their own tool surface.
-
-For hosted providers, DiffPal records review tool usage in the findings bundle
-and rejects a result when the provider did not inspect the diff with `git_diff`.
-ACP providers use their native Git and filesystem tools, so DiffPal records that
-runtime inspection proof is not available for that provider class.
+DiffPal passes the review task snapshot with base and head revisions. Providers
+inspect the repository diff and supporting code through their available Git and
+filesystem tools, then DiffPal validates the structured findings against the
+changed ranges it collected internally.
 
 ## MCP Servers
 

@@ -30,6 +30,7 @@ jobs:
         run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
       - name: Restore Codex auth
+        # Generate CODEX_AUTH_JSON_B64 with examples/README.md#generate-codex_auth_json_b64.
         run: |
           mkdir -p "$HOME/.codex"
           printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"

@@ -15,7 +15,6 @@ func TestSemanticChangeSummaryGroupsPathsByPurpose(t *testing.T) {
 		{Path: "docs/ci-examples.md"},
 		{Path: "go.mod"},
 		{Path: "internal/reviewer/engine.go"},
-		{Path: "tasks/azure-devops/package.json"},
 	})
 
 	joined := strings.Join(got, "\n")
@@ -23,7 +22,6 @@ func TestSemanticChangeSummaryGroupsPathsByPurpose(t *testing.T) {
 		"Updated DiffPal configuration and examples.",
 		"Updated the GitHub Action integration for installing and running DiffPal.",
 		"Updated CI workflow automation for testing, review, or release packaging.",
-		"Updated Azure DevOps task packaging or pipeline integration.",
 		"Updated review output generation and findings reporting behavior.",
 		"Updated user-facing documentation and setup guidance.",
 		"Updated Go module dependencies used by DiffPal.",

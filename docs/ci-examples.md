@@ -30,6 +30,10 @@ steps are the install and authentication commands for that provider.
 | Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 | OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
 
+For Codex subscription auth, generate `CODEX_AUTH_JSON_B64` with the command
+recipe in [`examples/README.md`](../examples/README.md#generate-codex_auth_json_b64),
+then store it as a protected or masked CI secret.
+
 ## Using Another ACP CLI
 
 DiffPal can use any CLI that starts an ACP stdio server. Copy the CI example

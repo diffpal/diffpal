@@ -113,11 +113,8 @@ var validSeverityThresholds = map[string]struct{}{
 var defaultReviewChecks = []string{"security", "bugs", "performance", "best-practices"}
 
 const (
-	DefaultReviewMaxFiles         = 200
-	DefaultReviewContextLines     = 20
-	DefaultReviewMaxPatchChars    = 12000
-	DefaultReviewMaxFilesPerChunk = 20
-	defaultBlockOn                = "high"
+	DefaultReviewMaxFiles = 200
+	defaultBlockOn        = "high"
 )
 
 func LoadConfig(workingDir, configDir, profile string) (Config, error) {

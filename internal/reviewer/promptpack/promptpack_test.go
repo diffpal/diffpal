@@ -126,11 +126,13 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 	}
 
 	invalid := gojsonschema.NewGoLoader(map[string]any{
-		"change_summary": []any{"Added session deletion logic."},
+		"change_summary":      []any{"Added session deletion logic."},
+		"overall_correctness": "patch is incorrect",
 		"findings": []any{
 			map[string]any{
 				"category":   "security",
 				"severity":   "high",
+				"priority":   1,
 				"confidence": 0.91,
 				"path":       "app/session.go",
 				"start_line": 12,
@@ -168,8 +170,8 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.2.0" {
-		t.Fatalf("PromptVersion = %q, want v1.2.0", got.PromptVersion)
+	if got.PromptVersion != "v1.2.1" {
+		t.Fatalf("PromptVersion = %q, want v1.2.1", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
@@ -201,6 +203,19 @@ func TestPromptRegistryResolvesDefaultReviewPrompt(t *testing.T) {
 	}
 }
 
+func TestPromptRegistryKeepsPreviousReviewPrompt(t *testing.T) {
+	t.Parallel()
+
+	prompt, ok := Lookup(ReviewPromptID, "v1.2.0")
+	if !ok {
+		t.Fatalf("Lookup(%q, v1.2.0) failed", ReviewPromptID)
+	}
+	metadata := prompt.ReviewMetadata()
+	if metadata.PromptVersion != "v1.2.0" || metadata.SchemaVersion != "findings.v2" {
+		t.Fatalf("previous prompt metadata = %+v, want v1.2.0/findings.v2", metadata)
+	}
+}
+
 func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 	t.Parallel()
 
@@ -219,6 +234,11 @@ func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 		}
 	}
 	requiredCoverage := []string{
+		"Report only issues the pull request author would likely fix before merging.",
+		"Only report issues introduced or made worse by the patch.",
+		"Do not flag intentional API, behavior, or documentation changes as bugs",
+		"Prefer high signal over high recall",
+		"Use the smallest useful changed-line range",
 		"security: use critical",
 		"security: use critical for direct compromise",
 		"high for exploitable vulnerabilities",

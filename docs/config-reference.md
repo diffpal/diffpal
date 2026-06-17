@@ -143,19 +143,21 @@ artifacts include prompt metadata so review output can be traced back to the
 prompt contract:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.0`
+- `prompt_version`: `v1.2.1`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 
 `diffpal.review.instructions`, `--instructions`, and `--instructions-file`
 are appended as repository-local tuning in a dedicated prompt section. DiffPal
 sends a compact review task snapshot instead of preloading every patch or file
-snippet. Hosted providers receive read-only DiffPal Git/repo tools to inspect
-the diff; ACP providers use their native Git and filesystem tools.
+snippet. Providers inspect the requested base/head diff through their available
+Git and filesystem tooling.
 
-Prompt Pack v1.2 labels commit messages, diffs, tool results, code, comments,
+Prompt Pack v1.2.1 labels commit messages, diffs, tool output, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
-role changes or instructions to follow.
+role changes or instructions to follow. It also follows a high-signal review
+threshold: report only patch-introduced issues the pull request author would
+likely fix before merging.
 
 For rollout, canary stricter prompt behavior in a named profile first:
 
@@ -324,11 +326,10 @@ diffpal:
 
 Then set `OPENAI_API_KEY` in CI.
 
-Hosted providers receive DiffPal's read-only review tools at review time:
-`git_changed_files`, `git_diff`, `list_files`, `read_file`, and
-`search_files`. These tools are not configured in YAML; they are attached to the
-review request and scoped to the job working directory. ACP providers keep their
-own tool surface.
+DiffPal passes base/head review metadata to the provider. The provider inspects
+the diff and supporting code through its available Git and filesystem tooling;
+DiffPal keeps provider choice at the `runtime.providers` boundary and validates
+returned findings against the changed ranges it collected internally.
 
 ## Provider Auth Recipes
 
@@ -374,6 +375,9 @@ Required secret: `OPENAI_API_KEY`.
 ### Codex Subscription Auth
 
 Use [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml).
+
+Generate a fresh `CODEX_AUTH_JSON_B64` value with the command recipe in
+[`examples/README.md`](../examples/README.md#generate-codex_auth_json_b64).
 
 Restore an existing Codex auth file in trusted CI:
 

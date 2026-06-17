@@ -20,8 +20,6 @@ func SemanticChangeSummary(files []ReviewedFile) []string {
 			areas["github-action"] = true
 		case strings.HasPrefix(path, ".github/workflows/"):
 			areas["ci"] = true
-		case strings.HasPrefix(path, "tasks/azure-devops/"):
-			areas["azure"] = true
 		case path == ".config/diffpal/config.yaml" || strings.HasPrefix(path, "internal/config/"):
 			areas["config"] = true
 		case path == "go.mod" || path == "go.sum":
@@ -45,7 +43,6 @@ func SemanticChangeSummary(files []ReviewedFile) []string {
 		"config",
 		"github-action",
 		"ci",
-		"azure",
 		"review-output",
 		"cli",
 		"docs",
@@ -57,7 +54,6 @@ func SemanticChangeSummary(files []ReviewedFile) []string {
 		"config":           "Updated DiffPal configuration and examples.",
 		"github-action":    "Updated the GitHub Action integration for installing and running DiffPal.",
 		"ci":               "Updated CI workflow automation for testing, review, or release packaging.",
-		"azure":            "Updated Azure DevOps task packaging or pipeline integration.",
 		"review-output":    "Updated review output generation and findings reporting behavior.",
 		"cli":              "Updated CLI review or publish command behavior.",
 		"docs":             "Updated user-facing documentation and setup guidance.",
