@@ -55,6 +55,12 @@ Add this GitHub repository secret:
 GitHub provides `GITHUB_TOKEN` automatically. The workflow grants it the
 permissions DiffPal needs to publish PR feedback.
 
+For public repositories, do not expose provider credentials to fork PR code.
+GitHub's fork workflow approval settings control whether outside contributors'
+fork workflows run automatically; they do not make it safe to release provider
+secrets to fork code. Keep secret-backed DiffPal review limited to
+same-repository pull requests, and let forks run no-secret CI only.
+
 ## 3. Add Workflow
 
 Copy the GitHub Actions example:
@@ -71,6 +77,11 @@ The example:
 - authenticates Codex with `OPENAI_API_KEY`
 - uses the DiffPal action, which installs the DiffPal CLI
 - runs only on trusted same-repository PRs when secrets are required
+
+`pull_request_target` runs from the default branch of the base repository and is
+useful for trusted automation such as labeling or commenting. Do not combine it
+with checking out the PR head or running fork code such as package installs,
+tests, build scripts, hooks, or provider CLIs.
 
 For another ACP CLI, keep the same workflow shape and replace the provider
 install/authentication step plus `.config/diffpal/config.yaml`.

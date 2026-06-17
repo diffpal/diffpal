@@ -1,11 +1,54 @@
 name: diffpal
 
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: diffpal-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   review:
     name: review
+    # Provider credentials are only exposed to same-repository PRs.
+    # Fork PRs should run no-secret CI only.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
-      - run: echo "The released-package DiffPal PR workflow is disabled."
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+
+      - name: Restore Codex auth
+        run: |
+          mkdir -p "$HOME/.codex"
+          printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
+          chmod 600 "$HOME/.codex/auth.json"
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+
+      - name: Review pull request
+        uses: diffpal/action@v1
+        with:
+          profile: ci
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          repo: ${{ github.repository }}
+          review-id: github-pr-${{ github.event.pull_request.number }}
+          feedback: balanced
+          gate: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

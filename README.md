@@ -81,6 +81,12 @@ files are kept unless you pass `--force`.
 | --- | --- |
 | `OPENAI_API_KEY` | Authenticates Codex for the review provider. |
 
+For public open-source repositories, keep provider credentials away from fork PR
+code. GitHub's fork workflow approval settings control whether outside
+contributors' fork workflows run automatically; they do not make it safe to
+release provider secrets to fork code. Keep DiffPal's secret-backed review job
+limited to same-repository pull requests. Fork PRs should run no-secret CI only.
+
 3. Add the workflow:
 
 ```bash
@@ -155,6 +161,8 @@ on:
 jobs:
   review:
     name: review
+    # Provider credentials are only exposed to same-repository PRs.
+    # Fork PRs should run no-secret CI only.
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
@@ -188,6 +196,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+`pull_request_target` runs from the default branch of the base repository and is
+useful for trusted automation such as labeling or commenting. Do not combine it
+with checking out the PR head or running package installs, tests, build scripts,
+hooks, provider CLIs, or other fork code. That pattern can expose privileged
+tokens or secrets to untrusted code.
 
 If you prefer copying files manually, use
 [`examples/configs/codex-api-key/config.yaml`](examples/configs/codex-api-key/config.yaml).
