@@ -19,7 +19,7 @@ go run ./cmd/diffpal --help
 
 GitHub Action wrapper changes live in the separate `diffpal/action` repository.
 Azure DevOps Marketplace extension changes live in the separate
-`diffpal-azure-devops` repository. Each integration repo uses its own Node.js
+`diffpal/azure-devops` repository. Each integration repo uses its own Node.js
 verification commands.
 
 Provider-backed reviewer checks are tagged integration tests. They are not part
