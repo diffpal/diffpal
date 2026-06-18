@@ -43,7 +43,7 @@ SemVer applies to CLI, Go module, and Action major compatibility tags.
 
 GitHub Action release metadata is maintained in the separate `diffpal/action`
 repository. Azure DevOps VSIX artifacts are named `dist/diffpal.vsix` and
-`dist/diffpal-dev.vsix` in the separate `diffpal-azure-devops` repository.
+`dist/diffpal-dev.vsix` in the separate `diffpal/azure-devops` repository.
 
 ## Tagging policy
 

@@ -140,7 +140,7 @@ Azure Pipelines users can install the public
 [DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
 from the Azure DevOps Marketplace and add the `DiffPalReview@1` task to PR
 validation pipelines. Extension source and release automation live in the
-separate [diffpal-azure-devops](https://github.com/diffpal/diffpal-azure-devops)
+separate [diffpal/azure-devops](https://github.com/diffpal/azure-devops)
 repository.
 
 The task installs `@diffpal/diffpal` by default, then runs `diffpal review ado`.

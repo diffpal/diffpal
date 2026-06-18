@@ -24,7 +24,7 @@
 
 GitHub Action artifacts are produced by the separate `diffpal/action`
 repository. Azure DevOps VSIX artifacts are produced by the separate
-`diffpal-azure-devops` repository.
+`diffpal/azure-devops` repository.
 
 ## Release pipeline
 
@@ -102,7 +102,7 @@ privileged tokens or secrets to untrusted code.
 
 GitHub Action and Azure DevOps extension releases are intentionally owned by
 their integration repositories. `diffpal/action` contains the action wrapper and
-major-tag release flow. `diffpal-azure-devops` contains the VSIX packaging,
+major-tag release flow. `diffpal/azure-devops` contains the VSIX packaging,
 Marketplace publishing workflow, extension manifests, task handler, and Node.js
 verification commands. DiffPal CLI releases in this repository do not package or
 publish GitHub Action or Azure DevOps Marketplace artifacts.
@@ -155,7 +155,7 @@ default `install: true`; provider setup such as `@openai/codex` and
 - GitHub Action packaging and major-tag maintenance run in the separate
   `diffpal/action` repository.
 - Azure DevOps VSIX packaging and Marketplace publishing run in the separate
-  `diffpal-azure-devops` repository.
+  `diffpal/azure-devops` repository.
 
 ## Self-review gate
 
