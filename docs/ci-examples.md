@@ -179,6 +179,11 @@ Required setup:
 - Enable **Allow scripts to access the OAuth token**.
 - Pass `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` to the `DiffPalReview@1` task.
 - Keep `fetchDepth: 0` on checkout.
+- Run the task from PR validation or an Azure branch policy. When `base` and
+  `head` are omitted, the task fetches the target branch and computes the PR
+  merge-base automatically.
+- Set `explain: true` while debugging to print the resolved PR id, branches,
+  base/head, merge-base, and redacted CLI arguments.
 - Keep credentialed steps behind `ne(variables['System.PullRequest.IsFork'], 'True')`
   or a stricter organization-specific trusted-source condition.
 
@@ -192,6 +197,10 @@ What you should see:
 Common fixes:
 
 - `SYSTEM_ACCESSTOKEN` is empty: enable OAuth token access for scripts.
+- Non-PR build failure: configure the pipeline as PR validation or pass explicit
+  `base` and `head` revisions for an advanced manual run.
+- Target ref or merge-base failure: keep `fetchDepth: 0` and ensure the target
+  branch is fetchable from `origin`.
 - Task cannot find `diffpal`: keep `install: true`, or set `install: false`
   only when `diffpal` is already on `PATH`.
 - Custom binary path: set `diffpalPath`; custom paths skip automatic install.
