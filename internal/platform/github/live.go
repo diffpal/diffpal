@@ -18,6 +18,7 @@ type ReviewEvent string
 const (
 	ReviewEventComment        ReviewEvent = "COMMENT"
 	ReviewEventRequestChanges ReviewEvent = "REQUEST_CHANGES"
+	ReviewEventApprove        ReviewEvent = "APPROVE"
 )
 
 type pullReview struct {
@@ -38,7 +39,7 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 		return fmt.Errorf("missing GitHub head SHA")
 	}
 	switch event {
-	case ReviewEventComment, ReviewEventRequestChanges:
+	case ReviewEventComment, ReviewEventRequestChanges, ReviewEventApprove:
 	default:
 		return fmt.Errorf("unsupported GitHub review event %q", event)
 	}
@@ -157,6 +158,8 @@ func reviewStateMatchesEvent(state string, event ReviewEvent) bool {
 		return event == ReviewEventComment
 	case "CHANGES_REQUESTED":
 		return event == ReviewEventRequestChanges
+	case "APPROVED":
+		return event == ReviewEventApprove
 	default:
 		return false
 	}

@@ -299,6 +299,77 @@ func TestReviewGitHubGateRequestsChanges(t *testing.T) {
 	}
 }
 
+func TestReviewGitHubGateApprovesPassingReview(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var reviewEvent string
+	handlerErrs := make(chan error, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			var payload struct {
+				Event string `json:"event"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			reviewEvent = payload.Event
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.Findings = nil
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+		"--gate",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if reviewEvent != "APPROVE" {
+		t.Fatalf("review event = %q, want APPROVE", reviewEvent)
+	}
+}
+
 func TestReviewChannelFlagIsGitHubOnly(t *testing.T) {
 	t.Parallel()
 
