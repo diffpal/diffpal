@@ -56,7 +56,7 @@ func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
 		Body: "finding body",
 		Path: "internal/app.go",
 		Line: 12,
-	}}}, ReviewEventRequestChanges, server.Client())
+	}}}, server.Client())
 	if err != nil {
 		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
@@ -68,8 +68,8 @@ func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
 	if posted.CommitID != "head-a" {
 		t.Fatalf("commit_id = %q, want head-a", posted.CommitID)
 	}
-	if posted.Event != "REQUEST_CHANGES" {
-		t.Fatalf("event = %q, want REQUEST_CHANGES", posted.Event)
+	if posted.Event != "COMMENT" {
+		t.Fatalf("event = %q, want COMMENT", posted.Event)
 	}
 	if !strings.Contains(posted.Body, "<!-- diffpal:review:diffpal-dev head_sha:head-a -->") {
 		t.Fatalf("body missing review marker:\n%s", posted.Body)
@@ -124,7 +124,7 @@ func TestPublishPullRequestReviewCreatesMultilineInlineComment(t *testing.T) {
 		Path:    "internal/cmd/review.go",
 		Line:    473,
 		EndLine: 475,
-	}}}, ReviewEventComment, server.Client())
+	}}}, server.Client())
 	if err != nil {
 		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
@@ -176,7 +176,7 @@ func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 		Repo:     "acme/diffpal",
 		PRNumber: 7,
 		HeadSHA:  "head-a",
-	}, "# Summary\n\nUpdated.", ReviewIdentity{}, CommentPlan{}, ReviewEventComment, server.Client())
+	}, "# Summary\n\nUpdated.", ReviewIdentity{}, CommentPlan{}, server.Client())
 	if err != nil {
 		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
@@ -227,7 +227,7 @@ func TestPublishPullRequestReviewCreatesNewReviewWithCommentsWhenExistingHeadRev
 		Body: "new finding",
 		Path: "internal/app.go",
 		Line: 12,
-	}}}, ReviewEventComment, server.Client())
+	}}}, server.Client())
 	if err != nil {
 		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
@@ -244,7 +244,7 @@ func TestPublishPullRequestReviewCreatesNewReviewWithCommentsWhenExistingHeadRev
 	}
 }
 
-func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *testing.T) {
+func TestPublishPullRequestReviewCreatesWhenExistingReviewIsNotCommented(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var postedEvent string
 	handlerErrs := make(chan error, 3)
@@ -252,7 +252,7 @@ func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *te
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
 			_, _ = w.Write([]byte(`[
-				{"id":42,"state":"COMMENTED","body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
+				{"id":42,"state":"CHANGES_REQUESTED","body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
 			]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
 			var payload struct {
@@ -277,7 +277,7 @@ func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *te
 		Repo:     "acme/diffpal",
 		PRNumber: 7,
 		HeadSHA:  "head-a",
-	}, "# Summary\n\nBlocking.", ReviewIdentity{}, CommentPlan{}, ReviewEventRequestChanges, server.Client())
+	}, "# Summary\n\nUpdated.", ReviewIdentity{}, CommentPlan{}, server.Client())
 	if err != nil {
 		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
@@ -286,8 +286,8 @@ func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *te
 		t.Fatal(err)
 	default:
 	}
-	if postedEvent != "REQUEST_CHANGES" {
-		t.Fatalf("posted event = %q, want REQUEST_CHANGES", postedEvent)
+	if postedEvent != "COMMENT" {
+		t.Fatalf("posted event = %q, want COMMENT", postedEvent)
 	}
 }
 
@@ -311,7 +311,7 @@ func TestPublishPullRequestReviewRejectsCrossHostPagination(t *testing.T) {
 		Repo:     "acme/diffpal",
 		PRNumber: 7,
 		HeadSHA:  "head-a",
-	}, "# Summary\n\nNo findings.", ReviewIdentity{}, CommentPlan{}, ReviewEventComment, server.Client())
+	}, "# Summary\n\nNo findings.", ReviewIdentity{}, CommentPlan{}, server.Client())
 	if err == nil {
 		t.Fatal("PublishPullRequestReviewWithIdentity() error = nil, want untrusted pagination error")
 	}

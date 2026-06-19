@@ -469,12 +469,14 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 				}
 			}
 			if publishReview {
-				event := github.ReviewEventComment
 				plan := github.CommentPlan{}
 				if includeInline {
 					plan = commentPlan
 				}
-				if err := github.PublishPullRequestReviewWithIdentity(ctx, token, reviewCtx, summary, identity, plan, event, nil); err != nil {
+				// GitHub Actions cannot approve pull requests with GITHUB_TOKEN.
+				// DiffPal publishes comment reviews; --gate is enforced by the
+				// workflow exit status instead of sticky PR review state.
+				if err := github.PublishPullRequestReviewWithIdentity(ctx, token, reviewCtx, summary, identity, plan, nil); err != nil {
 					return err
 				}
 			}

@@ -13,13 +13,6 @@ import (
 	"github.com/diffpal/diffpal/internal/platformapi"
 )
 
-type ReviewEvent string
-
-const (
-	ReviewEventComment        ReviewEvent = "COMMENT"
-	ReviewEventRequestChanges ReviewEvent = "REQUEST_CHANGES"
-)
-
 type pullReview struct {
 	ID       int64  `json:"id"`
 	Body     string `json:"body"`
@@ -27,7 +20,7 @@ type pullReview struct {
 	State    string `json:"state"`
 }
 
-func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, plan CommentPlan, event ReviewEvent, client *http.Client) error {
+func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, plan CommentPlan, client *http.Client) error {
 	if reviewCtx.PRNumber <= 0 {
 		return fmt.Errorf("missing GitHub pull request number")
 	}
@@ -37,18 +30,11 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	if strings.TrimSpace(reviewCtx.HeadSHA) == "" {
 		return fmt.Errorf("missing GitHub head SHA")
 	}
-	switch event {
-	case ReviewEventComment, ReviewEventRequestChanges:
-	default:
-		return fmt.Errorf("unsupported GitHub review event %q", event)
-	}
-	baseURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/pulls/" + fmt.Sprint(reviewCtx.PRNumber) + "/reviews"
-	headers := map[string]string{
-		"Authorization": "Bearer " + token,
-		"Accept":        "application/vnd.github+json",
-	}
+	repoURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo
+	baseURL := repoURL + "/pulls/" + fmt.Sprint(reviewCtx.PRNumber) + "/reviews"
+	headers := githubHeaders(token)
 	body := pullRequestReviewBody(summary, identity, reviewCtx.HeadSHA)
-	existingID, err := findPullRequestReview(ctx, token, baseURL, identity, reviewCtx.HeadSHA, event, client)
+	existingID, err := findPullRequestReview(ctx, token, baseURL, identity, reviewCtx.HeadSHA, client)
 	if err != nil {
 		return err
 	}
@@ -59,7 +45,7 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	}
 	req := map[string]any{
 		"commit_id": reviewCtx.HeadSHA,
-		"event":     string(event),
+		"event":     "COMMENT",
 		"body":      body,
 	}
 	if len(comments) > 0 {
@@ -93,7 +79,7 @@ func pullRequestReviewComments(plan CommentPlan) []map[string]any {
 	return out
 }
 
-func findPullRequestReview(ctx context.Context, token, url string, identity ReviewIdentity, headSHA string, event ReviewEvent, client *http.Client) (int64, error) {
+func findPullRequestReview(ctx context.Context, token, url string, identity ReviewIdentity, headSHA string, client *http.Client) (int64, error) {
 	marker := identity.ReviewMarker(headSHA)
 	nextURL := url + "?per_page=100"
 	var existingID int64
@@ -103,7 +89,7 @@ func findPullRequestReview(ctx context.Context, token, url string, identity Revi
 			return 0, err
 		}
 		for _, review := range resp.reviews {
-			if hasReviewMarker(review.Body, marker) && reviewStateMatchesEvent(review.State, event) {
+			if hasReviewMarker(review.Body, marker) && reviewStateIsCommented(review.State) {
 				existingID = review.ID
 			}
 		}
@@ -117,13 +103,21 @@ type pullReviewsPage struct {
 	nextURL string
 }
 
+func githubHeaders(token string) map[string]string {
+	return map[string]string{
+		"Authorization": "Bearer " + token,
+		"Accept":        "application/vnd.github+json",
+	}
+}
+
 func getGitHubPullReviewsPage(ctx context.Context, token, pageURL string, client *http.Client) (pullReviewsPage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
 		return pullReviewsPage{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	for key, value := range githubHeaders(token) {
+		req.Header.Set(key, value)
+	}
 	resp, err := platformapi.DefaultClient(client).Do(req)
 	if err != nil {
 		return pullReviewsPage{}, err
@@ -156,15 +150,8 @@ func hasReviewMarker(body, marker string) bool {
 	return body == marker || strings.HasPrefix(body, marker+"\n")
 }
 
-func reviewStateMatchesEvent(state string, event ReviewEvent) bool {
-	switch strings.ToUpper(strings.TrimSpace(state)) {
-	case "COMMENTED":
-		return event == ReviewEventComment
-	case "CHANGES_REQUESTED":
-		return event == ReviewEventRequestChanges
-	default:
-		return false
-	}
+func reviewStateIsCommented(state string) bool {
+	return strings.EqualFold(strings.TrimSpace(state), "COMMENTED")
 }
 
 func nextLinkURL(header, currentPageURL string) (string, error) {
