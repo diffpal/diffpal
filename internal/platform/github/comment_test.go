@@ -272,7 +272,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	body := plan.Actions[0].Body
 	for _, want := range []string{
-		"**High security**: query concatenates untrusted input",
+		"query concatenates untrusted input\n- **Finding**: High security",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
 		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
 		"- **Suggestion**: Use a parameterized statement.",

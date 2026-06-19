@@ -245,11 +245,8 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	}
 	link := strings.TrimSpace(opts.Link)
 	hasLink := link != ""
-	fmt.Fprintf(&out, "%s**%s**", prefix, findingHeading(finding, hasLink))
-	if finding.StartLine > 0 && !hasLink {
-		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
-	}
-	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
+	fmt.Fprintf(&out, "%s%s\n", prefix, firstNonEmpty(finding.Message, finding.Title))
+	fmt.Fprintf(&out, "%s**Finding**: %s\n", detailPrefix, findingHeading(finding, hasLink))
 	if evidence := finding.EvidenceText(); evidence != "" {
 		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, evidence)
 	}
