@@ -61,11 +61,8 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if runtime.inputs[0].Language != "en" {
 		t.Fatalf("runtime input language = %q, want en", runtime.inputs[0].Language)
 	}
-	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "security,bugs,performance,best-practices" {
-		t.Fatalf("runtime input review checks = %v, want defaults", runtime.inputs[0].ReviewChecks)
-	}
-	if !strings.Contains(runtime.inputs[0].ReviewTask, "Perform a code review") {
-		t.Fatalf("runtime input review task = %q, want explicit review task", runtime.inputs[0].ReviewTask)
+	if !strings.Contains(runtime.inputs[0].ReviewTask, "Perform a DiffPal CI code review") {
+		t.Fatalf("runtime input review task = %q, want DiffPal CI review task", runtime.inputs[0].ReviewTask)
 	}
 	if result.ChangedFiles != 1 {
 		t.Fatalf("ChangedFiles = %d, want 1", result.ChangedFiles)
@@ -91,9 +88,6 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != promptpack.ReviewPromptVersion {
 		t.Fatalf("Bundle.Prompt = %+v, want prompt pack metadata", result.Bundle.Prompt)
-	}
-	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
-		t.Fatalf("Bundle.ReviewChecks = %v, want defaults", result.Bundle.ReviewChecks)
 	}
 	if got.ImpactText() != "callers can no longer rely on the previous command output" {
 		t.Fatalf("Impact = %q, want copied provider impact", got.ImpactText())
@@ -134,7 +128,7 @@ func TestRunWithRuntimeFallsBackToSemanticChangeSummary(t *testing.T) {
 	}
 }
 
-func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
+func TestRunWithRuntimePassesLanguageAndKeepsAllSupportedCategories(t *testing.T) {
 	repo := newGitRepo(t)
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
 	runGitCmd(t, repo, "add", "main.go")
@@ -164,7 +158,7 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 					StartLine:  4,
 					EndLine:    4,
 					Title:      "performance finding",
-					Message:    "performance should be filtered",
+					Message:    "performance should be retained",
 					Evidence:   findings.NewEvidence("line 4 changed"),
 					Impact:     findings.NewImpact("runtime cost would increase"),
 				},
@@ -173,13 +167,12 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 	}
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
-		WorkingDir:   repo,
-		Repo:         "repo-checks",
-		ReviewID:     "review-checks",
-		MaxFiles:     20,
-		BlockOn:      "high",
-		Language:     "Russian",
-		ReviewChecks: []string{"bugs"},
+		WorkingDir: repo,
+		Repo:       "repo-taxonomy",
+		ReviewID:   "review-taxonomy",
+		MaxFiles:   20,
+		BlockOn:    "high",
+		Language:   "Russian",
 	}, runtime)
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
@@ -190,20 +183,11 @@ func TestRunWithRuntimePassesLanguageAndFiltersReviewChecks(t *testing.T) {
 	if runtime.inputs[0].Language != "Russian" {
 		t.Fatalf("runtime input language = %q, want Russian", runtime.inputs[0].Language)
 	}
-	if strings.Join(runtime.inputs[0].ReviewChecks, ",") != "bugs" {
-		t.Fatalf("runtime input review checks = %v, want [bugs]", runtime.inputs[0].ReviewChecks)
-	}
 	if result.Bundle.Language != "Russian" {
 		t.Fatalf("Bundle.Language = %q, want Russian", result.Bundle.Language)
 	}
-	if strings.Join(result.Bundle.ReviewChecks, ",") != "bugs" {
-		t.Fatalf("Bundle.ReviewChecks = %v, want [bugs]", result.Bundle.ReviewChecks)
-	}
-	if len(result.Bundle.Findings) != 1 {
-		t.Fatalf("len(Findings) = %d, want 1", len(result.Bundle.Findings))
-	}
-	if result.Bundle.Findings[0].Category != "correctness" {
-		t.Fatalf("finding category = %q, want correctness", result.Bundle.Findings[0].Category)
+	if len(result.Bundle.Findings) != 2 {
+		t.Fatalf("len(Findings) = %d, want 2", len(result.Bundle.Findings))
 	}
 }
 
@@ -232,7 +216,6 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 		ReviewID:     "review-injection",
 		MaxFiles:     20,
 		BlockOn:      "high",
-		ReviewChecks: []string{"best-practices"},
 		Instructions: "Report actionable documentation review issues.",
 	}, runtime)
 	if err != nil {
@@ -270,8 +253,7 @@ func TestRenderReviewTaskInputEscapesCommitAndPathInjectionFixtures(t *testing.T
 		BaseSHA:               "base",
 		HeadSHA:               "head",
 		Language:              "en",
-		ReviewChecks:          []string{"security"},
-		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
+		ReviewTask:            promptpack.ReviewTask(),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
@@ -327,7 +309,6 @@ func TestRunWithRuntimeDoesNotPreloadInjectionFixtureContent(t *testing.T) {
 		ReviewID:     "review-injection-fixtures",
 		MaxFiles:     20,
 		BlockOn:      "high",
-		ReviewChecks: []string{"best-practices"},
 		Instructions: "Report actionable documentation, comment, and fixture review issues.",
 	}, runtime)
 	if err != nil {
@@ -474,7 +455,6 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 		ReviewID:     "review-security",
 		MaxFiles:     20,
 		BlockOn:      "high",
-		ReviewChecks: []string{"security"},
 		Instructions: "Focus on externally reachable handlers.",
 	}, runtime)
 	if err != nil {
@@ -619,7 +599,7 @@ func TestReviewEvalFixturesValidateExpectedCategoriesAndSeverity(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
-			got := validateReviewFindings(tc.Findings, files, "fixture-provider", categoriesForReviewChecks(tc.ReviewChecks))
+			got := validateReviewFindings(tc.Findings, files, "fixture-provider")
 			if len(got) != len(tc.Want) {
 				t.Fatalf("validateReviewFindings() returned %d findings, want %d: %+v", len(got), len(tc.Want), got)
 			}
@@ -732,10 +712,9 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 }
 
 type reviewEvalFixture struct {
-	Name         string              `json:"name"`
-	ReviewChecks []string            `json:"review_checks"`
-	Findings     []ReviewFinding     `json:"findings"`
-	Want         []reviewEvalFinding `json:"want"`
+	Name     string              `json:"name"`
+	Findings []ReviewFinding     `json:"findings"`
+	Want     []reviewEvalFinding `json:"want"`
 }
 
 type reviewEvalFinding struct {

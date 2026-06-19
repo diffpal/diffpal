@@ -19,12 +19,11 @@ func unsafeHandlerInput() ReviewInput {
 		Repo:                  "diffpal/diffpal",
 		BaseSHA:               "base",
 		HeadSHA:               "head",
-		ReviewTask:            promptpack.ReviewTask([]string{"security"}),
+		ReviewTask:            promptpack.ReviewTask(),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
 		Language:              "en",
-		ReviewChecks:          []string{"security"},
 	}
 }
 

@@ -11,11 +11,10 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	t.Parallel()
 
 	bundle := findings.FindingsBundle{
-		ReviewID:     "review-123",
-		BaseSHA:      "base-1",
-		HeadSHA:      "head-1",
-		Language:     "en",
-		ReviewChecks: []string{"bugs", "performance", "best-practices"},
+		ReviewID: "review-123",
+		BaseSHA:  "base-1",
+		HeadSHA:  "head-1",
+		Language: "en",
 		ChangeSummary: []string{
 			"Changed service request handling and database query behavior.",
 		},
@@ -82,7 +81,6 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertNotContains(t, got, "- Reviewed files: 3")
 	assertNotContains(t, got, "- Findings: 4")
 	assertNotContains(t, got, "- Blocking findings: 3")
-	assertNotContains(t, got, "- Review checks: bugs, performance, best-practices")
 	assertContains(t, got, "## Feedback on Files")
 	assertContains(t, got, "| File | Change | Review | Notes |")
 	assertContains(t, got, "| `internal/app/service.go` | Modified | Blocked | critical: 1, low: 1 |")
@@ -181,11 +179,6 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 		BaseSHA:  "base-a",
 		HeadSHA:  "head-a",
 		Language: "en",
-		ReviewChecks: []string{
-			"bugs",
-			"performance",
-			"best-practices",
-		},
 		ChangeSummary: []string{
 			"Refined application service behavior.",
 		},

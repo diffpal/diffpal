@@ -9,8 +9,3 @@ diffpal:
     block_on: high
   review:
     language: en
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices

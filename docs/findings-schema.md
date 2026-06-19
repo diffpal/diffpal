@@ -15,7 +15,6 @@ Required top-level fields:
 Optional top-level fields:
 
 - `language`
-- `review_checks[]`
 - `prompt` prompt pack metadata:
   - `prompt_id`
   - `prompt_version`
@@ -36,7 +35,7 @@ Prompt metadata is resolved from the versioned prompt registry in
 `internal/reviewer/promptpack`. The current default review prompt is:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.2`
+- `prompt_version`: `v1.3.0`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 

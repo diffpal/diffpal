@@ -31,11 +31,6 @@ diffpal:
     language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices
   platforms:
     github:
       summary_comment:
@@ -57,7 +52,6 @@ Environment overrides:
 - `DIFFPAL_BLOCK_ON`
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_LANGUAGE`
-- `DIFFPAL_REVIEW_CHECKS`
 - `DIFFPAL_REVIEW_INSTRUCTIONS`
 
 Config files expand `$VAR` and `${VAR}` before YAML parsing when placeholders
@@ -103,8 +97,7 @@ Validation requires `version: v1`, a `diffpal.provider` key present in
 providers means changing the selected `runtime.providers` entry plus the
 matching CI install/auth steps.
 
-`diffpal.review.language` defaults to `en`. `diffpal.review.checks` defaults to
-`security`, `bugs`, `performance`, and `best-practices`; those values can be
-overridden by the `--language` and `--review-checks` review flags. Use
-`diffpal.review.instructions`, `--instructions`, or `--instructions-file` for
-repository-local prompt tuning.
+`diffpal.review.language` defaults to `en` and can be overridden by
+`--language`. Use `diffpal.review.instructions`, `--instructions`, or
+`--instructions-file` for repository-local prompt tuning and scope extensions,
+for example OWASP-focused security review.

@@ -25,8 +25,7 @@ diffpal:
     block_on: high
   review:
     language: en
-    checks:
-      - bugs
+    instructions: Focus on OWASP best practices.
 profiles:
   ci:
     diffpal:
@@ -34,8 +33,7 @@ profiles:
         block_on: critical
       review:
         language: Spanish
-        checks:
-          - performance
+        instructions: Focus on API authorization boundaries.
 `)
 
 	cfg, err := LoadConfig(dir, "", "ci")
@@ -51,8 +49,8 @@ profiles:
 	if cfg.Review.Language != "Spanish" {
 		t.Fatalf("Review.Language = %q, want Spanish", cfg.Review.Language)
 	}
-	if strings.Join(cfg.Review.Checks, ",") != "performance" {
-		t.Fatalf("Review.Checks = %v, want [performance]", cfg.Review.Checks)
+	if cfg.ReviewInstructions() != "Focus on API authorization boundaries." {
+		t.Fatalf("ReviewInstructions() = %q, want profile instructions", cfg.ReviewInstructions())
 	}
 }
 
@@ -95,7 +93,6 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast"))
 
 	t.Setenv("DIFFPAL_REVIEW_LANGUAGE", "Portuguese")
-	t.Setenv("DIFFPAL_REVIEW_CHECKS", "security,best_practices")
 	t.Setenv("DIFFPAL_REVIEW_INSTRUCTIONS", "Focus on auth-sensitive paths.")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
 	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
@@ -105,9 +102,6 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.Review.Language != "Portuguese" {
 		t.Fatalf("Review.Language = %q, want Portuguese", cfg.Review.Language)
-	}
-	if strings.Join(cfg.Review.Checks, ",") != "security,best-practices" {
-		t.Fatalf("Review.Checks = %v, want [security best-practices]", cfg.Review.Checks)
 	}
 	if cfg.ReviewInstructions() != "Focus on auth-sensitive paths." {
 		t.Fatalf("ReviewInstructions() = %q, want env override", cfg.ReviewInstructions())
@@ -238,33 +232,6 @@ diffpal:
 	}
 }
 
-func TestLoadConfigRejectsInvalidReviewChecks(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
-version: v1
-runtime:
-  providers:
-    openai-fast:
-      type: openai
-      openai:
-        model: gpt-5.4-mini
-diffpal:
-  provider: openai-fast
-  gate:
-    block_on: high
-  review:
-    checks:
-      - architecture
-`)
-
-	_, err := LoadConfig(dir, "", "")
-	if err == nil || !strings.Contains(err.Error(), `invalid review.checks value "architecture"`) {
-		t.Fatalf("LoadConfig() error = %v, want invalid review.checks error", err)
-	}
-}
-
 func TestNormalizeReviewDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -274,9 +241,6 @@ func TestNormalizeReviewDefaults(t *testing.T) {
 	}
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
-	}
-	if strings.Join(cfg.Review.Checks, ",") != "security,bugs,performance,best-practices" {
-		t.Fatalf("Review.Checks = %v, want default checks", cfg.Review.Checks)
 	}
 }
 

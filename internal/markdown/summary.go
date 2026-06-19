@@ -121,9 +121,6 @@ func writeMetadata(out *strings.Builder, bundle findings.FindingsBundle, rows []
 	if bundle.Language != "" {
 		fmt.Fprintf(out, "- Language: %s\n", bundle.Language)
 	}
-	if len(bundle.ReviewChecks) > 0 {
-		fmt.Fprintf(out, "- Review checks: %s\n", strings.Join(bundle.ReviewChecks, ", "))
-	}
 	out.WriteString("\n")
 }
 

@@ -72,11 +72,6 @@ diffpal:
     language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices
   platforms:
     github:
       summary_comment:
@@ -120,8 +115,7 @@ config file.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
-| `diffpal.review.instructions` | empty | Optional repository-local prompt tuning appended to the review instruction. |
-| `diffpal.review.checks` | `security`, `bugs`, `performance`, `best-practices` | Review scopes to request from the provider. |
+| `diffpal.review.instructions` | empty | Optional repository-local prompt tuning and scope extensions appended to the review instruction. |
 
 ## Prompt Pack
 
@@ -130,7 +124,7 @@ artifacts include prompt metadata so review output can be traced back to the
 prompt contract:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.2`
+- `prompt_version`: `v1.3.0`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 
@@ -140,11 +134,13 @@ sends a compact review task snapshot instead of preloading every patch or file
 snippet. Providers inspect the requested base/head diff through their available
 Git and filesystem tooling.
 
-Prompt Pack v1.2.2 labels commit messages, diffs, tool output, code, comments,
+Prompt Pack v1.3.0 labels commit messages, diffs, tool output, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
-role changes or instructions to follow. It also follows a high-signal review
-threshold: report only patch-introduced issues the pull request author would
-likely fix before merging.
+role changes or instructions to follow. It also follows DiffPal's CI review
+contract: report only discrete patch-introduced or patch-worsened issues the
+pull request author would likely fix before merging, anchor findings to the
+smallest useful changed-line range, and keep change summaries semantic instead
+of file-list based.
 
 Use the offline debug harness to inspect the active prompt and task snapshot
 without spending provider quota:
@@ -157,14 +153,17 @@ The command still loads config, collects the git diff, runs review
 normalization, and writes a schema-valid mock findings bundle. It replaces only
 the provider call with a local debug runtime.
 
-Review checks map to finding categories:
+DiffPal findings use this fixed taxonomy:
 
-| Check | Categories |
+| Category | Purpose |
 | --- | --- |
-| `security` | security |
-| `bugs` | correctness, reliability |
-| `performance` | performance |
-| `best-practices` | maintainability, testing, style |
+| `security` | Vulnerabilities, credential exposure, injection paths, authz/authn regressions, and unsafe data handling. |
+| `correctness` | User-visible wrong behavior, data corruption, and functional regressions. |
+| `reliability` | Crashes, leaks, retry storms, cancellation bugs, deadlocks, and resilience issues. |
+| `performance` | Concrete common-path latency, memory, query, scaling, or resource regressions. |
+| `maintainability` | Structure or clarity issues with concrete future-change risk. |
+| `testing` | Missing meaningful coverage for new or risky behavior. |
+| `style` | Repo-enforced readability or consistency issues with clear action. |
 
 ## Severity Matrix
 
@@ -191,7 +190,6 @@ diffpal review github \
   --base "$BASE_SHA" \
   --head "$HEAD_SHA" \
   --language en \
-  --review-checks security,bugs,performance,best-practices \
   --instructions-file .config/diffpal/review-instructions.md \
   --feedback balanced
 ```
@@ -428,7 +426,7 @@ These environment variables override config values:
 - `DIFFPAL_BLOCK_ON`
 - `DIFFPAL_OPENAI_MODEL`
 - `DIFFPAL_REVIEW_LANGUAGE`
-- `DIFFPAL_REVIEW_CHECKS`
+- `DIFFPAL_REVIEW_INSTRUCTIONS`
 
 ## Exit Codes
 

@@ -85,7 +85,6 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 	cmd.Flags().String("head", "", "Head revision")
 	cmd.Flags().Int("max-files", 0, "Maximum files from diff")
 	cmd.Flags().String("language", "", "Language for generated review findings")
-	cmd.Flags().String("review-checks", "", "Comma-separated checks to run: security, bugs, performance, best-practices")
 	cmd.Flags().String("instructions", "", "Additional review instructions for local prompt tuning")
 	cmd.Flags().String("instructions-file", "", "Path to additional review instructions")
 	cmd.Flags().String("out", findings.DefaultBundlePath, "Output findings bundle path")
@@ -241,7 +240,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	head, _ := cmd.Flags().GetString("head")
 	maxFiles, _ := cmd.Flags().GetInt("max-files")
 	language, _ := cmd.Flags().GetString("language")
-	reviewChecksSpec, _ := cmd.Flags().GetString("review-checks")
 	instructionsFlag, _ := cmd.Flags().GetString("instructions")
 	instructionsFile, _ := cmd.Flags().GetString("instructions-file")
 	outPath, _ := cmd.Flags().GetString("out")
@@ -264,16 +262,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	}
 	if !cmd.Flags().Changed("language") {
 		language = cfg.ReviewLanguage()
-	}
-	var reviewChecks []string
-	if cmd.Flags().Changed("review-checks") {
-		var err error
-		reviewChecks, err = config.NormalizeReviewChecks(parseModeList(reviewChecksSpec))
-		if err != nil {
-			return reviewExecution{}, withExitCode(2, err)
-		}
-	} else {
-		reviewChecks = cfg.ReviewChecks()
 	}
 	instructions := cfg.ReviewInstructions()
 	if cmd.Flags().Changed("instructions") {
@@ -312,7 +300,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		MaxFiles:     maxFiles,
 		BlockOn:      blockOn,
 		Language:     language,
-		ReviewChecks: reviewChecks,
 		Instructions: instructions,
 	})
 	if err != nil {

@@ -25,7 +25,6 @@ type FindingsBundle struct {
 	BaseSHA       string          `json:"base_sha"`
 	HeadSHA       string          `json:"head_sha"`
 	Language      string          `json:"language,omitempty"`
-	ReviewChecks  []string        `json:"review_checks,omitempty"`
 	Prompt        *PromptMetadata `json:"prompt,omitempty"`
 	Inspection    *Inspection     `json:"inspection,omitempty"`
 	ChangeSummary []string        `json:"change_summary,omitempty"`

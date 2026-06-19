@@ -26,8 +26,6 @@ diffpal:
     block_on: high
   review:
     language: en
-    checks:
-      - security
 `)
 	writeCommandFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
 	runCommandGit(t, repo, "add", ".")
