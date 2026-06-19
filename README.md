@@ -231,11 +231,6 @@ diffpal:
     language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
-    checks:
-      - security
-      - bugs
-      - performance
-      - best-practices
   platforms:
     github: {}
     gitlab: {}
@@ -248,15 +243,10 @@ profiles:
         block_on: high
 ```
 
-Review checks are intentionally simple. They ask the agent what to focus on;
-DiffPal does not hardcode individual signal slugs:
-
-| Check | Finding categories the agent may return |
-| --- | --- |
-| `security` | security |
-| `bugs` | correctness, reliability |
-| `performance` | performance |
-| `best-practices` | maintainability, testing, style |
+DiffPal uses a fixed finding taxonomy: security, correctness, reliability,
+performance, maintainability, testing, and style. Use review instructions to
+change or extend the review scope, for example `Review for OWASP best practices
+and authz/authn regressions.`
 
 Severity is impact-based across all categories. The full critical/high/medium/low
 matrix is in the [config reference](docs/config-reference.md#severity-matrix).

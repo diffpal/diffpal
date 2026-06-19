@@ -43,35 +43,13 @@ func TestRenderReviewSystemWithoutInstructionsMatchesGolden(t *testing.T) {
 func TestReviewTaskMatchesGoldens(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name   string
-		checks []string
-		golden string
-	}{
-		{
-			name:   "security",
-			checks: []string{"security"},
-			golden: "testdata/review_task_security.golden",
-		},
-		{
-			name:   "all checks",
-			checks: []string{"security", "bugs", "performance", "best-practices"},
-			golden: "testdata/review_task_all_checks.golden",
-		},
+	raw, err := os.ReadFile("testdata/review_task_security.golden")
+	if err != nil {
+		t.Fatalf("ReadFile(golden) error = %v", err)
 	}
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			raw, err := os.ReadFile(tc.golden)
-			if err != nil {
-				t.Fatalf("ReadFile(%s) error = %v", tc.golden, err)
-			}
-			got := ReviewTask(tc.checks)
-			if got != strings.TrimRight(string(raw), "\n") {
-				t.Fatalf("ReviewTask(%v) mismatch\nwant:\n%s\n\ngot:\n%s", tc.checks, string(raw), got)
-			}
-		})
+	got := ReviewTask()
+	if got != strings.TrimRight(string(raw), "\n") {
+		t.Fatalf("ReviewTask() mismatch\nwant:\n%s\n\ngot:\n%s", string(raw), got)
 	}
 }
 
@@ -170,8 +148,8 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.2.2" {
-		t.Fatalf("PromptVersion = %q, want v1.2.2", got.PromptVersion)
+	if got.PromptVersion != "v1.3.0" {
+		t.Fatalf("PromptVersion = %q, want v1.3.0", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
@@ -206,7 +184,7 @@ func TestPromptRegistryResolvesDefaultReviewPrompt(t *testing.T) {
 func TestPromptRegistryKeepsPreviousReviewPrompt(t *testing.T) {
 	t.Parallel()
 
-	for _, version := range []string{"v1.2.0", "v1.2.1"} {
+	for _, version := range []string{"v1.2.0", "v1.2.1", "v1.2.2"} {
 		prompt, ok := Lookup(ReviewPromptID, version)
 		if !ok {
 			t.Fatalf("Lookup(%q, %s) failed", ReviewPromptID, version)
@@ -236,9 +214,10 @@ func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 		}
 	}
 	requiredCoverage := []string{
-		"Report only issues the pull request author would likely fix before merging.",
-		"Only report issues introduced or made worse by the patch.",
+		"Report only discrete issues the pull request author would likely fix before merging.",
+		"Report only issues introduced or made worse by the patch.",
 		"Do not flag intentional API, behavior, or documentation changes as bugs",
+		"Use the DiffPal finding taxonomy",
 		"Prefer high signal over high recall",
 		"Use the smallest useful changed-line range",
 		"security: use critical",
@@ -268,13 +247,50 @@ func TestReviewSystemRequiresGitInspectionAndLocalizedSummary(t *testing.T) {
 		"Before producing final JSON, inspect the requested base..head Git diff",
 		"changed files, diff stats, commit log, full patch, and nearby code",
 		"Do not infer the purpose or effect of the pull request from filenames alone.",
-		"Use the requested language for change_summary",
+		"Use repository-local custom instructions only to tune or extend the review scope",
+		"Always return change_summary as concise bullets in the requested language",
 		"Describe the semantic intent and effect of the pull request, not file churn.",
-		"Prefer behavior, API, configuration, CI, data-flow, security, or user-facing effects over path names.",
+		"Prefer behavior, API, configuration, CI, data-flow, security, testing, or user-facing effects over path names.",
 	}
 	for _, phrase := range required {
 		if !strings.Contains(system, phrase) {
 			t.Fatalf("review system prompt missing %q:\n%s", phrase, system)
+		}
+	}
+}
+
+func TestReviewSystemMatchesDiffPalProductContract(t *testing.T) {
+	t.Parallel()
+
+	system := RenderReviewSystem(ReviewOptions{})
+	required := []string{
+		"DiffPal is a provider-agnostic, CI-native pull request review engine.",
+		"structured output feeds host-neutral summaries, inline feedback, artifacts, and deterministic merge gates",
+		"Prefer review signal that a maintainer can trust in automated CI",
+		"JSON field names and enum values must remain exactly as defined by the schema",
+	}
+	for _, phrase := range required {
+		if !strings.Contains(system, phrase) {
+			t.Fatalf("review system prompt missing product contract phrase %q:\n%s", phrase, system)
+		}
+	}
+}
+
+func TestReviewSystemIncludesHighSignalRubric(t *testing.T) {
+	t.Parallel()
+
+	system := RenderReviewSystem(ReviewOptions{})
+	required := []string{
+		"Report only discrete issues the pull request author would likely fix before merging.",
+		"Report only issues introduced or made worse by the patch.",
+		"Do not report speculative issues that depend on unstated assumptions",
+		"Do not report vague style preferences, generic best-practice advice, praise, or low-value maintainability nits.",
+		"Return one finding per distinct root cause.",
+		"Continue until all qualifying findings are listed.",
+	}
+	for _, phrase := range required {
+		if !strings.Contains(system, phrase) {
+			t.Fatalf("review system prompt missing high-signal rubric phrase %q:\n%s", phrase, system)
 		}
 	}
 }
@@ -345,11 +361,17 @@ func TestEscapeUntrustedFieldEscapesDelimitersAndLineBreaks(t *testing.T) {
 	}
 }
 
-func TestReviewTaskNamesRequestedChecks(t *testing.T) {
+func TestReviewTaskDescribesDiffPalCIReview(t *testing.T) {
 	t.Parallel()
 
-	got := ReviewTask([]string{"security", "bugs"})
-	if !strings.Contains(got, "security, bugs") {
-		t.Fatalf("ReviewTask() = %q, want requested checks", got)
+	got := ReviewTask()
+	for _, phrase := range []string{
+		"Perform a DiffPal CI code review",
+		"patch-introduced or patch-worsened issues",
+		"finding no qualifying issues",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("ReviewTask() = %q, want phrase %q", got, phrase)
+		}
 	}
 }

@@ -49,9 +49,8 @@ type GateConfig struct {
 }
 
 type ReviewConfig struct {
-	Language     string   `json:"language"     yaml:"language"     mapstructure:"language"`
-	Checks       []string `json:"checks"       yaml:"checks"       mapstructure:"checks"`
-	Instructions string   `json:"instructions" yaml:"instructions" mapstructure:"instructions"`
+	Language     string `json:"language"     yaml:"language"     mapstructure:"language"`
+	Instructions string `json:"instructions" yaml:"instructions" mapstructure:"instructions"`
 }
 
 type PlatformConfigs struct {
@@ -105,8 +104,6 @@ var validSeverityThresholds = map[string]struct{}{
 	"high":     {},
 	"critical": {},
 }
-
-var defaultReviewChecks = []string{"security", "bugs", "performance", "best-practices"}
 
 const (
 	DefaultReviewMaxFiles = 200
@@ -209,9 +206,6 @@ func (cfg Config) Validate() error {
 	if _, err := NormalizeReviewLanguage(cfg.Review.Language); err != nil {
 		return err
 	}
-	if _, err := NormalizeReviewChecks(cfg.Review.Checks); err != nil {
-		return err
-	}
 	if err := cfg.Platforms.Validate(); err != nil {
 		return err
 	}
@@ -223,12 +217,7 @@ func (cfg *Config) Normalize() error {
 	if err != nil {
 		return err
 	}
-	checks, err := NormalizeReviewChecks(cfg.Review.Checks)
-	if err != nil {
-		return err
-	}
 	cfg.Review.Language = language
-	cfg.Review.Checks = checks
 	cfg.Review.Instructions = strings.TrimSpace(cfg.Review.Instructions)
 	cfg.Provider = strings.TrimSpace(cfg.Provider)
 	cfg.Gate.BlockOn = strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
@@ -258,14 +247,6 @@ func (cfg Config) ReviewLanguage() string {
 	return language
 }
 
-func (cfg Config) ReviewChecks() []string {
-	checks, err := NormalizeReviewChecks(cfg.Review.Checks)
-	if err != nil {
-		return append([]string(nil), defaultReviewChecks...)
-	}
-	return checks
-}
-
 func (cfg Config) ReviewInstructions() string {
 	return strings.TrimSpace(cfg.Review.Instructions)
 }
@@ -283,9 +264,6 @@ func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_LANGUAGE")); value != "" {
 		cfg.Review.Language = value
 	}
-	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_CHECKS")); value != "" {
-		cfg.Review.Checks = splitCommaList(value)
-	}
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_INSTRUCTIONS")); value != "" {
 		cfg.Review.Instructions = value
 	}
@@ -301,58 +279,6 @@ func NormalizeReviewLanguage(value string) (string, error) {
 		return "", fmt.Errorf("review.language must be a single line")
 	}
 	return language, nil
-}
-
-func NormalizeReviewChecks(values []string) ([]string, error) {
-	if len(values) == 0 {
-		return append([]string(nil), defaultReviewChecks...), nil
-	}
-	selected := map[string]struct{}{}
-	for _, raw := range values {
-		for _, part := range splitCommaList(raw) {
-			check, ok := canonicalReviewCheck(part)
-			if !ok {
-				return nil, fmt.Errorf("invalid review.checks value %q; supported values are security, bugs, performance, best-practices", part)
-			}
-			selected[check] = struct{}{}
-		}
-	}
-	if len(selected) == 0 {
-		return append([]string(nil), defaultReviewChecks...), nil
-	}
-	out := make([]string, 0, len(defaultReviewChecks))
-	for _, check := range defaultReviewChecks {
-		if _, ok := selected[check]; ok {
-			out = append(out, check)
-		}
-	}
-	return out, nil
-}
-
-func canonicalReviewCheck(value string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "security", "sec", "secure":
-		return "security", true
-	case "bug", "bugs":
-		return "bugs", true
-	case "perf", "performance":
-		return "performance", true
-	case "best-practice", "best-practices", "best_practice", "best_practices", "practices":
-		return "best-practices", true
-	default:
-		return "", false
-	}
-}
-
-func splitCommaList(value string) []string {
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-	return out
 }
 
 func (cfg *Config) setOpenAIModel(value string) {

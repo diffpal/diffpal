@@ -35,9 +35,6 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 		if opts.Language != "en" {
 			t.Fatalf("Language = %q, want en from config", opts.Language)
 		}
-		if strings.Join(opts.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
-			t.Fatalf("ReviewChecks = %v, want defaults", opts.ReviewChecks)
-		}
 		return testReviewResult("local"), nil
 	})
 
@@ -57,7 +54,7 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	}
 }
 
-func TestReviewLocalSubcommandPassesLanguageAndReviewChecksFlags(t *testing.T) {
+func TestReviewLocalSubcommandPassesLanguageAndInstructionsFlags(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
@@ -69,9 +66,6 @@ func TestReviewLocalSubcommandPassesLanguageAndReviewChecksFlags(t *testing.T) {
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.Language != "French" {
 			t.Fatalf("Language = %q, want French", opts.Language)
-		}
-		if strings.Join(opts.ReviewChecks, ",") != "performance" {
-			t.Fatalf("ReviewChecks = %v, want [performance]", opts.ReviewChecks)
 		}
 		wantInstructions := "Focus on request handlers.\n\nPrefer security findings over style comments."
 		if opts.Instructions != wantInstructions {
@@ -86,7 +80,6 @@ func TestReviewLocalSubcommandPassesLanguageAndReviewChecksFlags(t *testing.T) {
 	cmd.SetArgs([]string{
 		"local",
 		"--language", "French",
-		"--review-checks", "perf",
 		"--instructions", "Focus on request handlers.",
 		"--instructions-file", instructionsPath,
 		"--out", filepath.Join(dir, "findings.json"),

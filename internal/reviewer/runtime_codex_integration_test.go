@@ -44,7 +44,7 @@ func TestADKRuntimeCodexACPReviewFindsUnsafeHandler(t *testing.T) {
 		ToPath:           "internal/platformapi/admin_debug.go",
 		ChangedLineSpans: []diff.LineSpan{{Start: 12, End: 20}},
 	}}
-	valid := validateReviewFindings(output.Findings, files, "codex-acp", categoriesForReviewChecks([]string{"security"}))
+	valid := validateReviewFindings(output.Findings, files, "codex-acp")
 	if len(valid) == 0 {
 		t.Fatalf("Review(codex_acp) returned no valid security findings: %+v", output.Findings)
 	}

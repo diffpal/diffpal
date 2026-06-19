@@ -225,11 +225,6 @@ func composeConfig(detected []string) string {
 	lines = append(lines, "    block_on: high")
 	lines = append(lines, "  review:")
 	lines = append(lines, "    language: en")
-	lines = append(lines, "    checks:")
-	lines = append(lines, "      - security")
-	lines = append(lines, "      - bugs")
-	lines = append(lines, "      - performance")
-	lines = append(lines, "      - best-practices")
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
@@ -260,11 +255,6 @@ func composeWizardConfig(opts wizardConfigOptions) string {
 	lines = append(lines, "    language: en")
 	lines = append(lines, "    instructions: |")
 	lines = append(lines, "      Prefer actionable findings that are directly supported by the diff.")
-	lines = append(lines, "    checks:")
-	lines = append(lines, "      - security")
-	lines = append(lines, "      - bugs")
-	lines = append(lines, "      - performance")
-	lines = append(lines, "      - best-practices")
 	if opts.Platform != "" && opts.Platform != "none" {
 		lines = append(lines, "  platforms:")
 		lines = append(lines, "    "+opts.Platform+": {}")

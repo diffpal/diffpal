@@ -44,9 +44,6 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
 	}
-	if strings.Join(cfg.Review.Checks, ",") != "security,bugs,performance,best-practices" {
-		t.Fatalf("Review.Checks = %v, want default review checks", cfg.Review.Checks)
-	}
 }
 
 func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
@@ -216,10 +213,6 @@ func TestComposeConfigUsesSelectedProviderRoot(t *testing.T) {
 	for _, needle := range []string{
 		"      reasoning_effort: low",
 		"    language: en",
-		"      - security",
-		"      - bugs",
-		"      - performance",
-		"      - best-practices",
 	} {
 		if !strings.Contains(rendered, needle) {
 			t.Fatalf("composeConfig() missing %q:\n%s", needle, rendered)

@@ -158,7 +158,6 @@ func renderReviewTaskInput(input ReviewInput) string {
 	fmt.Fprintf(&out, "Base: %s\n", promptpack.EscapeUntrustedField(input.BaseSHA))
 	fmt.Fprintf(&out, "Head: %s\n", promptpack.EscapeUntrustedField(input.HeadSHA))
 	fmt.Fprintf(&out, "Language: %s\n", promptpack.EscapeUntrustedField(input.Language))
-	fmt.Fprintf(&out, "Review checks: %s\n", promptpack.EscapeUntrustedField(strings.Join(input.ReviewChecks, ", ")))
 	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
 		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", promptpack.EscapeUntrusted(trimmed))
 	}

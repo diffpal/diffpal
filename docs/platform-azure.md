@@ -63,8 +63,9 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
   `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`.
 - Set `install: false` to use `diffpal` from `PATH`, or set `diffpalPath` to a
   custom binary path. Custom paths skip automatic installation.
-- Optional task inputs `language`, `reviewChecks`, and `feedback` map to the
-  CLI flags `--language`, `--review-checks`, and `--feedback`.
+- Optional task inputs `language`, `instructions`, `instructionsFile`, and
+  `feedback` map to the CLI flags `--language`, `--instructions`,
+  `--instructions-file`, and `--feedback`.
 - `feedback: balanced` is the default and publishes status, a PR summary
   thread, and actionable high-confidence inline threads.
 - Config auth values:

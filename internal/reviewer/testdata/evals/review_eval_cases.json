@@ -1,13 +1,11 @@
 [
   {
     "name": "no finding",
-    "review_checks": ["security"],
     "findings": [],
     "want": []
   },
   {
     "name": "critical security",
-    "review_checks": ["security"],
     "findings": [
       {
         "category": "security",
@@ -34,7 +32,6 @@
   },
   {
     "name": "high security",
-    "review_checks": ["security"],
     "findings": [
       {
         "category": "security",
@@ -61,7 +58,6 @@
   },
   {
     "name": "medium correctness",
-    "review_checks": ["bugs"],
     "findings": [
       {
         "category": "correctness",
@@ -88,7 +84,6 @@
   },
   {
     "name": "medium reliability",
-    "review_checks": ["bugs"],
     "findings": [
       {
         "category": "reliability",
@@ -115,7 +110,6 @@
   },
   {
     "name": "low maintainability",
-    "review_checks": ["best-practices"],
     "findings": [
       {
         "category": "maintainability",
@@ -142,7 +136,6 @@
   },
   {
     "name": "low testing",
-    "review_checks": ["best-practices"],
     "findings": [
       {
         "category": "testing",

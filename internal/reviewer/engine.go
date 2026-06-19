@@ -28,7 +28,6 @@ type Options struct {
 	MaxFiles     int
 	BlockOn      string
 	Language     string
-	ReviewChecks []string
 	Instructions string
 }
 
@@ -53,7 +52,6 @@ type ReviewInput struct {
 	UntrustedInputStart   string   `json:"untrusted_input_start"`
 	UntrustedInputEnd     string   `json:"untrusted_input_end"`
 	Language              string   `json:"language"`
-	ReviewChecks          []string `json:"review_checks"`
 	Instructions          string   `json:"instructions,omitempty"`
 	CommitMessages        []string `json:"commit_messages,omitempty"`
 }
@@ -149,19 +147,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if err != nil {
 		return Result{}, wrapError(KindConfig, err)
 	}
-	reviewChecks := opts.ReviewChecks
-	if len(reviewChecks) == 0 {
-		reviewChecks = cfg.ReviewChecks()
-	}
-	reviewChecks, err = dpconfig.NormalizeReviewChecks(reviewChecks)
-	if err != nil {
-		return Result{}, wrapError(KindConfig, err)
-	}
 	instructions := strings.TrimSpace(opts.Instructions)
 	if instructions == "" {
 		instructions = cfg.ReviewInstructions()
 	}
-	allowedCategories := categoriesForReviewChecks(reviewChecks)
 	filtered := filterFilesWithReviewPath(result.Files)
 	commitMessages, err := collectCommitMessages(workingDir, result.BaseSHA, result.HeadSHA)
 	if err != nil {
@@ -175,7 +164,6 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		BaseSHA:       result.BaseSHA,
 		HeadSHA:       result.HeadSHA,
 		Language:      language,
-		ReviewChecks:  append([]string(nil), reviewChecks...),
 		Prompt:        prompt.ReviewMetadata(),
 		ChangeSummary: findings.SemanticChangeSummary(reviewed),
 		Files:         reviewed,
@@ -202,7 +190,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0)
 	var inspection *findings.Inspection
-	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, reviewChecks, instructions, commitMessages)
+	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, instructions, commitMessages)
 	var output ReviewOutput
 	var usage RuntimeUsage
 	err = reliability.RetryWithPolicy(ctx, reliability.Policy{
@@ -232,7 +220,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	} else {
 		inspection = mergeInspection(inspection, usage.Inspection)
 		summaries = append(summaries, output.ChangeSummary...)
-		collected = append(collected, validateReviewFindings(output.Findings, filtered, cfg.ProviderID(), allowedCategories)...)
+		collected = append(collected, validateReviewFindings(output.Findings, filtered, cfg.ProviderID())...)
 	}
 
 	bundle.ChangeSummary = normalizeChangeSummary(summaries)
@@ -349,18 +337,17 @@ func normalizeChangeSummary(items []string) []string {
 	return out
 }
 
-func reviewInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, reviewChecks []string, instructions string, commitMessages []string) ReviewInput {
+func reviewInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, instructions string, commitMessages []string) ReviewInput {
 	return ReviewInput{
 		ReviewID:              reviewID,
 		Repo:                  repo,
 		BaseSHA:               baseSHA,
 		HeadSHA:               headSHA,
-		ReviewTask:            promptpack.DefaultReviewPrompt().ReviewTask(reviewChecks),
+		ReviewTask:            promptpack.DefaultReviewPrompt().ReviewTask(),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
 		UntrustedInputEnd:     promptpack.UntrustedInputEnd,
 		Language:              language,
-		ReviewChecks:          append([]string(nil), reviewChecks...),
 		Instructions:          strings.TrimSpace(instructions),
 		CommitMessages:        append([]string(nil), commitMessages...),
 	}
@@ -411,7 +398,7 @@ func providersWithEnv(in map[string]dpconfig.ProviderConfig) map[string]dpconfig
 	return out
 }
 
-func validateReviewFindings(items []ReviewFinding, files []diff.FileChange, providerID string, allowedCategories map[string]struct{}) []findings.Finding {
+func validateReviewFindings(items []ReviewFinding, files []diff.FileChange, providerID string) []findings.Finding {
 	if len(items) == 0 {
 		return nil
 	}
@@ -420,9 +407,6 @@ func validateReviewFindings(items []ReviewFinding, files []diff.FileChange, prov
 	for _, item := range items {
 		finding, ok := normalizeReviewFinding(item, allowed, providerID)
 		if !ok {
-			continue
-		}
-		if _, ok := allowedCategories[finding.Category]; !ok {
 			continue
 		}
 		out = append(out, finding)
@@ -445,26 +429,6 @@ func changedSpansByPath(files []diff.FileChange) map[string][]changedSpan {
 		}
 	}
 	return allowed
-}
-
-func categoriesForReviewChecks(checks []string) map[string]struct{} {
-	out := map[string]struct{}{}
-	for _, check := range checks {
-		switch check {
-		case "security":
-			out["security"] = struct{}{}
-		case "bugs":
-			out["correctness"] = struct{}{}
-			out["reliability"] = struct{}{}
-		case "performance":
-			out["performance"] = struct{}{}
-		case "best-practices":
-			out["maintainability"] = struct{}{}
-			out["testing"] = struct{}{}
-			out["style"] = struct{}{}
-		}
-	}
-	return out
 }
 
 func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan, providerID string) (findings.Finding, bool) {
