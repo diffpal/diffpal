@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	acp "github.com/coder/acp-go-sdk"
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
-	"github.com/normahq/norma/pkg/runtime/acpagent"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
 	"github.com/normahq/norma/pkg/runtime/mcpregistry"
 	"github.com/normahq/norma/pkg/runtime/structuredagent"
@@ -45,7 +43,6 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
-	sessionState = reviewSessionState(providerCfg, sessionState)
 	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg))
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
@@ -132,38 +129,14 @@ func nonEmptyChangeSummary(items []string) []string {
 }
 
 func reviewPermissionHandler(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	if reviewToolCallIsReadOnly(req.ToolCall) {
-		if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
-			debugReviewPermissionDecision(req, "allow", option.Kind)
-			return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
-		}
-	}
-	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways); ok {
-		debugReviewPermissionDecision(req, "reject", option.Kind)
+	// Agent security is delegated to the provider configuration. DiffPal does not
+	// layer a second tool policy on top of ACP; it selects provider-offered allow
+	// options so provider-specific sandbox and approval settings remain the source
+	// of truth.
+	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
 		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
 	}
-	debugReviewPermissionDecision(req, "cancel", "")
 	return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeCancelled()}, nil
-}
-
-func debugReviewPermissionDecision(req acp.RequestPermissionRequest, decision string, optionKind acp.PermissionOptionKind) {
-	if os.Getenv("DIFFPAL_DEBUG_ACP_PERMISSIONS") != "1" {
-		return
-	}
-	kind := ""
-	if req.ToolCall.Kind != nil {
-		kind = string(*req.ToolCall.Kind)
-	}
-	_, _ = fmt.Fprintf(os.Stderr, "diffpal acp permission: decision=%s option=%s kind=%s command=%s\n", decision, optionKind, kind, reviewToolCommandName(req.ToolCall.RawInput))
-}
-
-func reviewToolCommandName(raw any) string {
-	for _, argv := range reviewToolCommandArgs(raw) {
-		if len(argv) > 0 {
-			return argv[0]
-		}
-	}
-	return ""
 }
 
 func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOption, bool) {
@@ -175,201 +148,6 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 		}
 	}
 	return acp.PermissionOption{}, false
-}
-
-func reviewToolCallIsReadOnly(tool acp.ToolCallUpdate) bool {
-	if tool.Kind != nil {
-		switch *tool.Kind {
-		case acp.ToolKindRead, acp.ToolKindSearch:
-			return true
-		case acp.ToolKindEdit, acp.ToolKindDelete, acp.ToolKindMove, acp.ToolKindFetch:
-			return false
-		}
-	}
-	for _, argv := range reviewToolCommandArgs(tool.RawInput) {
-		if reviewCommandIsReadOnly(argv) {
-			return true
-		}
-	}
-	return false
-}
-
-func reviewToolCommandArgs(raw any) [][]string {
-	switch v := raw.(type) {
-	case map[string]any:
-		var out [][]string
-		for _, key := range []string{"cmd", "command"} {
-			if command, ok := v[key].(string); ok {
-				if argv := simpleShellFields(command); len(argv) > 0 {
-					out = append(out, argv)
-				}
-			}
-		}
-		for _, key := range []string{"args", "argv"} {
-			if argv := stringSlice(v[key]); len(argv) > 0 {
-				out = append(out, argv)
-			}
-		}
-		return out
-	case []any:
-		if argv := stringSlice(v); len(argv) > 0 {
-			return [][]string{argv}
-		}
-	case []string:
-		if len(v) > 0 {
-			return [][]string{v}
-		}
-	case string:
-		if argv := simpleShellFields(v); len(argv) > 0 {
-			return [][]string{argv}
-		}
-	}
-	return nil
-}
-
-func stringSlice(raw any) []string {
-	switch v := raw.(type) {
-	case []string:
-		return v
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, item := range v {
-			text, ok := item.(string)
-			if !ok || strings.TrimSpace(text) == "" {
-				return nil
-			}
-			out = append(out, text)
-		}
-		return out
-	}
-	return nil
-}
-
-func simpleShellFields(command string) []string {
-	command = strings.TrimSpace(command)
-	if command == "" || strings.ContainsAny(command, "\n\r;&|<>`$\\") {
-		return nil
-	}
-	fields := strings.Fields(command)
-	for _, field := range fields {
-		if strings.ContainsAny(field, "*?[]{}()") {
-			return nil
-		}
-	}
-	return fields
-}
-
-func reviewCommandIsReadOnly(argv []string) bool {
-	if len(argv) == 0 {
-		return false
-	}
-	switch argv[0] {
-	case "pwd":
-		return true
-	case "cat", "ls", "head", "tail", "wc", "rg":
-		return readOnlyCommandArgsAreRepoScoped(argv[1:])
-	case "sed":
-		return !hasArg(argv[1:], "-i") && !hasArgPrefix(argv[1:], "-i") && readOnlyCommandArgsAreRepoScoped(argv[1:])
-	case "find":
-		return !hasArg(argv[1:], "-delete") && !hasArg(argv[1:], "-exec") && !hasArg(argv[1:], "-execdir") && readOnlyCommandArgsAreRepoScoped(argv[1:])
-	case "git":
-		return gitCommandIsReadOnly(argv[1:])
-	default:
-		return false
-	}
-}
-
-func gitCommandIsReadOnly(argv []string) bool {
-	if len(argv) == 0 {
-		return false
-	}
-	subcommand := ""
-	for _, arg := range argv {
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		subcommand = arg
-		break
-	}
-	switch subcommand {
-	case "branch":
-		return gitBranchCommandIsReadOnly(argv)
-	case "diff", "grep", "log", "ls-files", "merge-base", "rev-parse", "show", "status":
-		return true
-	default:
-		return false
-	}
-}
-
-func gitBranchCommandIsReadOnly(argv []string) bool {
-	for _, arg := range argv {
-		if arg == "branch" {
-			continue
-		}
-		if !strings.HasPrefix(arg, "-") {
-			continue
-		}
-		switch arg {
-		case "--all", "--contains", "--list", "--merged", "--no-contains", "--no-merged", "--remotes", "--show-current", "-a", "-r", "-v", "-vv":
-			continue
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-func readOnlyCommandArgsAreRepoScoped(args []string) bool {
-	for _, arg := range args {
-		if strings.TrimSpace(arg) == "" {
-			return false
-		}
-		if strings.HasPrefix(arg, "-") || !looksLikePathArg(arg) {
-			continue
-		}
-		if !repoRelativePathArgIsSafe(arg) {
-			return false
-		}
-	}
-	return true
-}
-
-func looksLikePathArg(arg string) bool {
-	return strings.Contains(arg, "/") ||
-		strings.HasPrefix(arg, ".") ||
-		strings.Contains(arg, ".")
-}
-
-func repoRelativePathArgIsSafe(arg string) bool {
-	arg = strings.TrimSpace(arg)
-	if arg == "" || strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, "~") {
-		return false
-	}
-	for _, part := range strings.Split(arg, "/") {
-		switch part {
-		case "", "..", ".git", ".codex", ".ssh":
-			return false
-		}
-	}
-	return true
-}
-
-func hasArg(args []string, needle string) bool {
-	for _, arg := range args {
-		if arg == needle {
-			return true
-		}
-	}
-	return false
-}
-
-func hasArgPrefix(args []string, prefix string) bool {
-	for _, arg := range args {
-		if strings.HasPrefix(arg, prefix) {
-			return true
-		}
-	}
-	return false
 }
 
 func reviewSystemInstruction(instructions string) string {
@@ -435,40 +213,6 @@ func renderReviewTaskInput(input ReviewInput) string {
 	}
 	fmt.Fprintf(&out, "%s\n", promptpack.UntrustedInputEnd)
 	return out.String()
-}
-
-func reviewSessionState(providerCfg dpconfig.ProviderConfig, state map[string]any) map[string]any {
-	if !strings.EqualFold(strings.TrimSpace(providerCfg.Type), "codex_acp") {
-		return state
-	}
-	if state == nil {
-		state = map[string]any{}
-	}
-	acpState, _ := state[acpagent.SessionStateKey].(map[string]any)
-	if acpState == nil {
-		acpState = map[string]any{}
-	}
-	meta, _ := acpState["meta"].(map[string]any)
-	if meta == nil {
-		meta = map[string]any{}
-	}
-	codexMeta, _ := meta["codex"].(map[string]any)
-	if codexMeta == nil {
-		codexMeta = map[string]any{}
-	}
-	setIfMissing(codexMeta, "sandbox", "danger-full-access")
-	setIfMissing(codexMeta, "approvalPolicy", "untrusted")
-	meta["codex"] = codexMeta
-	acpState["meta"] = meta
-	state[acpagent.SessionStateKey] = acpState
-	return state
-}
-
-func setIfMissing(values map[string]any, key string, value any) {
-	if _, ok := values[key]; ok {
-		return
-	}
-	values[key] = value
 }
 
 func appendVisibleText(out *strings.Builder, content *genai.Content) {
