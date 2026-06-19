@@ -266,11 +266,31 @@ func gitCommandIsReadOnly(argv []string) bool {
 		break
 	}
 	switch subcommand {
-	case "branch", "diff", "grep", "log", "ls-files", "merge-base", "rev-parse", "show", "status":
+	case "branch":
+		return gitBranchCommandIsReadOnly(argv)
+	case "diff", "grep", "log", "ls-files", "merge-base", "rev-parse", "show", "status":
 		return true
 	default:
 		return false
 	}
+}
+
+func gitBranchCommandIsReadOnly(argv []string) bool {
+	for _, arg := range argv {
+		if arg == "branch" {
+			continue
+		}
+		if !strings.HasPrefix(arg, "-") {
+			continue
+		}
+		switch arg {
+		case "--all", "--contains", "--list", "--merged", "--no-contains", "--no-merged", "--remotes", "--show-current", "-a", "-r", "-v", "-vv":
+			continue
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func hasArg(args []string, needle string) bool {
