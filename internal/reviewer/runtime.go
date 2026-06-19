@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	acp "github.com/coder/acp-go-sdk"
@@ -133,13 +134,36 @@ func nonEmptyChangeSummary(items []string) []string {
 func reviewPermissionHandler(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	if reviewToolCallIsReadOnly(req.ToolCall) {
 		if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
+			debugReviewPermissionDecision(req, "allow", option.Kind)
 			return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
 		}
 	}
 	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways); ok {
+		debugReviewPermissionDecision(req, "reject", option.Kind)
 		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
 	}
+	debugReviewPermissionDecision(req, "cancel", "")
 	return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeCancelled()}, nil
+}
+
+func debugReviewPermissionDecision(req acp.RequestPermissionRequest, decision string, optionKind acp.PermissionOptionKind) {
+	if os.Getenv("DIFFPAL_DEBUG_ACP_PERMISSIONS") != "1" {
+		return
+	}
+	kind := ""
+	if req.ToolCall.Kind != nil {
+		kind = string(*req.ToolCall.Kind)
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "diffpal acp permission: decision=%s option=%s kind=%s command=%s\n", decision, optionKind, kind, reviewToolCommandName(req.ToolCall.RawInput))
+}
+
+func reviewToolCommandName(raw any) string {
+	for _, argv := range reviewToolCommandArgs(raw) {
+		if len(argv) > 0 {
+			return argv[0]
+		}
+	}
+	return ""
 }
 
 func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOption, bool) {
