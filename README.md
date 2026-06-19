@@ -117,7 +117,7 @@ DiffPal.
 
 | CI system | Examples | Output surfaces |
 | --- | --- | --- |
-| GitHub Actions | [`examples/ci/github-actions`](examples/ci/github-actions) | check run, PR summary, review comments, SARIF |
+| GitHub Actions | [`examples/ci/github-actions`](examples/ci/github-actions) | PR review summary, inline review comments, SARIF |
 | GitLab CI | [`examples/ci/gitlab`](examples/ci/gitlab) | MR summary, discussions, Code Quality, SARIF |
 | Azure Pipelines | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) | PR summary thread, PR threads, PR status |
 
@@ -345,7 +345,7 @@ Use `feedback` for the normal user-facing shape:
 
 | Mode | Behavior |
 | --- | --- |
-| `summary` | One PR/MR summary plus check/status, no inline comments. |
+| `summary` | One PR/MR summary. On GitHub, DiffPal still publishes actionable findings as inline PR review comments. |
 | `balanced` | Summary plus actionable high-confidence inline feedback. |
 | `inline` | Summary plus a more permissive inline threshold. |
 
@@ -360,8 +360,8 @@ with:
   review-id: github-pr-${{ github.event.pull_request.number }}-diffpal-dev
 ```
 
-That produces a separate `diffpal-dev-checks` check run and separate summary
-comment.
+That produces a separate `diffpal-dev` PR review with its own summary and inline
+comments.
 
 ## Local Debugging
 

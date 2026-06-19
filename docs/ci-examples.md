@@ -209,7 +209,7 @@ Use `feedback` for normal setup:
 
 | Feedback | Behavior |
 | --- | --- |
-| `summary` | PR summary plus status/check, no inline comments or threads. |
+| `summary` | PR/MR summary. On GitHub, actionable findings are still published as inline PR review comments. |
 | `balanced` | Summary plus actionable high-confidence inline comments or threads. |
 | `inline` | Summary plus a more permissive inline threshold for actionable findings. |
 

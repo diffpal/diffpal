@@ -159,8 +159,8 @@ default `install: true`; provider setup such as `@openai/codex` and
 DiffPal keeps three automated core workflows: `ci`, `diffpal-dev`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
 open a maintainer-controlled same-repository pull request and verify that
-`diffpal-dev` publishes the `diffpal-dev-checks` check run, submits the PR
-review, and leaves the PR in the expected pass/fail state. Verify the
+`diffpal-dev` submits a separate PR review and leaves the PR in the expected
+pass/fail state through workflow status. Verify the
 released GitHub Action from the separate `diffpal/action` repository.
 
 ## Change log and audits
