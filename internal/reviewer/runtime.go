@@ -242,6 +242,12 @@ func reviewCommandIsReadOnly(argv []string) bool {
 	switch argv[0] {
 	case "pwd":
 		return true
+	case "cat", "ls", "head", "tail", "wc", "rg":
+		return readOnlyCommandArgsAreRepoScoped(argv[1:])
+	case "sed":
+		return !hasArg(argv[1:], "-i") && !hasArgPrefix(argv[1:], "-i") && readOnlyCommandArgsAreRepoScoped(argv[1:])
+	case "find":
+		return !hasArg(argv[1:], "-delete") && !hasArg(argv[1:], "-exec") && !hasArg(argv[1:], "-execdir") && readOnlyCommandArgsAreRepoScoped(argv[1:])
 	case "git":
 		return gitCommandIsReadOnly(argv[1:])
 	default:
@@ -287,6 +293,59 @@ func gitBranchCommandIsReadOnly(argv []string) bool {
 		}
 	}
 	return true
+}
+
+func readOnlyCommandArgsAreRepoScoped(args []string) bool {
+	for _, arg := range args {
+		if strings.TrimSpace(arg) == "" {
+			return false
+		}
+		if strings.HasPrefix(arg, "-") || !looksLikePathArg(arg) {
+			continue
+		}
+		if !repoRelativePathArgIsSafe(arg) {
+			return false
+		}
+	}
+	return true
+}
+
+func looksLikePathArg(arg string) bool {
+	return strings.Contains(arg, "/") ||
+		strings.HasPrefix(arg, ".") ||
+		strings.Contains(arg, ".")
+}
+
+func repoRelativePathArgIsSafe(arg string) bool {
+	arg = strings.TrimSpace(arg)
+	if arg == "" || strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, "~") {
+		return false
+	}
+	for _, part := range strings.Split(arg, "/") {
+		switch part {
+		case "", "..", ".git", ".codex", ".ssh":
+			return false
+		}
+	}
+	return true
+}
+
+func hasArg(args []string, needle string) bool {
+	for _, arg := range args {
+		if arg == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func hasArgPrefix(args []string, prefix string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func reviewSystemInstruction(instructions string) string {
