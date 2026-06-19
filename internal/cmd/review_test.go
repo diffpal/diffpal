@@ -166,6 +166,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 			reviewEvent = payload.Event
 			reviewComments = payload.Comments
 			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
 			http.Error(w, "unexpected request", http.StatusBadRequest)
@@ -194,8 +196,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("requests = %d, want 2", got)
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("requests = %d, want 3", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -267,6 +269,8 @@ func TestReviewGitHubGateFailsWithCommentReview(t *testing.T) {
 			}
 			reviewEvent = payload.Event
 			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
 			http.Error(w, "unexpected request", http.StatusBadRequest)
@@ -340,6 +344,8 @@ func TestReviewGitHubGateCommentsOnPassingReview(t *testing.T) {
 			}
 			reviewEvent = payload.Event
 			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
 			http.Error(w, "unexpected request", http.StatusBadRequest)
@@ -644,6 +650,8 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
 			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
 		default:
 			http.Error(w, "unexpected request", http.StatusBadRequest)
 		}
@@ -667,8 +675,8 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("requests = %d, want 2", got)
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("requests = %d, want 3", got)
 	}
 	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())

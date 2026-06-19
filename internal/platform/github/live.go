@@ -38,10 +38,14 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	if err != nil {
 		return err
 	}
-	comments := pullRequestReviewComments(plan)
+	comments := pullRequestReviewComments(plan, identity)
 	if existingID > 0 && len(comments) == 0 {
 		updateURL := baseURL + "/" + fmt.Sprint(existingID)
-		return platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body})
+		if err := platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body}); err != nil {
+			return err
+		}
+		resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
+		return nil
 	}
 	req := map[string]any{
 		"commit_id": reviewCtx.HeadSHA,
@@ -51,24 +55,32 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	if len(comments) > 0 {
 		req["comments"] = comments
 	}
-	return platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req)
+	if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req); err != nil {
+		return err
+	}
+	resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
+	return nil
 }
 
 func pullRequestReviewBody(summary string, identity ReviewIdentity, headSHA string) string {
 	return identity.ReviewMarker(headSHA) + "\n" + strings.TrimSpace(summary) + "\n"
 }
 
-func pullRequestReviewComments(plan CommentPlan) []map[string]any {
+func pullRequestReviewComments(plan CommentPlan, identity ReviewIdentity) []map[string]any {
 	out := make([]map[string]any, 0, len(plan.Actions))
 	for _, action := range plan.Actions {
 		if action.Type == ActionSkip || strings.TrimSpace(action.Body) == "" || strings.TrimSpace(action.Path) == "" || action.Line <= 0 {
 			continue
 		}
+		body := action.Body
+		if marker := findingMarker(identity, action.FindingID); marker != "" {
+			body += "\n" + marker
+		}
 		out = append(out, map[string]any{
 			"path": action.Path,
 			"line": action.Line,
 			"side": "RIGHT",
-			"body": action.Body,
+			"body": body,
 		})
 		if action.EndLine > action.Line {
 			out[len(out)-1]["start_line"] = action.Line

@@ -185,3 +185,11 @@ func linkForFinding(provider markdown.FindingLinkProvider, finding findings.Find
 	}
 	return link
 }
+
+func findingMarker(identity ReviewIdentity, findingID string) string {
+	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(findingID))
+	if id == "" {
+		return ""
+	}
+	return "<!-- diffpal:finding:" + identity.channel() + " id:" + id + " -->"
+}
