@@ -451,7 +451,6 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		}
 		commentPlan := github.PlanInlineCommentsWithOptions(nil, bundle.Findings, github.CommentOptions{
 			Profile:     string(profile),
-			Links:       github.NewPermanentLinkProvider(reviewCtx),
 			AllFindings: true,
 		})
 		if err := github.ValidateInlineFindings(bundle.Findings); err != nil {

@@ -288,3 +288,26 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 		t.Fatalf("comment body repeats linked line range in header:\n%s", body)
 	}
 }
+
+func TestPlanInlineCommentsKeepsFindingLineRange(t *testing.T) {
+	t.Parallel()
+
+	plan := PlanInlineComments(nil, []findings.Finding{{
+		ID:         "fp-range",
+		Category:   "correctness",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "internal/cmd/review.go",
+		StartLine:  473,
+		EndLine:    475,
+		Message:    "range issue",
+	}})
+
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	action := plan.Actions[0]
+	if action.Line != 473 || action.EndLine != 475 {
+		t.Fatalf("action range = %d-%d, want 473-475", action.Line, action.EndLine)
+	}
+}

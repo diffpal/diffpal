@@ -82,6 +82,66 @@ func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
 	}
 }
 
+func TestPublishPullRequestReviewCreatesMultilineInlineComment(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var posted struct {
+		Comments []struct {
+			Path      string `json:"path"`
+			Line      int    `json:"line"`
+			Side      string `json:"side"`
+			StartLine int    `json:"start_line"`
+			StartSide string `json:"start_side"`
+			Body      string `json:"body"`
+		} `json:"comments"`
+	}
+	handlerErrs := make(chan error, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			if err := json.NewDecoder(r.Body).Decode(&posted); err != nil {
+				handlerErrs <- fmt.Errorf("decode review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err := PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nFinding.", ReviewIdentity{}, CommentPlan{Actions: []CommentAction{{
+		Type:    ActionCreate,
+		Body:    "finding body",
+		Path:    "internal/cmd/review.go",
+		Line:    473,
+		EndLine: 475,
+	}}}, ReviewEventComment, server.Client())
+	if err != nil {
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if len(posted.Comments) != 1 {
+		t.Fatalf("comments = %d, want 1", len(posted.Comments))
+	}
+	got := posted.Comments[0]
+	if got.Path != "internal/cmd/review.go" || got.StartLine != 473 || got.Line != 475 || got.StartSide != "RIGHT" || got.Side != "RIGHT" {
+		t.Fatalf("comment location = %#v, want internal/cmd/review.go lines 473-475 on RIGHT", got)
+	}
+}
+
 func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var patchedBody string

@@ -27,6 +27,7 @@ type CommentAction struct {
 	Body      string
 	Path      string
 	Line      int
+	EndLine   int
 }
 
 type CommentState struct {
@@ -73,9 +74,13 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		}
 		key := commentKey(f.Path, f.StartLine, f.Category, f.ID)
 		body := formatBody(f, links)
+		endLine := f.EndLine
+		if endLine < f.StartLine {
+			endLine = f.StartLine
+		}
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
-			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		prior, ok := existing[key]
@@ -83,14 +88,14 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
 		}
 		if ok && prior == f.ID {
-			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		if ok {
-			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
-		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 	}
 	return CommentPlan{
 		Actions: out,

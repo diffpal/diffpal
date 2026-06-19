@@ -85,6 +85,11 @@ func pullRequestReviewComments(plan CommentPlan) []map[string]any {
 			"side": "RIGHT",
 			"body": action.Body,
 		})
+		if action.EndLine > action.Line {
+			out[len(out)-1]["start_line"] = action.Line
+			out[len(out)-1]["start_side"] = "RIGHT"
+			out[len(out)-1]["line"] = action.EndLine
+		}
 	}
 	return out
 }

@@ -135,7 +135,9 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	var requests atomic.Int32
 	var summaryBody string
 	var reviewEvent string
-	var reviewComments int
+	var reviewComments []struct {
+		Body string `json:"body"`
+	}
 	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
@@ -149,9 +151,11 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
 			var payload struct {
-				Body     string        `json:"body"`
-				Event    string        `json:"event"`
-				Comments []interface{} `json:"comments"`
+				Body     string `json:"body"`
+				Event    string `json:"event"`
+				Comments []struct {
+					Body string `json:"body"`
+				} `json:"comments"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
@@ -160,7 +164,7 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 			}
 			summaryBody = payload.Body
 			reviewEvent = payload.Event
-			reviewComments = len(payload.Comments)
+			reviewComments = payload.Comments
 			w.WriteHeader(http.StatusCreated)
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
@@ -207,11 +211,14 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if reviewEvent != "COMMENT" {
 		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
 	}
-	if reviewComments != 1 {
-		t.Fatalf("review comments = %d, want 1 inline finding", reviewComments)
+	if len(reviewComments) != 1 {
+		t.Fatalf("review comments = %d, want 1 inline finding", len(reviewComments))
 	}
 	if strings.Contains(summaryBody, "## Detailed Comments") {
 		t.Fatalf("summary body duplicates detailed comments:\n%s", summaryBody)
+	}
+	if strings.Contains(reviewComments[0].Body, "**Source:**") {
+		t.Fatalf("inline comment body contains redundant source link:\n%s", reviewComments[0].Body)
 	}
 	text := out.String()
 	for _, needle := range []string{
