@@ -97,7 +97,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 }
 
-func TestRunWithRuntimeFallsBackToSemanticChangeSummary(t *testing.T) {
+func TestRunWithRuntimeDoesNotInventChangeSummaryFromPaths(t *testing.T) {
 	repo := newGitRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "docs"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(docs) error = %v", err)
@@ -120,11 +120,8 @@ func TestRunWithRuntimeFallsBackToSemanticChangeSummary(t *testing.T) {
 		t.Fatalf("RunWithRuntime() error = %v", err)
 	}
 	got := strings.Join(result.Bundle.ChangeSummary, "\n")
-	if got != "Updated user-facing documentation and setup guidance." {
-		t.Fatalf("ChangeSummary = %v, want semantic fallback", result.Bundle.ChangeSummary)
-	}
-	if strings.Contains(got, "docs/quickstart.md") {
-		t.Fatalf("ChangeSummary contains file-list detail: %v", result.Bundle.ChangeSummary)
+	if got != "" {
+		t.Fatalf("ChangeSummary = %v, want no path-derived fallback", result.Bundle.ChangeSummary)
 	}
 }
 
@@ -681,7 +678,7 @@ func TestProviderAuthAndQuotaErrorsAreTransient(t *testing.T) {
 	}
 }
 
-func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) {
+func TestRunWithRuntimeFailsMalformedStructuredOutputAfterRetries(t *testing.T) {
 	repo := newGitRepo(t)
 	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
 	runGitCmd(t, repo, "add", "main.go")
@@ -693,21 +690,18 @@ func TestRunWithRuntimeSkipsMalformedStructuredOutputAfterRetries(t *testing.T) 
 		errs: []error{malformed, malformed, malformed},
 	}
 
-	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
 		WorkingDir: repo,
 		Repo:       "repo-d",
 		ReviewID:   "review-d",
 		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
-	if err != nil {
-		t.Fatalf("RunWithRuntime() error = %v", err)
+	if err == nil {
+		t.Fatal("RunWithRuntime() error = nil, want malformed structured output error")
 	}
 	if runtime.calls != 3 {
 		t.Fatalf("runtime calls = %d, want 3", runtime.calls)
-	}
-	if len(result.Bundle.Findings) != 0 {
-		t.Fatalf("len(Findings) = %d, want 0", len(result.Bundle.Findings))
 	}
 }
 

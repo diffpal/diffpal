@@ -133,8 +133,11 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
-	var checkRunName string
 	var summaryBody string
+	var reviewEvent string
+	var reviewComments []struct {
+		Body string `json:"body"`
+	}
 	handlerErrs := make(chan error, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
@@ -144,30 +147,27 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 			return
 		}
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
-			var payload struct {
-				Name string `json:"name"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				handlerErrs <- fmt.Errorf("decode check run: %w", err)
-				http.Error(w, "bad payload", http.StatusBadRequest)
-				return
-			}
-			checkRunName = payload.Name
-			w.WriteHeader(http.StatusCreated)
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
 			_, _ = w.Write([]byte(`[]`))
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/10/comments":
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
 			var payload struct {
-				Body string `json:"body"`
+				Body     string `json:"body"`
+				Event    string `json:"event"`
+				Comments []struct {
+					Body string `json:"body"`
+				} `json:"comments"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				handlerErrs <- fmt.Errorf("decode summary comment: %w", err)
+				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
 				http.Error(w, "bad payload", http.StatusBadRequest)
 				return
 			}
 			summaryBody = payload.Body
+			reviewEvent = payload.Event
+			reviewComments = payload.Comments
 			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
 			http.Error(w, "unexpected request", http.StatusBadRequest)
@@ -189,7 +189,7 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "check-run,summary",
+		"--mode", "comments,summary",
 		"--review-channel", "diffpal-dev",
 	})
 
@@ -204,25 +204,269 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
-	if checkRunName != "diffpal-dev-checks" {
-		t.Fatalf("check run name = %q, want diffpal-dev-checks", checkRunName)
-	}
-	if !strings.Contains(summaryBody, "<!-- diffpal:summary:diffpal-dev -->") {
+	if !strings.Contains(summaryBody, "<!-- diffpal:review:diffpal-dev head_sha:head-a -->") {
 		t.Fatalf("summary body missing channel marker:\n%s", summaryBody)
 	}
 	if !strings.Contains(summaryBody, "# DiffPal Dev Review Summary") {
 		t.Fatalf("summary body missing channel title:\n%s", summaryBody)
 	}
+	if reviewEvent != "COMMENT" {
+		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
+	}
+	if len(reviewComments) != 1 {
+		t.Fatalf("review comments = %d, want 1 inline finding", len(reviewComments))
+	}
+	if strings.Contains(summaryBody, "## Detailed Comments") {
+		t.Fatalf("summary body duplicates detailed comments:\n%s", summaryBody)
+	}
+	if strings.Contains(reviewComments[0].Body, "**Source:**") {
+		t.Fatalf("inline comment body contains redundant source link:\n%s", reviewComments[0].Body)
+	}
 	text := out.String()
 	for _, needle := range []string{
 		"findings=1",
 		"bundle=",
-		"mode=check_run path=.artifacts/diffpal/github-checkrun.json",
+		"mode=github_comments path=.artifacts/diffpal/github-comments.json",
 		"mode=summary path=.artifacts/diffpal/summary.md",
 	} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("output missing %q:\n%s", needle, text)
 		}
+	}
+}
+
+func TestReviewGitHubGateFailsWithCommentReview(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var reviewEvent string
+	handlerErrs := make(chan error, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			var payload struct {
+				Event string `json:"event"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			reviewEvent = payload.Event
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("github"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+		"--gate",
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want blocking gate error")
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if reviewEvent != "COMMENT" {
+		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
+	}
+	if !strings.Contains(err.Error(), "review blocked: blocking findings detected: 1") {
+		t.Fatalf("error = %v, want blocking gate", err)
+	}
+}
+
+func TestReviewGitHubGateCommentsOnPassingReview(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var reviewEvent string
+	handlerErrs := make(chan error, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			var payload struct {
+				Event string `json:"event"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			reviewEvent = payload.Event
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.Findings = nil
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+		"--gate",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if reviewEvent != "COMMENT" {
+		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
+	}
+}
+
+func TestReviewGitHubPublishesNoInlineCommentsForNonBlockingFindings(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_TOKEN", "token")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_ADO_PAT_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
+
+	var reviewComments []struct {
+		Body string `json:"body"`
+	}
+	handlerErrs := make(chan error, 4)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Bearer token", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			var payload struct {
+				Comments []struct {
+					Body string `json:"body"`
+				} `json:"comments"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode pull request review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			reviewComments = payload.Comments
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("github")
+		result.Bundle.Findings = []findings.Finding{{
+			ReviewID:   "github",
+			Category:   "correctness",
+			Severity:   "medium",
+			Confidence: 0.95,
+			Path:       "main.go",
+			StartLine:  4,
+			EndLine:    4,
+			Title:      "advisory",
+			Message:    "medium advisory",
+			Evidence:   findings.NewEvidence("medium evidence"),
+		}}
+		return result, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"github",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "summary",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if len(reviewComments) != 0 {
+		t.Fatalf("review comments = %d, want 0", len(reviewComments))
 	}
 }
 
@@ -328,14 +572,13 @@ func TestReviewGitHubDryRunPrintsMarkdownWithoutPublishing(t *testing.T) {
 	text := out.String()
 	for _, want := range []string{
 		"# DiffPal Review Summary",
-		"https://github.com/acme/diffpal/blob/head-a/main.go#L4",
-		"example evidence",
+		"DiffPal found 1 actionable finding(s), including 1 blocking finding(s).",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("dry-run output missing %q:\n%s", want, text)
 		}
 	}
-	for _, forbidden := range []string{"findings=", "bundle=", "```"} {
+	for _, forbidden := range []string{"findings=", "bundle=", "```", "## Detailed Comments", "example evidence"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("dry-run output contains %q:\n%s", forbidden, text)
 		}
@@ -476,7 +719,7 @@ func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
 	}
 }
 
-func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
+func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("GITHUB_TOKEN", "token")
@@ -489,7 +732,16 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		http.Error(w, "unexpected request", http.StatusBadRequest)
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPost && r.URL.Path == "/graphql":
+			_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`))
+		default:
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
@@ -510,8 +762,8 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 0 {
-		t.Fatalf("requests = %d, want 0", got)
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("requests = %d, want 2", got)
 	}
 	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())
@@ -819,11 +1071,12 @@ func writeHostTestConfig(t *testing.T, dir string) {
 
 func writeHostTestConfigWithGitHubSummary(t *testing.T, dir string, enabled bool) {
 	t.Helper()
+	_ = enabled
 	configDir := filepath.Join(dir, ".config", "diffpal")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
-	payload := fmt.Sprintf(`version: v1
+	const payload = `version: v1
 runtime:
   providers:
     openai-fast:
@@ -836,12 +1089,10 @@ diffpal:
   gate:
     block_on: high
   platforms:
-    github:
-      summary_comment:
-        enabled: %t
+    github: {}
     gitlab: {}
     azure: {}
-`, enabled)
+`
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)
 	}

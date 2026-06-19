@@ -3,7 +3,6 @@ package markdown
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
@@ -22,6 +21,7 @@ type SummaryOptions struct {
 	PublishSurfaces []string
 	ShowMetadata    bool
 	HideOverview    bool
+	HideDetails     bool
 	Snippets        SnippetProvider
 	Links           FindingLinkProvider
 }
@@ -32,7 +32,6 @@ func RenderSummary(bundle findings.FindingsBundle) string {
 
 func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOptions) string {
 	sortedFindings := sortFindings(bundle.Findings)
-	rows := feedbackRows(bundle, sortedFindings)
 	blocking := countBlocking(sortedFindings)
 
 	out := strings.Builder{}
@@ -57,22 +56,13 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	}
 
 	if opts.ShowMetadata {
-		writeMetadata(&out, bundle, rows, sortedFindings, blocking, opts)
+		writeMetadata(&out, bundle, sortedFindings, blocking, opts)
 	}
-
-	out.WriteString("## Feedback on Files\n\n")
-	if len(rows) == 0 {
-		out.WriteString("No reviewable files were recorded.\n")
-		return out.String()
-	}
-	out.WriteString("| File | Change | Review | Notes |\n")
-	out.WriteString("| --- | --- | --- | --- |\n")
-	for _, row := range rows {
-		fmt.Fprintf(&out, "| `%s` | %s | %s | %s |\n", escapeTable(row.Path), row.Change, row.Review, escapeTable(row.Notes))
-	}
-	out.WriteString("\n")
 
 	if len(sortedFindings) == 0 {
+		return out.String()
+	}
+	if opts.HideDetails {
 		return out.String()
 	}
 
@@ -104,12 +94,12 @@ func writeChangeOverview(out *strings.Builder, bundle findings.FindingsBundle) {
 	out.WriteString("\n")
 }
 
-func writeMetadata(out *strings.Builder, bundle findings.FindingsBundle, rows []feedbackRow, sortedFindings []findings.Finding, blocking int, opts SummaryOptions) {
+func writeMetadata(out *strings.Builder, bundle findings.FindingsBundle, sortedFindings []findings.Finding, blocking int, opts SummaryOptions) {
 	out.WriteString("## Review Metadata\n\n")
 	fmt.Fprintf(out, "- Review ID: %s\n", bundle.ReviewID)
 	fmt.Fprintf(out, "- Base: %s\n", bundle.BaseSHA)
 	fmt.Fprintf(out, "- Head: %s\n", bundle.HeadSHA)
-	fmt.Fprintf(out, "- Reviewed files: %d\n", len(rows))
+	fmt.Fprintf(out, "- Reviewed files: %d\n", reviewedFileCount(bundle, sortedFindings))
 	fmt.Fprintf(out, "- Findings: %d\n", len(sortedFindings))
 	fmt.Fprintf(out, "- Blocking findings: %d\n", blocking)
 	if strings.TrimSpace(opts.FeedbackProfile) != "" {
@@ -136,78 +126,11 @@ func changeSummaryItems(bundle findings.FindingsBundle) []string {
 	if len(out) > 0 {
 		return out
 	}
-	return findings.SemanticChangeSummary(bundle.Files)
+	return nil
 }
 
-type feedbackRow struct {
-	Path   string
-	Change string
-	Review string
-	Notes  string
-}
-
-func feedbackRows(bundle findings.FindingsBundle, items []findings.Finding) []feedbackRow {
-	byPath := groupByPath(items)
-	paths := reviewedPaths(bundle, byPath)
-	changes := reviewedChanges(bundle)
-	rows := make([]feedbackRow, 0, len(paths))
-	for _, path := range paths {
-		findingsForFile := byPath[path]
-		review := "Passed"
-		notes := "No actionable findings."
-		if len(findingsForFile) > 0 {
-			if countBlocking(findingsForFile) > 0 {
-				review = "Blocked"
-			} else {
-				review = "Needs attention"
-			}
-			notes = severityNotes(findingsForFile)
-		}
-		rows = append(rows, feedbackRow{
-			Path:   path,
-			Change: changeLabel(changes[path]),
-			Review: review,
-			Notes:  notes,
-		})
-	}
-	return rows
-}
-
-func reviewedChanges(bundle findings.FindingsBundle) map[string]string {
-	out := make(map[string]string, len(bundle.Files))
-	for _, file := range bundle.Files {
-		path := strings.TrimSpace(file.Path)
-		if path == "" {
-			continue
-		}
-		if _, ok := out[path]; ok {
-			continue
-		}
-		out[path] = file.Status
-	}
-	return out
-}
-
-func changeLabel(status string) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "added":
-		return "Added"
-	case "modified":
-		return "Modified"
-	case "deleted":
-		return "Deleted"
-	case "renamed":
-		return "Renamed"
-	case "copied":
-		return "Copied"
-	default:
-		return "Changed"
-	}
-}
-
-func reviewedPaths(bundle findings.FindingsBundle, byPath map[string][]findings.Finding) []string {
+func reviewedFileCount(bundle findings.FindingsBundle, items []findings.Finding) int {
 	seen := map[string]struct{}{}
-	paths := make([]string, 0, len(bundle.Files)+len(byPath))
 	for _, file := range bundle.Files {
 		path := strings.TrimSpace(file.Path)
 		if path == "" {
@@ -217,17 +140,18 @@ func reviewedPaths(bundle findings.FindingsBundle, byPath map[string][]findings.
 			continue
 		}
 		seen[path] = struct{}{}
-		paths = append(paths, path)
 	}
-	for path := range byPath {
+	for _, finding := range items {
+		path := strings.TrimSpace(finding.Path)
+		if path == "" {
+			continue
+		}
 		if _, ok := seen[path]; ok {
 			continue
 		}
 		seen[path] = struct{}{}
-		paths = append(paths, path)
 	}
-	sort.Strings(paths)
-	return paths
+	return len(seen)
 }
 
 func sortFindings(items []findings.Finding) []findings.Finding {
@@ -254,25 +178,6 @@ func sortFindings(items []findings.Finding) []findings.Finding {
 		return left.Message < right.Message
 	})
 	return out
-}
-
-func severityNotes(items []findings.Finding) string {
-	counts := map[string]int{}
-	for _, item := range items {
-		counts[strings.ToLower(strings.TrimSpace(item.Severity))]++
-	}
-	parts := make([]string, 0, len(counts))
-	for _, severity := range []string{"critical", "high", "medium", "low"} {
-		count := counts[severity]
-		if count == 0 {
-			continue
-		}
-		parts = append(parts, severity+": "+strconv.Itoa(count))
-	}
-	if len(parts) == 0 {
-		return strconv.Itoa(len(items)) + " finding(s)."
-	}
-	return strings.Join(parts, ", ")
 }
 
 func countBlocking(items []findings.Finding) int {
@@ -340,11 +245,8 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	}
 	link := strings.TrimSpace(opts.Link)
 	hasLink := link != ""
-	fmt.Fprintf(&out, "%s**%s**", prefix, findingHeading(finding, hasLink))
-	if finding.StartLine > 0 && !hasLink {
-		fmt.Fprintf(&out, " `%s`", lineRange(finding.StartLine, finding.EndLine))
-	}
-	fmt.Fprintf(&out, ": %s\n", firstNonEmpty(finding.Message, finding.Title))
+	fmt.Fprintf(&out, "%s%s\n", prefix, firstNonEmpty(finding.Message, finding.Title))
+	fmt.Fprintf(&out, "%s**Finding**: %s\n", detailPrefix, findingHeading(finding, hasLink))
 	if evidence := finding.EvidenceText(); evidence != "" {
 		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, evidence)
 	}
@@ -366,7 +268,6 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	if finding.Suggestion != "" {
 		fmt.Fprintf(&out, "%s**Suggestion**: %s\n", detailPrefix, finding.Suggestion)
 	}
-	fmt.Fprintf(&out, "%s**Confidence**: %.2f\n", detailPrefix, finding.Confidence)
 	return out.String()
 }
 
@@ -451,12 +352,6 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func escapeTable(value string) string {
-	value = strings.ReplaceAll(value, "\n", " ")
-	value = strings.ReplaceAll(value, "|", "\\|")
-	return value
 }
 
 func groupByPath(items []findings.Finding) map[string][]findings.Finding {

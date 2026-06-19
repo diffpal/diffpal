@@ -27,6 +27,7 @@ type CommentAction struct {
 	Body      string
 	Path      string
 	Line      int
+	EndLine   int
 }
 
 type CommentState struct {
@@ -48,19 +49,24 @@ func PlanInlineCommentsWithProfile(existing map[string]string, findings []findin
 }
 
 type CommentOptions struct {
-	Profile string
-	Links   markdown.FindingLinkProvider
+	Profile     string
+	Links       markdown.FindingLinkProvider
+	AllFindings bool
 }
 
 func PlanInlineCommentsWithOptions(existing map[string]string, findings []findings.Finding, opts CommentOptions) CommentPlan {
-	return planInlineComments(existing, findings, inlineConfidenceThreshold(opts.Profile), opts.Links)
+	minConfidence := inlineConfidenceThreshold(opts.Profile)
+	if opts.AllFindings {
+		minConfidence = -1
+	}
+	return planInlineComments(existing, findings, minConfidence, opts.Links)
 }
 
 func planInlineComments(existing map[string]string, findings []findings.Finding, minConfidence float64, links markdown.FindingLinkProvider) CommentPlan {
 	out := make([]CommentAction, 0, len(findings))
 	state := make([]CommentState, 0, len(findings))
 	for _, f := range findings {
-		if f.Category == "" || f.Path == "" {
+		if f.Path == "" {
 			continue
 		}
 		if f.StartLine <= 0 || f.Confidence < minConfidence {
@@ -68,9 +74,13 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		}
 		key := commentKey(f.Path, f.StartLine, f.Category, f.ID)
 		body := formatBody(f, links)
+		endLine := f.EndLine
+		if endLine < f.StartLine {
+			endLine = f.StartLine
+		}
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
-			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		prior, ok := existing[key]
@@ -78,14 +88,14 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
 		}
 		if ok && prior == f.ID {
-			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		if ok {
-			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
-		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine})
+		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 	}
 	return CommentPlan{
 		Actions: out,
@@ -98,6 +108,18 @@ func inlineConfidenceThreshold(profile string) float64 {
 		return MinExpandedInlineConfidence
 	}
 	return MinInlineConfidence
+}
+
+func ValidateInlineFindings(items []findings.Finding) error {
+	for _, item := range items {
+		if strings.TrimSpace(item.Path) == "" {
+			return fmt.Errorf("github finding %q cannot be published inline: missing path", item.ID)
+		}
+		if item.StartLine <= 0 {
+			return fmt.Errorf("github finding %q cannot be published inline: missing start line", item.ID)
+		}
+	}
+	return nil
 }
 
 func LoadExistingState(path string) (map[string]string, error) {
@@ -162,4 +184,12 @@ func linkForFinding(provider markdown.FindingLinkProvider, finding findings.Find
 		return ""
 	}
 	return link
+}
+
+func findingMarker(identity ReviewIdentity, findingID string) string {
+	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(findingID))
+	if id == "" {
+		return ""
+	}
+	return "<!-- diffpal:finding:" + identity.channel() + " id:" + id + " -->"
 }

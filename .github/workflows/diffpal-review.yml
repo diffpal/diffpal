@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -29,6 +28,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Codex sandbox dependency
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: Install Codex provider
         run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
@@ -37,6 +39,10 @@ jobs:
           mkdir -p "$HOME/.codex"
           printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
           chmod 600 "$HOME/.codex/auth.json"
+          {
+            echo 'sandbox_mode = "workspace-write"'
+            echo 'approval_policy = "untrusted"'
+          } > "$HOME/.codex/config.toml"
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 
@@ -49,6 +55,7 @@ jobs:
           repo: ${{ github.repository }}
           review-id: github-pr-${{ github.event.pull_request.number }}
           feedback: balanced
+          mode: comments,summary
           gate: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

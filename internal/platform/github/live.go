@@ -13,133 +13,124 @@ import (
 	"github.com/diffpal/diffpal/internal/platformapi"
 )
 
-func PublishCheckRun(ctx context.Context, token string, reviewCtx Context, payload CheckRunPayload, client *http.Client) error {
-	if strings.TrimSpace(reviewCtx.Repo) == "" {
-		return fmt.Errorf("missing GitHub repository")
-	}
-	req := map[string]any{
-		"name":       payload.Name,
-		"head_sha":   payload.HeadSHA,
-		"status":     payload.Status,
-		"conclusion": payload.Conclusion,
-		"output": map[string]any{
-			"title":       payload.Name,
-			"summary":     payload.Summary,
-			"annotations": payload.Annotations,
-		},
-	}
-	url := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/check-runs"
-	return platformapi.DoJSON(ctx, client, http.MethodPost, url, map[string]string{
-		"Authorization": "Bearer " + token,
-		"Accept":        "application/vnd.github+json",
-	}, req)
+type pullReview struct {
+	ID       int64  `json:"id"`
+	Body     string `json:"body"`
+	CommitID string `json:"commit_id"`
+	State    string `json:"state"`
 }
 
-func PublishInlineComments(ctx context.Context, token string, reviewCtx Context, plan CommentPlan, client *http.Client) error {
+func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, plan CommentPlan, client *http.Client) error {
 	if reviewCtx.PRNumber <= 0 {
 		return fmt.Errorf("missing GitHub pull request number")
 	}
 	if strings.TrimSpace(reviewCtx.Repo) == "" {
 		return fmt.Errorf("missing GitHub repository")
 	}
-	baseURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/pulls/" + fmt.Sprint(reviewCtx.PRNumber) + "/comments"
-	headers := map[string]string{
-		"Authorization": "Bearer " + token,
-		"Accept":        "application/vnd.github+json",
+	if strings.TrimSpace(reviewCtx.HeadSHA) == "" {
+		return fmt.Errorf("missing GitHub head SHA")
 	}
-	for _, action := range plan.Actions {
-		if action.Type == ActionSkip {
-			continue
-		}
-		req := map[string]any{
-			"body":      action.Body,
-			"commit_id": reviewCtx.HeadSHA,
-			"path":      action.Path,
-			"line":      action.Line,
-			"side":      "RIGHT",
-		}
-		if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req); err != nil {
+	repoURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo
+	baseURL := repoURL + "/pulls/" + fmt.Sprint(reviewCtx.PRNumber) + "/reviews"
+	headers := githubHeaders(token)
+	body := pullRequestReviewBody(summary, identity, reviewCtx.HeadSHA)
+	existingID, err := findPullRequestReview(ctx, token, baseURL, identity, reviewCtx.HeadSHA, client)
+	if err != nil {
+		return err
+	}
+	comments := pullRequestReviewComments(plan, identity)
+	if existingID > 0 && len(comments) == 0 {
+		updateURL := baseURL + "/" + fmt.Sprint(existingID)
+		if err := platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body}); err != nil {
 			return err
 		}
+		return nil
+	}
+	req := map[string]any{
+		"commit_id": reviewCtx.HeadSHA,
+		"event":     "COMMENT",
+		"body":      body,
+	}
+	if len(comments) > 0 {
+		req["comments"] = comments
+	}
+	if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req); err != nil {
+		return err
 	}
 	return nil
 }
 
-type issueComment struct {
-	ID   int64  `json:"id"`
-	Body string `json:"body"`
+func pullRequestReviewBody(summary string, identity ReviewIdentity, headSHA string) string {
+	return identity.ReviewMarker(headSHA) + "\n" + strings.TrimSpace(summary) + "\n"
 }
 
-func PublishSummaryComment(ctx context.Context, token string, reviewCtx Context, summary string, client *http.Client) error {
-	return PublishSummaryCommentWithIdentity(ctx, token, reviewCtx, summary, ReviewIdentity{}, client)
+func pullRequestReviewComments(plan CommentPlan, identity ReviewIdentity) []map[string]any {
+	out := make([]map[string]any, 0, len(plan.Actions))
+	for _, action := range plan.Actions {
+		if action.Type == ActionSkip || strings.TrimSpace(action.Body) == "" || strings.TrimSpace(action.Path) == "" || action.Line <= 0 {
+			continue
+		}
+		body := action.Body
+		if marker := findingMarker(identity, action.FindingID); marker != "" {
+			body += "\n" + marker
+		}
+		out = append(out, map[string]any{
+			"path": action.Path,
+			"line": action.Line,
+			"side": "RIGHT",
+			"body": body,
+		})
+		if action.EndLine > action.Line {
+			out[len(out)-1]["start_line"] = action.Line
+			out[len(out)-1]["start_side"] = "RIGHT"
+			out[len(out)-1]["line"] = action.EndLine
+		}
+	}
+	return out
 }
 
-func PublishSummaryCommentWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, client *http.Client) error {
-	if reviewCtx.PRNumber <= 0 {
-		return fmt.Errorf("missing GitHub pull request number")
-	}
-	if strings.TrimSpace(reviewCtx.Repo) == "" {
-		return fmt.Errorf("missing GitHub repository")
-	}
-	body := summaryCommentBody(summary, identity)
-	baseURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/issues/" + fmt.Sprint(reviewCtx.PRNumber) + "/comments"
-	headers := map[string]string{
-		"Authorization": "Bearer " + token,
-		"Accept":        "application/vnd.github+json",
-	}
-	existingID, err := findSummaryComment(ctx, token, baseURL, identity, client)
-	if err != nil {
-		return err
-	}
-	if existingID > 0 {
-		updateURL := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/issues/comments/" + fmt.Sprint(existingID)
-		return platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body})
-	}
-	return platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, map[string]any{"body": body})
-}
-
-func summaryCommentBody(summary string, identity ReviewIdentity) string {
-	return identity.SummaryMarker() + "\n" + strings.TrimSpace(summary) + "\n"
-}
-
-func findSummaryComment(ctx context.Context, token, url string, identity ReviewIdentity, client *http.Client) (int64, error) {
-	marker := identity.SummaryMarker()
+func findPullRequestReview(ctx context.Context, token, url string, identity ReviewIdentity, headSHA string, client *http.Client) (int64, error) {
+	marker := identity.ReviewMarker(headSHA)
 	nextURL := url + "?per_page=100"
+	var existingID int64
 	for nextURL != "" {
-		resp, err := getGitHubIssueCommentsPage(ctx, token, nextURL, client)
+		resp, err := getGitHubPullReviewsPage(ctx, token, nextURL, client)
 		if err != nil {
 			return 0, err
 		}
-		for _, comment := range resp.comments {
-			if hasSummaryMarker(comment.Body, marker) {
-				return comment.ID, nil
+		for _, review := range resp.reviews {
+			if hasReviewMarker(review.Body, marker) && reviewStateIsCommented(review.State) {
+				existingID = review.ID
 			}
 		}
 		nextURL = resp.nextURL
 	}
-	return 0, nil
+	return existingID, nil
 }
 
-func hasSummaryMarker(body, marker string) bool {
-	body = strings.TrimLeft(body, " \t\r\n")
-	return body == marker || strings.HasPrefix(body, marker+"\n")
+type pullReviewsPage struct {
+	reviews []pullReview
+	nextURL string
 }
 
-type issueCommentsPage struct {
-	comments []issueComment
-	nextURL  string
+func githubHeaders(token string) map[string]string {
+	return map[string]string{
+		"Authorization": "Bearer " + token,
+		"Accept":        "application/vnd.github+json",
+	}
 }
 
-func getGitHubIssueCommentsPage(ctx context.Context, token, pageURL string, client *http.Client) (issueCommentsPage, error) {
+func getGitHubPullReviewsPage(ctx context.Context, token, pageURL string, client *http.Client) (pullReviewsPage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
-		return issueCommentsPage{}, err
+		return pullReviewsPage{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	for key, value := range githubHeaders(token) {
+		req.Header.Set(key, value)
+	}
 	resp, err := platformapi.DefaultClient(client).Do(req)
 	if err != nil {
-		return issueCommentsPage{}, err
+		return pullReviewsPage{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -148,20 +139,29 @@ func getGitHubIssueCommentsPage(ctx context.Context, token, pageURL string, clie
 		if msg == "" {
 			msg = resp.Status
 		}
-		return issueCommentsPage{}, fmt.Errorf("platform api %s %s failed: status=%d body=%s", http.MethodGet, pageURL, resp.StatusCode, msg)
+		return pullReviewsPage{}, fmt.Errorf("platform api %s %s failed: status=%d body=%s", http.MethodGet, pageURL, resp.StatusCode, msg)
 	}
-	var comments []issueComment
-	if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
-		return issueCommentsPage{}, err
+	var reviews []pullReview
+	if err := json.NewDecoder(resp.Body).Decode(&reviews); err != nil {
+		return pullReviewsPage{}, err
 	}
 	nextURL, err := nextLinkURL(resp.Header.Get("Link"), pageURL)
 	if err != nil {
-		return issueCommentsPage{}, err
+		return pullReviewsPage{}, err
 	}
-	return issueCommentsPage{
-		comments: comments,
-		nextURL:  nextURL,
+	return pullReviewsPage{
+		reviews: reviews,
+		nextURL: nextURL,
 	}, nil
+}
+
+func hasReviewMarker(body, marker string) bool {
+	body = strings.TrimLeft(body, " \t\r\n")
+	return body == marker || strings.HasPrefix(body, marker+"\n")
+}
+
+func reviewStateIsCommented(state string) bool {
+	return strings.EqualFold(strings.TrimSpace(state), "COMMENTED")
 }
 
 func nextLinkURL(header, currentPageURL string) (string, error) {

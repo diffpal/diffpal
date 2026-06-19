@@ -36,7 +36,7 @@
 
 | Host | Phase | Primary surfaces |
 |---|---|---|
-| GitHub | MVP | check runs, review comments, markdown summary, SARIF |
+| GitHub | MVP | PR reviews, inline review comments, markdown summary, SARIF |
 | GitLab | v1 | discussions, Code Quality, SARIF |
 | Azure DevOps | v1 | PR threads, PR status |
 
@@ -54,7 +54,6 @@
 - Markdown summary: `.artifacts/diffpal/summary.md`
 - SARIF export: `.artifacts/diffpal/diffpal.sarif`
 - Code Quality export: `.artifacts/diffpal/codequality.json`
-- GitHub check-run payload: `.artifacts/diffpal/github-checkrun.json`
 - GitHub inline comment plan: `.artifacts/diffpal/github-comments.json`
 - GitLab discussions plan: `.artifacts/diffpal/gitlab-discussions.json`
 - Azure threads plan: `.artifacts/diffpal/azure-threads.json`
@@ -74,4 +73,4 @@
 - Primary review modes are `local`, `github`, `gitlab`, and `ado`.
 - User-facing host output behavior is configurable by review `--feedback`;
   advanced publish surfaces remain configurable by `--mode`.
-- Merge gating is based on `check/status` style surfaces, not bot approval semantics.
+- Merge gating is based on workflow exit status or platform status surfaces, not bot approval semantics.

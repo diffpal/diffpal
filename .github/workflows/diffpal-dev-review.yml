@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Codex sandbox dependency
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: Build DiffPal
         run: go build -o .artifacts/bin/diffpal ./cmd/diffpal
 
@@ -42,6 +45,10 @@ jobs:
           mkdir -p "$HOME/.codex"
           printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
           chmod 600 "$HOME/.codex/auth.json"
+          {
+            echo 'sandbox_mode = "workspace-write"'
+            echo 'approval_policy = "untrusted"'
+          } > "$HOME/.codex/config.toml"
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 
@@ -54,7 +61,7 @@ jobs:
           --review-id github-pr-${{ github.event.pull_request.number }}-diffpal-dev
           --review-channel diffpal-dev
           --feedback balanced
-          --mode summary
+          --mode comments,summary
           --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

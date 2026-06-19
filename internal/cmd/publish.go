@@ -65,35 +65,16 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				return nil, 0, err
 			}
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
-		case "check_run":
-			blocking = max(blocking, decision.BlockCount)
-			ctx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
-			if err != nil {
-				ctx = github.Context{}
-				ctx.HeadSHA = bundle.HeadSHA
-			}
-			identity, err := github.NewReviewIdentity(reviewChannel)
-			if err != nil {
-				return nil, 0, err
-			}
-			payload := github.BuildCheckRunPayloadWithIdentity(ctx, bundle, summary, identity)
-			raw, err := json.MarshalIndent(payload, "", "  ")
-			if err != nil {
-				return nil, 0, err
-			}
-			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
-				return nil, 0, err
-			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: payload.Conclusion})
 		case "github_comments":
 			blocking = max(blocking, decision.BlockCount)
 			existing, err := github.LoadExistingState(targetOut)
 			if err != nil {
 				return nil, 0, err
 			}
-			plan := github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
-				Profile: string(profile),
-				Links:   githubLinkProvider(platform, bundle, repo),
+			plan := github.PlanInlineCommentsWithOptions(existing, blockingInlineFindings(bundle.Findings, blockOn), github.CommentOptions{
+				Profile:     string(profile),
+				Links:       githubLinkProvider(platform, bundle, repo),
+				AllFindings: true,
 			})
 			raw, err := json.MarshalIndent(plan, "", "  ")
 			if err != nil {
@@ -198,9 +179,30 @@ func resolvePublishModes(platform string, modes []string, feedback string) ([]st
 		return nil, "", err
 	}
 	if len(modes) > 0 {
-		return modes, profile, nil
+		return resolveExplicitPublishModes(platform, modes, profile)
 	}
 	return modesForFeedback(platform, profile), profile, nil
+}
+
+func resolveExplicitPublishModes(platform string, modes []string, profile FeedbackProfile) ([]string, FeedbackProfile, error) {
+	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
+		return modes, profile, nil
+	}
+	normalized := make([]string, 0, len(modes))
+	seen := map[string]struct{}{}
+	for _, mode := range modes {
+		clean := normalizePublishMode(platform, mode)
+		if clean == "check_run" {
+			return nil, "", fmt.Errorf("unsupported mode %q for platform github", mode)
+		}
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		normalized = append(normalized, clean)
+	}
+	sort.Strings(normalized)
+	return normalized, profile, nil
 }
 
 func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string, repo string) (string, error) {
@@ -217,6 +219,7 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
+		HideDetails:     strings.ToLower(strings.TrimSpace(platform)) == "github",
 		Links:           githubLinkProvider(platform, bundle, repo),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts), nil
@@ -262,8 +265,6 @@ func publishSurfaceLabels(modes []string) []string {
 
 func publishSurfaceLabel(mode string) string {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case "check_run", "check-run", "checks":
-		return "check-run"
 	case "github_comments", "comments", "review-comments":
 		return "comments"
 	case "code_quality", "code-quality":
@@ -314,10 +315,8 @@ func modesForFeedback(platform string, feedback FeedbackProfile) []string {
 		}
 	default:
 		switch feedback {
-		case FeedbackSummary:
-			return []string{"check-run", "sarif", "summary"}
 		default:
-			return []string{"check-run", "comments", "sarif", "summary"}
+			return []string{"comments", "sarif", "summary"}
 		}
 	}
 }
@@ -393,8 +392,6 @@ func defaultModeOutput(platform string, mode string) string {
 		return ".artifacts/diffpal/diffpal.sarif"
 	case "code-quality":
 		return ".artifacts/diffpal/codequality.json"
-	case "check_run":
-		return ".artifacts/diffpal/github-checkrun.json"
 	case "github_comments":
 		return ".artifacts/diffpal/github-comments.json"
 	case "discussions":
@@ -419,4 +416,36 @@ func normalizeSeverity(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid block-on severity %q", value)
 	}
+}
+
+func blockingInlineFindings(items []findings.Finding, blockOn string) []findings.Finding {
+	blockOn, err := normalizeSeverity(blockOn)
+	if err != nil {
+		blockOn = "high"
+	}
+	out := make([]findings.Finding, 0, len(items))
+	for _, item := range items {
+		if item.Blocking || severityAtOrAbove(item.Severity, blockOn) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func severityAtOrAbove(value string, threshold string) bool {
+	ranks := map[string]int{
+		"low":      1,
+		"medium":   2,
+		"high":     3,
+		"critical": 4,
+	}
+	valueRank, ok := ranks[strings.ToLower(strings.TrimSpace(value))]
+	if !ok {
+		return false
+	}
+	thresholdRank, ok := ranks[strings.ToLower(strings.TrimSpace(threshold))]
+	if !ok {
+		return false
+	}
+	return valueRank >= thresholdRank
 }

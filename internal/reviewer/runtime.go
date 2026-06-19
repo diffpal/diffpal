@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	acp "github.com/coder/acp-go-sdk"
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
@@ -33,7 +34,11 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
 
-	factory := agentfactory.New(cfg.Providers, mcpregistry.New(cfg.MCPServers))
+	factory := agentfactory.New(
+		cfg.Providers,
+		mcpregistry.New(cfg.MCPServers),
+		agentfactory.WithPermissionHandler(reviewPermissionHandler),
+	)
 	sessionState, err := factory.BuildSessionState(cfg.ProviderID, cfg.WorkingDir)
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
@@ -51,7 +56,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 		structuredagent.WithoutInputSchema(),
 		structuredagent.WithOutputSchema(prompt.OutputSchema),
 		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
-		structuredagent.WithOutputValidationRetries(1),
+		structuredagent.WithOutputValidationRetries(3),
 	)
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindInternal, err)
@@ -107,7 +112,42 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
 		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
+	if len(nonEmptyChangeSummary(output.ChangeSummary)) == 0 {
+		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("provider returned no change_summary"))
+	}
 	return output, usage, nil
+}
+
+func nonEmptyChangeSummary(items []string) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func reviewPermissionHandler(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	// Agent security is delegated to the provider configuration. DiffPal does not
+	// layer a second tool policy on top of ACP; it selects provider-offered allow
+	// options so provider-specific sandbox and approval settings remain the source
+	// of truth.
+	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
+		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
+	}
+	return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeCancelled()}, nil
+}
+
+func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOption, bool) {
+	for _, kind := range kinds {
+		for _, option := range options {
+			if option.Kind == kind {
+				return option, true
+			}
+		}
+	}
+	return acp.PermissionOption{}, false
 }
 
 func reviewSystemInstruction(instructions string) string {
@@ -201,14 +241,6 @@ func isTransientProviderError(err error) bool {
 		strings.Contains(msg, "payment required") ||
 		strings.Contains(msg, "rate limit") ||
 		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
-}
-
-func isStructuredOutputProviderError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return isStructuredOutputProviderMessage(msg)
 }
 
 func isStructuredOutputProviderMessage(msg string) bool {

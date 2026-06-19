@@ -139,6 +139,18 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 	if result.Valid() {
 		t.Fatal("invalid schema payload accepted, want rejection")
 	}
+
+	emptySummary := gojsonschema.NewGoLoader(map[string]any{
+		"change_summary": []any{},
+		"findings":       []any{},
+	})
+	result, err = gojsonschema.Validate(schema, emptySummary)
+	if err != nil {
+		t.Fatalf("Validate(empty summary payload) error = %v", err)
+	}
+	if result.Valid() {
+		t.Fatal("empty change_summary accepted, want rejection")
+	}
 }
 
 func TestReviewMetadataIsStable(t *testing.T) {
@@ -251,6 +263,8 @@ func TestReviewSystemRequiresGitInspectionAndLocalizedSummary(t *testing.T) {
 		"Always return change_summary as concise bullets in the requested language",
 		"Describe the semantic intent and effect of the pull request, not file churn.",
 		"Prefer behavior, API, configuration, CI, data-flow, security, testing, or user-facing effects over path names.",
+		"Every change_summary bullet must answer what changed and why it matters",
+		"Do not write area-only bullets",
 	}
 	for _, phrase := range required {
 		if !strings.Contains(system, phrase) {

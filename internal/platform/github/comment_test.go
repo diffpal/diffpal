@@ -207,6 +207,45 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 	}
 }
 
+func TestPlanInlineCommentsCanPublishAllFindings(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-low",
+		Category:   "correctness",
+		Severity:   "medium",
+		Confidence: 0.2,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "low confidence but provider emitted it",
+	}}
+
+	plan := PlanInlineCommentsWithOptions(nil, items, CommentOptions{AllFindings: true})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+}
+
+func TestValidateInlineFindingsRejectsUnplaceableFindings(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateInlineFindings([]findings.Finding{{ID: "fp-no-line", Path: "main.go"}})
+	if err == nil {
+		t.Fatal("ValidateInlineFindings() error = nil, want missing line error")
+	}
+	if !strings.Contains(err.Error(), "missing start line") {
+		t.Fatalf("error = %v, want missing start line", err)
+	}
+
+	err = ValidateInlineFindings([]findings.Finding{{ID: "fp-no-path", StartLine: 12}})
+	if err == nil {
+		t.Fatal("ValidateInlineFindings() error = nil, want missing path error")
+	}
+	if !strings.Contains(err.Error(), "missing path") {
+		t.Fatalf("error = %v, want missing path", err)
+	}
+}
+
 func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	t.Parallel()
 
@@ -233,7 +272,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	body := plan.Actions[0].Body
 	for _, want := range []string{
-		"**High security**: query concatenates untrusted input",
+		"query concatenates untrusted input\n- **Finding**: High security",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
 		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
 		"- **Suggestion**: Use a parameterized statement.",
@@ -247,5 +286,31 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	if strings.Contains(body, "`L12-L17`") {
 		t.Fatalf("comment body repeats linked line range in header:\n%s", body)
+	}
+	if strings.Contains(body, "**Confidence**") {
+		t.Fatalf("comment body contains confidence:\n%s", body)
+	}
+}
+
+func TestPlanInlineCommentsKeepsFindingLineRange(t *testing.T) {
+	t.Parallel()
+
+	plan := PlanInlineComments(nil, []findings.Finding{{
+		ID:         "fp-range",
+		Category:   "correctness",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "internal/cmd/review.go",
+		StartLine:  473,
+		EndLine:    475,
+		Message:    "range issue",
+	}})
+
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	action := plan.Actions[0]
+	if action.Line != 473 || action.EndLine != 475 {
+		t.Fatalf("action range = %d-%d, want 473-475", action.Line, action.EndLine)
 	}
 }

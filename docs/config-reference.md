@@ -73,9 +73,7 @@ diffpal:
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
   platforms:
-    github:
-      summary_comment:
-        enabled: true
+    github: {}
     gitlab: {}
     azure: {}
 

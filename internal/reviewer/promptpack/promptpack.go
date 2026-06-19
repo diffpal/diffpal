@@ -91,6 +91,7 @@ const OutputSchemaJSON = `{
     "change_summary": {
       "type": "array",
       "items": {"type": "string"},
+      "minItems": 1,
       "maxItems": 8
     },
     "findings": {
@@ -477,6 +478,8 @@ func changeSummaryPolicyV1_3() string {
 		"Describe the semantic intent and effect of the pull request, not file churn.",
 		"Prefer behavior, API, configuration, CI, data-flow, security, testing, or user-facing effects over path names.",
 		"Use commit messages and inspected diffs to infer intent, but keep every bullet factual and evidence-based.",
+		"Every change_summary bullet must answer what changed and why it matters; name the specific action or behavior change, not only the broad area touched.",
+		"Do not write area-only bullets such as \"Updated configuration\", \"Updated documentation\", \"Updated examples\", or \"Updated implementation files\" unless the same bullet explains the concrete change and effect.",
 		"Do not make change_summary a list of changed files. Mention paths only when they clarify the semantic change.",
 		"Good change_summary bullets explain intent, such as release workflow setup, CI validation changes, API behavior changes, documentation updates, security hardening, or configuration changes.",
 		"Keep change_summary concise and useful to a reviewer deciding what this PR does.",
