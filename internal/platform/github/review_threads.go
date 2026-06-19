@@ -28,20 +28,26 @@ func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Contex
 	return out
 }
 
-func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, plan CommentPlan, client *http.Client) {
+func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, plan CommentPlan, client *http.Client) error {
 	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
 	if !ok || strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" || reviewCtx.PRNumber <= 0 {
-		return
+		return nil
 	}
 	current := currentFindingMarkers(plan, identity)
 	cursor := ""
 	for {
 		page, err := queryReviewThreads(ctx, token, owner, repo, reviewCtx.PRNumber, cursor, client)
 		if err != nil {
-			return
+			return err
 		}
 		for _, thread := range page.Threads {
 			if thread.ID == "" || thread.IsResolved {
+				continue
+			}
+			if threadBelongsToPriorDiffPalReview(thread, identity, reviewCtx.HeadSHA) {
+				if err := resolveReviewThread(ctx, token, thread.ID, client); err != nil {
+					return err
+				}
 				continue
 			}
 			marker := threadFindingMarker(thread, identity)
@@ -51,10 +57,12 @@ func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCt
 			if _, ok := current[marker]; ok {
 				continue
 			}
-			_ = resolveReviewThread(ctx, token, thread.ID, client)
+			if err := resolveReviewThread(ctx, token, thread.ID, client); err != nil {
+				return err
+			}
 		}
 		if !page.HasNextPage || page.EndCursor == "" {
-			return
+			return nil
 		}
 		cursor = page.EndCursor
 	}
@@ -143,6 +151,39 @@ func findingIDFromMarker(marker string) string {
 	return ""
 }
 
+func threadBelongsToPriorDiffPalReview(thread reviewThread, identity ReviewIdentity, currentHeadSHA string) bool {
+	currentHeadSHA = strings.TrimSpace(currentHeadSHA)
+	for _, comment := range thread.Comments {
+		headSHA, ok := reviewHeadFromBody(comment.PullRequestReviewBody, identity)
+		if !ok {
+			continue
+		}
+		return currentHeadSHA == "" || headSHA != currentHeadSHA
+	}
+	return false
+}
+
+func reviewHeadFromBody(body string, identity ReviewIdentity) (string, bool) {
+	prefix := "<!-- diffpal:review:" + identity.channel()
+	idx := strings.Index(strings.TrimSpace(body), prefix)
+	if idx < 0 {
+		return "", false
+	}
+	body = body[idx:]
+	end := strings.Index(body, "-->")
+	if end < 0 {
+		return "", false
+	}
+	marker := body[:end+3]
+	for _, part := range strings.Fields(strings.TrimSuffix(strings.TrimPrefix(marker, "<!--"), "-->")) {
+		key, value, ok := strings.Cut(part, ":")
+		if ok && key == "head_sha" {
+			return value, true
+		}
+	}
+	return "", true
+}
+
 type reviewThreadsPage struct {
 	Threads     []reviewThread
 	HasNextPage bool
@@ -156,7 +197,8 @@ type reviewThread struct {
 }
 
 type reviewThreadComment struct {
-	Body string
+	Body                  string
+	PullRequestReviewBody string
 }
 
 func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber int, cursor string, client *http.Client) (reviewThreadsPage, error) {
@@ -168,7 +210,12 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
           id
           isResolved
           comments(first:20) {
-            nodes { body }
+            nodes {
+              body
+              pullRequestReview {
+                body
+              }
+            }
           }
         }
         pageInfo { hasNextPage endCursor }
@@ -186,7 +233,10 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
 							IsResolved bool   `json:"isResolved"`
 							Comments   struct {
 								Nodes []struct {
-									Body string `json:"body"`
+									Body              string `json:"body"`
+									PullRequestReview struct {
+										Body string `json:"body"`
+									} `json:"pullRequestReview"`
 								} `json:"nodes"`
 							} `json:"comments"`
 						} `json:"nodes"`
@@ -226,7 +276,10 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
 			Comments:   make([]reviewThreadComment, 0, len(node.Comments.Nodes)),
 		}
 		for _, comment := range node.Comments.Nodes {
-			thread.Comments = append(thread.Comments, reviewThreadComment{Body: comment.Body})
+			thread.Comments = append(thread.Comments, reviewThreadComment{
+				Body:                  comment.Body,
+				PullRequestReviewBody: comment.PullRequestReview.Body,
+			})
 		}
 		out.Threads = append(out.Threads, thread)
 	}

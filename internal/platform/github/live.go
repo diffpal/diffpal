@@ -44,8 +44,7 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 		if err := platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body}); err != nil {
 			return err
 		}
-		resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
-		return nil
+		return resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
 	}
 	req := map[string]any{
 		"commit_id": reviewCtx.HeadSHA,
@@ -58,8 +57,7 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	if err := platformapi.DoJSON(ctx, client, http.MethodPost, baseURL, headers, req); err != nil {
 		return err
 	}
-	resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
-	return nil
+	return resolveSupersededFindingThreads(ctx, token, reviewCtx, identity, plan, client)
 }
 
 func pullRequestReviewBody(summary string, identity ReviewIdentity, headSHA string) string {

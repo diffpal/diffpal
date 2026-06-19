@@ -288,6 +288,7 @@ func TestPublishPullRequestReviewResolvesSupersededFindingThreads(t *testing.T) 
 					"nodes": [
 						{"id":"old-thread","isResolved":false,"comments":{"nodes":[{"body":"old\n<!-- diffpal:finding:diffpal id:old-finding -->"}]}},
 						{"id":"current-thread","isResolved":false,"comments":{"nodes":[{"body":"current\n<!-- diffpal:finding:diffpal id:current-finding -->"}]}},
+						{"id":"prior-review-thread","isResolved":false,"comments":{"nodes":[{"body":"legacy","pullRequestReview":{"body":"<!-- diffpal:review:diffpal head_sha:old-head -->\n# DiffPal Review Summary"}}]}},
 						{"id":"other-channel","isResolved":false,"comments":{"nodes":[{"body":"other\n<!-- diffpal:finding:diffpal-dev id:old-finding -->"}]}},
 						{"id":"already-resolved","isResolved":true,"comments":{"nodes":[{"body":"old\n<!-- diffpal:finding:diffpal id:resolved-finding -->"}]}}
 					],
@@ -324,8 +325,14 @@ func TestPublishPullRequestReviewResolvesSupersededFindingThreads(t *testing.T) 
 		t.Fatal(err)
 	default:
 	}
-	if len(resolved) != 1 || resolved[0] != "old-thread" {
-		t.Fatalf("resolved threads = %#v, want [old-thread]", resolved)
+	wantResolved := map[string]bool{"old-thread": true, "prior-review-thread": true}
+	if len(resolved) != len(wantResolved) {
+		t.Fatalf("resolved threads = %#v, want old-thread and prior-review-thread", resolved)
+	}
+	for _, id := range resolved {
+		if !wantResolved[id] {
+			t.Fatalf("resolved threads = %#v, want old-thread and prior-review-thread", resolved)
+		}
 	}
 }
 
