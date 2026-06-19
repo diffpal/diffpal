@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Codex sandbox dependency
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: Install Codex provider
         run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 

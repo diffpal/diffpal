@@ -1,9 +1,11 @@
 package reviewer
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	acp "github.com/coder/acp-go-sdk"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 )
 
@@ -24,6 +26,39 @@ func TestReviewSystemInstructionIsAppliedByStructuredWrapperOnly(t *testing.T) {
 	}
 	if req.Instruction != "" {
 		t.Fatalf("Instruction = %q, want empty; structured wrapper owns review system prompt", req.Instruction)
+	}
+}
+
+func TestReviewPermissionHandlerSelectsAllowOption(t *testing.T) {
+	t.Parallel()
+
+	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		Options: []acp.PermissionOption{
+			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewPermissionHandler() error = %v", err)
+	}
+	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow" {
+		t.Fatalf("selected option = %+v, want allow", got)
+	}
+}
+
+func TestReviewPermissionHandlerCancelsWithoutAllowOption(t *testing.T) {
+	t.Parallel()
+
+	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		Options: []acp.PermissionOption{
+			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewPermissionHandler() error = %v", err)
+	}
+	if resp.Outcome.Cancelled == nil {
+		t.Fatalf("outcome = %+v, want cancelled", resp.Outcome)
 	}
 }
 

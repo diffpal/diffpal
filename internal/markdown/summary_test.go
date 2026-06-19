@@ -81,11 +81,9 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertNotContains(t, got, "- Reviewed files: 3")
 	assertNotContains(t, got, "- Findings: 4")
 	assertNotContains(t, got, "- Blocking findings: 3")
-	assertContains(t, got, "## Feedback on Files")
-	assertContains(t, got, "| File | Change | Review | Notes |")
-	assertContains(t, got, "| `internal/app/service.go` | Modified | Blocked | critical: 1, low: 1 |")
-	assertContains(t, got, "| `internal/db/query.go` | Modified | Blocked | high: 2 |")
-	assertContains(t, got, "| `internal/web/handler.go` | Added | Passed | No actionable findings. |")
+	assertNotContains(t, got, "## Feedback on Files")
+	assertNotContains(t, got, "| File | Change | Review | Notes |")
+	assertNotContains(t, got, "No actionable findings.")
 	assertContains(t, got, "## Detailed Comments")
 	assertContains(t, got, "### internal/app/service.go")
 	assertContains(t, got, "#### Critical correctness - L8\n\npossible nil dereference")
@@ -114,17 +112,18 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	assertContains(t, got, "- Refined application service behavior without actionable review findings.")
 	assertNotContains(t, got, "review_id: review-empty")
 	assertContains(t, got, "DiffPal found no actionable issues in the reviewed diff.")
-	assertContains(t, got, "| `internal/app/service.go` | Modified | Passed | No actionable findings. |")
+	assertNotContains(t, got, "## Feedback on Files")
+	assertNotContains(t, got, "No actionable findings.")
 	if strings.Contains(got, "## Detailed Comments") {
 		t.Fatalf("empty summary includes detailed comments:\n%s", got)
 	}
 }
 
-func TestRenderSummaryShowsFileChangeLabels(t *testing.T) {
+func TestRenderSummaryOmitsChangedFileInventory(t *testing.T) {
 	t.Parallel()
 
 	got := RenderSummary(findings.FindingsBundle{
-		ReviewID: "review-change-labels",
+		ReviewID: "review-no-file-inventory",
 		Files: []findings.ReviewedFile{
 			{Path: "added.go", Status: "added"},
 			{Path: "copied.go", Status: "copied"},
@@ -142,13 +141,17 @@ func TestRenderSummaryShowsFileChangeLabels(t *testing.T) {
 		},
 	})
 
-	assertContains(t, got, "| `added.go` | Added | Passed | No actionable findings. |")
-	assertContains(t, got, "| `copied.go` | Copied | Passed | No actionable findings. |")
-	assertContains(t, got, "| `deleted.go` | Deleted | Passed | No actionable findings. |")
-	assertContains(t, got, "| `modified.go` | Modified | Passed | No actionable findings. |")
-	assertContains(t, got, "| `renamed.go` | Renamed | Passed | No actionable findings. |")
-	assertContains(t, got, "| `unknown.go` | Changed | Passed | No actionable findings. |")
-	assertContains(t, got, "| `finding-only.go` | Changed | Needs attention | medium: 1 |")
+	assertNotContains(t, got, "## Feedback on Files")
+	assertNotContains(t, got, "| File | Change | Review | Notes |")
+	assertNotContains(t, got, "No actionable findings.")
+	assertNotContains(t, got, "added.go")
+	assertNotContains(t, got, "copied.go")
+	assertNotContains(t, got, "deleted.go")
+	assertNotContains(t, got, "modified.go")
+	assertNotContains(t, got, "renamed.go")
+	assertNotContains(t, got, "unknown.go")
+	assertContains(t, got, "### finding-only.go")
+	assertContains(t, got, "finding path was not recorded in reviewed files")
 }
 
 func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
@@ -203,7 +206,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
 }
 
-func TestRenderSummaryFallsBackToSemanticChangeOverview(t *testing.T) {
+func TestRenderSummaryDoesNotInventSemanticChangeOverview(t *testing.T) {
 	t.Parallel()
 
 	got := RenderSummary(findings.FindingsBundle{
@@ -215,8 +218,9 @@ func TestRenderSummaryFallsBackToSemanticChangeOverview(t *testing.T) {
 	})
 
 	assertContains(t, got, "## Summary of Changes")
-	assertContains(t, got, "- Updated user-facing documentation and setup guidance.")
-	assertContains(t, got, "- Updated DiffPal implementation files.")
+	assertContains(t, got, "DiffPal could not generate a semantic change overview from the reviewed diff.")
+	assertNotContains(t, got, "- Updated user-facing documentation and setup guidance.")
+	assertNotContains(t, got, "- Updated DiffPal implementation files.")
 	assertNotContains(t, got, "Updated `README.md`.")
 	assertNotContains(t, got, "Updated `internal/app/service.go`.")
 }

@@ -159,15 +159,14 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:       findings.VersionV2,
-		ReviewID:      reviewID,
-		BaseSHA:       result.BaseSHA,
-		HeadSHA:       result.HeadSHA,
-		Language:      language,
-		Prompt:        prompt.ReviewMetadata(),
-		ChangeSummary: findings.SemanticChangeSummary(reviewed),
-		Files:         reviewed,
-		Findings:      []findings.Finding{},
+		Version:  findings.VersionV2,
+		ReviewID: reviewID,
+		BaseSHA:  result.BaseSHA,
+		HeadSHA:  result.HeadSHA,
+		Language: language,
+		Prompt:   prompt.ReviewMetadata(),
+		Files:    reviewed,
+		Findings: []findings.Finding{},
 	}
 	if len(filtered) == 0 {
 		return Result{
@@ -214,9 +213,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		return nil
 	})
 	if err != nil {
-		if !isStructuredOutputProviderError(err) {
-			return Result{}, err
-		}
+		return Result{}, err
 	} else {
 		inspection = mergeInspection(inspection, usage.Inspection)
 		summaries = append(summaries, output.ChangeSummary...)
@@ -224,9 +221,6 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	bundle.ChangeSummary = normalizeChangeSummary(summaries)
-	if len(bundle.ChangeSummary) == 0 {
-		bundle.ChangeSummary = findings.SemanticChangeSummary(bundle.Files)
-	}
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	bundle.Inspection = inspection
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
