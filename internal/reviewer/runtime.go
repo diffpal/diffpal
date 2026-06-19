@@ -10,6 +10,7 @@ import (
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
+	"github.com/normahq/norma/pkg/runtime/acpagent"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
 	"github.com/normahq/norma/pkg/runtime/mcpregistry"
 	"github.com/normahq/norma/pkg/runtime/structuredagent"
@@ -43,6 +44,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
 	}
+	sessionState = reviewSessionState(providerCfg, sessionState)
 	agentRuntime, err := factory.Build(ctx, reviewAgentBuildRequest(cfg))
 	if err != nil {
 		return ReviewOutput{}, RuntimeUsage{}, wrapError(KindConfig, err)
@@ -352,6 +354,40 @@ func renderReviewTaskInput(input ReviewInput) string {
 	}
 	fmt.Fprintf(&out, "%s\n", promptpack.UntrustedInputEnd)
 	return out.String()
+}
+
+func reviewSessionState(providerCfg dpconfig.ProviderConfig, state map[string]any) map[string]any {
+	if !strings.EqualFold(strings.TrimSpace(providerCfg.Type), "codex_acp") {
+		return state
+	}
+	if state == nil {
+		state = map[string]any{}
+	}
+	acpState, _ := state[acpagent.SessionStateKey].(map[string]any)
+	if acpState == nil {
+		acpState = map[string]any{}
+	}
+	meta, _ := acpState["meta"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	codexMeta, _ := meta["codex"].(map[string]any)
+	if codexMeta == nil {
+		codexMeta = map[string]any{}
+	}
+	setIfMissing(codexMeta, "sandbox", "danger-full-access")
+	setIfMissing(codexMeta, "approvalPolicy", "untrusted")
+	meta["codex"] = codexMeta
+	acpState["meta"] = meta
+	state[acpagent.SessionStateKey] = acpState
+	return state
+}
+
+func setIfMissing(values map[string]any, key string, value any) {
+	if _, ok := values[key]; ok {
+		return
+	}
+	values[key] = value
 }
 
 func appendVisibleText(out *strings.Builder, content *genai.Content) {
