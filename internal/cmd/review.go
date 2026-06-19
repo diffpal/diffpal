@@ -449,9 +449,6 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		if err := github.ValidateInlineFindings(bundle.Findings); err != nil {
-			return err
-		}
 		return auth.WithToken(func(token string) error {
 			publishReview := false
 			includeInline := false
@@ -467,8 +464,12 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			if publishReview {
 				plan := github.CommentPlan{}
 				if includeInline {
-					existing := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, bundle.Findings, nil)
-					plan = github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
+					inlineFindings := blockingInlineFindings(bundle.Findings, blockOn)
+					if err := github.ValidateInlineFindings(inlineFindings); err != nil {
+						return err
+					}
+					existing := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
+					plan = github.PlanInlineCommentsWithOptions(existing, inlineFindings, github.CommentOptions{
 						Profile:     string(profile),
 						AllFindings: true,
 					})
