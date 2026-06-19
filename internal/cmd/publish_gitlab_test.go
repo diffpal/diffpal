@@ -121,8 +121,8 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 	if blocking != 1 {
 		t.Fatalf("blocking = %d, want 1", blocking)
 	}
-	if len(outputs) != 2 {
-		t.Fatalf("outputs = %d, want 2", len(outputs))
+	if len(outputs) != 1 {
+		t.Fatalf("outputs = %d, want 1", len(outputs))
 	}
 	path := filepath.Join(".artifacts", "diffpal", "github-comments.json")
 	raw, err := os.ReadFile(path)

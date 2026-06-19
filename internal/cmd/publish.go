@@ -188,7 +188,7 @@ func resolveExplicitPublishModes(platform string, modes []string, profile Feedba
 	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
 		return modes, profile, nil
 	}
-	normalized := make([]string, 0, len(modes)+2)
+	normalized := make([]string, 0, len(modes))
 	seen := map[string]struct{}{}
 	for _, mode := range modes {
 		clean := normalizePublishMode(platform, mode)
@@ -200,13 +200,6 @@ func resolveExplicitPublishModes(platform string, modes []string, profile Feedba
 		}
 		seen[clean] = struct{}{}
 		normalized = append(normalized, clean)
-	}
-	for _, required := range []string{"github_comments", "summary"} {
-		if _, ok := seen[required]; ok {
-			continue
-		}
-		seen[required] = struct{}{}
-		normalized = append(normalized, required)
 	}
 	sort.Strings(normalized)
 	return normalized, profile, nil

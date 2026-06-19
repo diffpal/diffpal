@@ -87,16 +87,29 @@ func TestResolvePublishModesRejectsGitHubCheckRun(t *testing.T) {
 	}
 }
 
-func TestResolvePublishModesAddsGitHubInlineReviewModes(t *testing.T) {
+func TestResolvePublishModesKeepsExplicitGitHubModes(t *testing.T) {
 	t.Parallel()
 
-	got, _, err := resolvePublishModes("github", []string{"summary"}, "summary")
-	if err != nil {
-		t.Fatalf("resolvePublishModes() error = %v", err)
+	cases := []struct {
+		name string
+		mode string
+		want []string
+	}{
+		{name: "summary only", mode: "summary", want: []string{"summary"}},
+		{name: "sarif only", mode: "sarif", want: []string{"sarif"}},
 	}
-	want := []string{"github_comments", "summary"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("modes = %v, want %v", got, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, _, err := resolvePublishModes("github", []string{tc.mode}, "summary")
+			if err != nil {
+				t.Fatalf("resolvePublishModes() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("modes = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
