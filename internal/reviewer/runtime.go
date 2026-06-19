@@ -240,12 +240,8 @@ func reviewCommandIsReadOnly(argv []string) bool {
 		return false
 	}
 	switch argv[0] {
-	case "pwd", "cat", "ls", "head", "tail", "wc", "rg":
+	case "pwd":
 		return true
-	case "sed":
-		return !hasArg(argv[1:], "-i") && !hasArgPrefix(argv[1:], "-i")
-	case "find":
-		return !hasArg(argv[1:], "-delete") && !hasArg(argv[1:], "-exec") && !hasArg(argv[1:], "-execdir")
 	case "git":
 		return gitCommandIsReadOnly(argv[1:])
 	default:
@@ -291,24 +287,6 @@ func gitBranchCommandIsReadOnly(argv []string) bool {
 		}
 	}
 	return true
-}
-
-func hasArg(args []string, needle string) bool {
-	for _, arg := range args {
-		if arg == needle {
-			return true
-		}
-	}
-	return false
-}
-
-func hasArgPrefix(args []string, prefix string) bool {
-	for _, arg := range args {
-		if strings.HasPrefix(arg, prefix) {
-			return true
-		}
-	}
-	return false
 }
 
 func reviewSystemInstruction(instructions string) string {

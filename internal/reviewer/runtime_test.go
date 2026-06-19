@@ -116,6 +116,28 @@ func TestReviewPermissionHandlerRejectsMutatingGitBranchCommand(t *testing.T) {
 	}
 }
 
+func TestReviewPermissionHandlerRejectsGenericFileReadCommand(t *testing.T) {
+	t.Parallel()
+
+	kind := acp.ToolKindExecute
+	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		ToolCall: acp.ToolCallUpdate{
+			Kind:     &kind,
+			RawInput: map[string]any{"command": "cat /home/runner/.codex/auth.json"},
+		},
+		Options: []acp.PermissionOption{
+			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewPermissionHandler() error = %v", err)
+	}
+	if got := resp.Outcome.Selected; got == nil || got.OptionId != "reject" {
+		t.Fatalf("selected option = %+v, want reject", got)
+	}
+}
+
 func TestReviewPermissionHandlerAllowsReadOnlyGitBranchCommand(t *testing.T) {
 	t.Parallel()
 
