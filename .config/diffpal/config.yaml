@@ -20,6 +20,11 @@ diffpal:
       dogfooding. Do not report that trust-model choice by itself. Still report
       fork exposure, secret logging, broader credential misuse, or unrelated CI
       credential issues.
+      DiffPal's ACP permission handler intentionally delegates agent security to
+      the configured provider sandbox and approval policy. Do not report the
+      generic ACP allow-selection handler by itself. Still report provider
+      configurations that weaken the intended sandbox, expose credentials to
+      forked PRs, or bypass repository trust boundaries.
   platforms:
     github: {}
 
