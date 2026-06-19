@@ -28,46 +28,6 @@ func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Contex
 	return out
 }
 
-func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, plan CommentPlan, client *http.Client) error {
-	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
-	if !ok || strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" || reviewCtx.PRNumber <= 0 {
-		return nil
-	}
-	current := currentFindingMarkers(plan, identity)
-	cursor := ""
-	for {
-		page, err := queryReviewThreads(ctx, token, owner, repo, reviewCtx.PRNumber, cursor, client)
-		if err != nil {
-			return err
-		}
-		for _, thread := range page.Threads {
-			if thread.ID == "" || thread.IsResolved {
-				continue
-			}
-			if threadBelongsToPriorDiffPalReview(thread, identity, reviewCtx.HeadSHA) {
-				if err := resolveReviewThread(ctx, token, thread.ID, client); err != nil {
-					return err
-				}
-				continue
-			}
-			marker := threadFindingMarker(thread, identity)
-			if marker == "" {
-				continue
-			}
-			if _, ok := current[marker]; ok {
-				continue
-			}
-			if err := resolveReviewThread(ctx, token, thread.ID, client); err != nil {
-				return err
-			}
-		}
-		if !page.HasNextPage || page.EndCursor == "" {
-			return nil
-		}
-		cursor = page.EndCursor
-	}
-}
-
 func activeReviewThreadFindingIDs(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, client *http.Client) map[string]struct{} {
 	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
 	if !ok || strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" || reviewCtx.PRNumber <= 0 {
@@ -97,32 +57,7 @@ func activeReviewThreadFindingIDs(ctx context.Context, token string, reviewCtx C
 	}
 }
 
-func currentFindingMarkers(plan CommentPlan, identity ReviewIdentity) map[string]struct{} {
-	out := map[string]struct{}{}
-	for _, state := range plan.State {
-		if marker := findingMarker(identity, state.FindingID); marker != "" {
-			out[marker] = struct{}{}
-		}
-	}
-	for _, action := range plan.Actions {
-		if marker := findingMarker(identity, action.FindingID); marker != "" {
-			out[marker] = struct{}{}
-		}
-	}
-	return out
-}
-
-func threadFindingMarker(thread reviewThread, identity ReviewIdentity) string {
-	marker, _ := threadFindingMarkerParts(thread, identity)
-	return marker
-}
-
 func threadFindingID(thread reviewThread, identity ReviewIdentity) string {
-	_, findingID := threadFindingMarkerParts(thread, identity)
-	return findingID
-}
-
-func threadFindingMarkerParts(thread reviewThread, identity ReviewIdentity) (string, string) {
 	prefix := "<!-- diffpal:finding:" + identity.channel() + " "
 	for _, comment := range thread.Comments {
 		body := strings.TrimSpace(comment.Body)
@@ -135,9 +70,9 @@ func threadFindingMarkerParts(thread reviewThread, identity ReviewIdentity) (str
 			continue
 		}
 		marker := body[idx : idx+end+3]
-		return marker, findingIDFromMarker(marker)
+		return findingIDFromMarker(marker)
 	}
-	return "", ""
+	return ""
 }
 
 func findingIDFromMarker(marker string) string {
@@ -149,39 +84,6 @@ func findingIDFromMarker(marker string) string {
 		}
 	}
 	return ""
-}
-
-func threadBelongsToPriorDiffPalReview(thread reviewThread, identity ReviewIdentity, currentHeadSHA string) bool {
-	currentHeadSHA = strings.TrimSpace(currentHeadSHA)
-	for _, comment := range thread.Comments {
-		headSHA, ok := reviewHeadFromBody(comment.PullRequestReviewBody, identity)
-		if !ok {
-			continue
-		}
-		return currentHeadSHA == "" || headSHA != currentHeadSHA
-	}
-	return false
-}
-
-func reviewHeadFromBody(body string, identity ReviewIdentity) (string, bool) {
-	prefix := "<!-- diffpal:review:" + identity.channel()
-	idx := strings.Index(strings.TrimSpace(body), prefix)
-	if idx < 0 {
-		return "", false
-	}
-	body = body[idx:]
-	end := strings.Index(body, "-->")
-	if end < 0 {
-		return "", false
-	}
-	marker := body[:end+3]
-	for _, part := range strings.Fields(strings.TrimSuffix(strings.TrimPrefix(marker, "<!--"), "-->")) {
-		key, value, ok := strings.Cut(part, ":")
-		if ok && key == "head_sha" {
-			return value, true
-		}
-	}
-	return "", true
 }
 
 type reviewThreadsPage struct {
@@ -197,8 +99,7 @@ type reviewThread struct {
 }
 
 type reviewThreadComment struct {
-	Body                  string
-	PullRequestReviewBody string
+	Body string
 }
 
 func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber int, cursor string, client *http.Client) (reviewThreadsPage, error) {
@@ -210,12 +111,7 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
           id
           isResolved
           comments(first:20) {
-            nodes {
-              body
-              pullRequestReview {
-                body
-              }
-            }
+            nodes { body }
           }
         }
         pageInfo { hasNextPage endCursor }
@@ -233,10 +129,7 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
 							IsResolved bool   `json:"isResolved"`
 							Comments   struct {
 								Nodes []struct {
-									Body              string `json:"body"`
-									PullRequestReview struct {
-										Body string `json:"body"`
-									} `json:"pullRequestReview"`
+									Body string `json:"body"`
 								} `json:"nodes"`
 							} `json:"comments"`
 						} `json:"nodes"`
@@ -276,34 +169,11 @@ func queryReviewThreads(ctx context.Context, token, owner, repo string, prNumber
 			Comments:   make([]reviewThreadComment, 0, len(node.Comments.Nodes)),
 		}
 		for _, comment := range node.Comments.Nodes {
-			thread.Comments = append(thread.Comments, reviewThreadComment{
-				Body:                  comment.Body,
-				PullRequestReviewBody: comment.PullRequestReview.Body,
-			})
+			thread.Comments = append(thread.Comments, reviewThreadComment{Body: comment.Body})
 		}
 		out.Threads = append(out.Threads, thread)
 	}
 	return out, nil
-}
-
-func resolveReviewThread(ctx context.Context, token, threadID string, client *http.Client) error {
-	const mutation = `mutation($threadId:ID!) {
-  resolveReviewThread(input:{threadId:$threadId}) {
-    thread { id }
-  }
-}`
-	var resp struct {
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if err := doGraphQL(ctx, token, mutation, map[string]any{"threadId": threadID}, &resp, client); err != nil {
-		return err
-	}
-	if len(resp.Errors) > 0 {
-		return fmt.Errorf("github graphql: %s", resp.Errors[0].Message)
-	}
-	return nil
 }
 
 func doGraphQL(ctx context.Context, token, query string, variables map[string]any, out any, client *http.Client) error {
