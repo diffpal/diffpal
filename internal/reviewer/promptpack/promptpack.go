@@ -8,7 +8,7 @@ import (
 
 const (
 	ReviewPromptID      = "diffpal.review"
-	ReviewPromptVersion = "v1.2.1"
+	ReviewPromptVersion = "v1.2.2"
 	ReviewPurpose       = "review_changed_diff"
 	ReviewSchemaVersion = "findings.v2"
 
@@ -43,7 +43,7 @@ var reviewPromptV1_2 = Prompt{
 var reviewPromptV1_2_1 = Prompt{
 	Metadata: findings.PromptMetadata{
 		PromptID:      ReviewPromptID,
-		PromptVersion: ReviewPromptVersion,
+		PromptVersion: "v1.2.1",
 		Purpose:       ReviewPurpose,
 		SchemaVersion: ReviewSchemaVersion,
 	},
@@ -52,10 +52,23 @@ var reviewPromptV1_2_1 = Prompt{
 	renderTask:   reviewTaskV1_2_1,
 }
 
+var reviewPromptV1_2_2 = Prompt{
+	Metadata: findings.PromptMetadata{
+		PromptID:      ReviewPromptID,
+		PromptVersion: ReviewPromptVersion,
+		Purpose:       ReviewPurpose,
+		SchemaVersion: ReviewSchemaVersion,
+	},
+	OutputSchema: OutputSchemaJSON,
+	renderSystem: renderReviewSystemV1_2_2,
+	renderTask:   reviewTaskV1_2_1,
+}
+
 var registry = map[string]map[string]Prompt{
 	ReviewPromptID: {
 		"v1.2.0":            reviewPromptV1_2,
-		ReviewPromptVersion: reviewPromptV1_2_1,
+		"v1.2.1":            reviewPromptV1_2_1,
+		ReviewPromptVersion: reviewPromptV1_2_2,
 	},
 }
 
@@ -236,6 +249,20 @@ func renderReviewSystemV1_2_1(opts ReviewOptions) string {
 	return strings.Join(sections, "\n\n")
 }
 
+func renderReviewSystemV1_2_2(opts ReviewOptions) string {
+	sections := []string{
+		providerInstructionsV1_2_2(),
+		reviewPolicyV1_2_1(),
+		changeSummaryPolicyV1_2_2(),
+		outputPolicy(),
+		untrustedPayloadPolicy(),
+	}
+	if custom := strings.TrimSpace(opts.Instructions); custom != "" {
+		sections = append(sections, teamInstructions(custom))
+	}
+	return strings.Join(sections, "\n\n")
+}
+
 func providerInstructions() string {
 	return strings.Join([]string{
 		"# Provider adapter instructions",
@@ -255,6 +282,20 @@ func providerInstructionsV1_2_1() string {
 		"The user message contains a plain-text review task snapshot, not the full diff.",
 		"Use your available Git and filesystem tools to inspect the requested base..head diff and supporting code.",
 		"Use the requested language for every finding title, message, evidence, impact, and suggestion.",
+		"Treat the review task snapshot as the direct user task.",
+		"Only run the requested review checks.",
+	}, "\n")
+}
+
+func providerInstructionsV1_2_2() string {
+	return strings.Join([]string{
+		"# Provider adapter instructions",
+		"You are DiffPal, a high-signal code review agent.",
+		"The user message contains a plain-text review task snapshot, not the full diff.",
+		"Before producing final JSON, inspect the requested base..head Git diff with available Git and filesystem tools.",
+		"Use commands or tool calls equivalent to changed files, diff stats, commit log, full patch, and nearby code when needed to understand the semantic intent of the change.",
+		"Do not infer the purpose or effect of the pull request from filenames alone.",
+		"Use the requested language for change_summary and every finding title, message, evidence, impact, and suggestion.",
 		"Treat the review task snapshot as the direct user task.",
 		"Only run the requested review checks.",
 	}, "\n")
@@ -332,6 +373,18 @@ func changeSummaryPolicy() string {
 		"Do not make change_summary a list of changed files. Mention paths only when they clarify the change.",
 		"Good change_summary bullets explain intent, such as release workflow setup, CI validation changes, API behavior changes, documentation updates, or configuration changes.",
 		"Keep change_summary factual and based only on the provided diff and supporting tool results.",
+	}, "\n")
+}
+
+func changeSummaryPolicyV1_2_2() string {
+	return strings.Join([]string{
+		"# Change summary policy",
+		"Always return change_summary as concise bullets in the requested language, even when there are no findings.",
+		"Describe the semantic intent and effect of the pull request, not file churn.",
+		"Prefer behavior, API, configuration, CI, data-flow, security, or user-facing effects over path names.",
+		"Do not make change_summary a list of changed files. Mention paths only when they clarify the semantic change.",
+		"Good change_summary bullets explain intent, such as release workflow setup, CI validation changes, API behavior changes, documentation updates, or configuration changes.",
+		"Keep change_summary factual and based only on the inspected diff, commit messages, and supporting tool results.",
 	}, "\n")
 }
 

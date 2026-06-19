@@ -36,7 +36,7 @@ Prompt metadata is resolved from the versioned prompt registry in
 `internal/reviewer/promptpack`. The current default review prompt is:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.1`
+- `prompt_version`: `v1.2.2`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 

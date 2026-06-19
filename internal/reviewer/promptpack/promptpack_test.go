@@ -170,8 +170,8 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.2.1" {
-		t.Fatalf("PromptVersion = %q, want v1.2.1", got.PromptVersion)
+	if got.PromptVersion != "v1.2.2" {
+		t.Fatalf("PromptVersion = %q, want v1.2.2", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
@@ -206,13 +206,15 @@ func TestPromptRegistryResolvesDefaultReviewPrompt(t *testing.T) {
 func TestPromptRegistryKeepsPreviousReviewPrompt(t *testing.T) {
 	t.Parallel()
 
-	prompt, ok := Lookup(ReviewPromptID, "v1.2.0")
-	if !ok {
-		t.Fatalf("Lookup(%q, v1.2.0) failed", ReviewPromptID)
-	}
-	metadata := prompt.ReviewMetadata()
-	if metadata.PromptVersion != "v1.2.0" || metadata.SchemaVersion != "findings.v2" {
-		t.Fatalf("previous prompt metadata = %+v, want v1.2.0/findings.v2", metadata)
+	for _, version := range []string{"v1.2.0", "v1.2.1"} {
+		prompt, ok := Lookup(ReviewPromptID, version)
+		if !ok {
+			t.Fatalf("Lookup(%q, %s) failed", ReviewPromptID, version)
+		}
+		metadata := prompt.ReviewMetadata()
+		if metadata.PromptVersion != version || metadata.SchemaVersion != "findings.v2" {
+			t.Fatalf("previous prompt metadata = %+v, want %s/findings.v2", metadata, version)
+		}
 	}
 }
 
@@ -254,6 +256,25 @@ func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 	for _, phrase := range requiredCoverage {
 		if !strings.Contains(system, phrase) {
 			t.Fatalf("review system prompt missing severity coverage phrase %q", phrase)
+		}
+	}
+}
+
+func TestReviewSystemRequiresGitInspectionAndLocalizedSummary(t *testing.T) {
+	t.Parallel()
+
+	system := RenderReviewSystem(ReviewOptions{})
+	required := []string{
+		"Before producing final JSON, inspect the requested base..head Git diff",
+		"changed files, diff stats, commit log, full patch, and nearby code",
+		"Do not infer the purpose or effect of the pull request from filenames alone.",
+		"Use the requested language for change_summary",
+		"Describe the semantic intent and effect of the pull request, not file churn.",
+		"Prefer behavior, API, configuration, CI, data-flow, security, or user-facing effects over path names.",
+	}
+	for _, phrase := range required {
+		if !strings.Contains(system, phrase) {
+			t.Fatalf("review system prompt missing %q:\n%s", phrase, system)
 		}
 	}
 }

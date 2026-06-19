@@ -130,7 +130,7 @@ artifacts include prompt metadata so review output can be traced back to the
 prompt contract:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.2.1`
+- `prompt_version`: `v1.2.2`
 - `purpose`: `review_changed_diff`
 - `schema_version`: `findings.v2`
 
@@ -140,7 +140,7 @@ sends a compact review task snapshot instead of preloading every patch or file
 snippet. Providers inspect the requested base/head diff through their available
 Git and filesystem tooling.
 
-Prompt Pack v1.2.1 labels commit messages, diffs, tool output, code, comments,
+Prompt Pack v1.2.2 labels commit messages, diffs, tool output, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
 role changes or instructions to follow. It also follows a high-signal review
 threshold: report only patch-introduced issues the pull request author would
