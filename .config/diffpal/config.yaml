@@ -12,7 +12,7 @@ diffpal:
   gate:
     block_on: high
   review:
-    language: Russian
+    language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
       The diffpal-dev workflow intentionally restores Codex auth and runs the

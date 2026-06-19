@@ -91,8 +91,8 @@ install/authentication step plus `.config/diffpal/config.yaml`.
 After a PR run, expect:
 
 - a `diffpal-checks` check run
-- a `DiffPal Review Summary` PR comment
-- inline comments only when actionable findings exist
+- a `DiffPal Review Summary` PR review
+- inline review comments only when actionable findings exist
 - `.artifacts/diffpal/findings.json` in the workflow workspace
 - a failed job only when `gate: true` and blocking findings exist, or when
   setup/publish fails
@@ -104,8 +104,8 @@ summary-overview: false
 ```
 
 If you run multiple DiffPal workflows on the same pull request, give each one a
-different `review-channel` and `review-id` so their checks and summary comments
-stay separate.
+different `review-channel` and `review-id` so their checks and PR reviews stay
+separate.
 
 ## Other Setups
 

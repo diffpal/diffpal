@@ -12,8 +12,8 @@ func TestReviewIdentityDefaultsToStableChannel(t *testing.T) {
 	if identity.CheckRunName() != "diffpal-checks" {
 		t.Fatalf("CheckRunName() = %q, want diffpal-checks", identity.CheckRunName())
 	}
-	if identity.SummaryMarker() != "<!-- diffpal:summary -->" {
-		t.Fatalf("SummaryMarker() = %q, want legacy marker", identity.SummaryMarker())
+	if identity.ReviewMarker("head-a") != "<!-- diffpal:review:diffpal head_sha:head-a -->" {
+		t.Fatalf("ReviewMarker() = %q, want default marker", identity.ReviewMarker("head-a"))
 	}
 	if identity.SummaryTitle() != "DiffPal Review Summary" {
 		t.Fatalf("SummaryTitle() = %q, want default title", identity.SummaryTitle())
@@ -33,8 +33,8 @@ func TestReviewIdentityIsolatesDevChannel(t *testing.T) {
 	if identity.CheckRunName() != "diffpal-dev-checks" {
 		t.Fatalf("CheckRunName() = %q, want diffpal-dev-checks", identity.CheckRunName())
 	}
-	if identity.SummaryMarker() != "<!-- diffpal:summary:diffpal-dev -->" {
-		t.Fatalf("SummaryMarker() = %q, want dev marker", identity.SummaryMarker())
+	if identity.ReviewMarker("head-a") != "<!-- diffpal:review:diffpal-dev head_sha:head-a -->" {
+		t.Fatalf("ReviewMarker() = %q, want dev marker", identity.ReviewMarker("head-a"))
 	}
 	if identity.SummaryTitle() != "DiffPal Dev Review Summary" {
 		t.Fatalf("SummaryTitle() = %q, want dev title", identity.SummaryTitle())

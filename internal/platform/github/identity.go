@@ -38,13 +38,15 @@ func (id ReviewIdentity) CheckRunName() string {
 	return id.channel() + "-checks"
 }
 
-// SummaryMarker returns the hidden marker used to update one summary comment.
-func (id ReviewIdentity) SummaryMarker() string {
+// ReviewMarker returns the hidden marker used to reconcile one PR review per
+// publishing channel and head commit.
+func (id ReviewIdentity) ReviewMarker(headSHA string) string {
 	channel := id.channel()
-	if channel == DefaultReviewChannel {
-		return "<!-- diffpal:summary -->"
+	cleanHead := strings.TrimSpace(headSHA)
+	if cleanHead == "" {
+		return "<!-- diffpal:review:" + channel + " -->"
 	}
-	return "<!-- diffpal:summary:" + channel + " -->"
+	return "<!-- diffpal:review:" + channel + " head_sha:" + cleanHead + " -->"
 }
 
 // SummaryTitle returns the Markdown title for the review channel summary.

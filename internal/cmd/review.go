@@ -100,7 +100,7 @@ func addReviewPublishFlags(cmd *cobra.Command) {
 }
 
 func addGitHubReviewPublishFlags(cmd *cobra.Command) {
-	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and summary comments")
+	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and pull request reviews")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -214,7 +214,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel, execution.Gate); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -425,7 +425,7 @@ func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
 	return ctx.IsFork, nil
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string, gate bool) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -449,16 +449,14 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		existingComments, err := github.LoadExistingState(defaultModeOutput(platform, "github_comments"))
-		if err != nil {
-			return err
-		}
-		commentPlan := github.PlanInlineCommentsWithOptions(existingComments, bundle.Findings, github.CommentOptions{
+		commentPlan := github.PlanInlineCommentsWithOptions(nil, bundle.Findings, github.CommentOptions{
 			Profile: string(profile),
 			Links:   github.NewPermanentLinkProvider(reviewCtx),
 		})
-		summaryCommentEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
+		summaryReviewEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
 		return auth.WithToken(func(token string) error {
+			publishReview := false
+			includeInline := false
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
 				case "check_run":
@@ -466,16 +464,26 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 						return err
 					}
 				case "github_comments":
-					if err := github.PublishInlineComments(ctx, token, reviewCtx, commentPlan, nil); err != nil {
-						return err
-					}
+					publishReview = true
+					includeInline = true
 				case "summary":
-					if !summaryCommentEnabled {
+					if !summaryReviewEnabled {
 						continue
 					}
-					if err := github.PublishSummaryCommentWithIdentity(ctx, token, reviewCtx, summary, identity, nil); err != nil {
-						return err
-					}
+					publishReview = true
+				}
+			}
+			if publishReview {
+				event := github.ReviewEventComment
+				if gate && countBlockingFindings(bundle) > 0 {
+					event = github.ReviewEventRequestChanges
+				}
+				plan := github.CommentPlan{}
+				if includeInline {
+					plan = commentPlan
+				}
+				if err := github.PublishPullRequestReviewWithIdentity(ctx, token, reviewCtx, summary, identity, plan, event, nil); err != nil {
+					return err
 				}
 			}
 			return nil

@@ -89,8 +89,8 @@ The default public onboarding recipe selects `codex-acp`. Install it with
 and authenticate Codex with `OPENAI_API_KEY` in CI.
 
 `diffpal.platforms.github.summary_comment.enabled` defaults to `true`. When
-`summary` mode is selected, DiffPal posts or updates a PR-level GitHub summary
-comment even if there are no findings.
+`summary` mode is selected, DiffPal submits or updates a GitHub pull request
+review summary even if there are no findings.
 
 Validation requires `version: v1`, a `diffpal.provider` key present in
 `runtime.providers`, and a valid `diffpal.gate.block_on` severity. Changing

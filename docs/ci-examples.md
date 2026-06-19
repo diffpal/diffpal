@@ -122,14 +122,14 @@ automation that does not execute fork code.
 What you should see:
 
 - `diffpal-checks` check run on the PR head commit.
-- A PR summary comment headed `DiffPal Review Summary`.
-- Inline comments when DiffPal finds actionable issues.
+- A PR review headed `DiffPal Review Summary`.
+- Inline review comments when DiffPal finds actionable issues.
 - Job failure only when `gate` is set and blocking findings exist, or when setup/publish fails.
 
 Common fixes:
 
 - `GITHUB_TOKEN is required`: keep `GITHUB_TOKEN` on the review step.
-- No summary comment: confirm `pull-requests: write`.
+- No PR review: confirm `pull-requests: write`.
 - No check run: confirm `checks: write`.
 - Fork PRs do not run: this is intentional when using secrets.
 
@@ -219,14 +219,14 @@ Use `feedback` for normal setup:
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
 
-The semantic change overview is shown by default in summary comments/checks.
+The semantic change overview is shown by default in PR reviews and checks.
 Turn it off with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
 
 For parallel GitHub review channels, set `review-channel`. The default channel
-is `diffpal`, which publishes `diffpal-checks` and updates the legacy DiffPal
-summary comment. A dev channel such as `diffpal-dev` publishes
-`diffpal-dev-checks` and a separate summary comment:
+is `diffpal`, which publishes `diffpal-checks` and a DiffPal PR review. A dev
+channel such as `diffpal-dev` publishes `diffpal-dev-checks` and a separate PR
+review:
 
 ```yaml
 with:

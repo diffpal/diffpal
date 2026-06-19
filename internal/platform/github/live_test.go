@@ -10,67 +10,99 @@ import (
 	"testing"
 )
 
-func TestPublishSummaryCommentCreatesWhenMissing(t *testing.T) {
-	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
-	var postedBody string
-	handlerErrs := make(chan error, 2)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			_, _ = w.Write([]byte(`[]`))
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			var payload struct {
-				Body string `json:"body"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				handlerErrs <- fmt.Errorf("decode summary comment: %w", err)
-				http.Error(w, "bad payload", http.StatusBadRequest)
-				return
-			}
-			postedBody = payload.Body
-			w.WriteHeader(http.StatusCreated)
-		default:
-			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-		}
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
-
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
-	if err != nil {
-		t.Fatalf("PublishSummaryComment() error = %v", err)
-	}
-	select {
-	case err := <-handlerErrs:
-		t.Fatal(err)
-	default:
-	}
-	if !strings.Contains(postedBody, (ReviewIdentity{}).SummaryMarker()) {
-		t.Fatalf("posted body missing marker: %q", postedBody)
-	}
-	if !strings.Contains(postedBody, "No findings.") {
-		t.Fatalf("posted body missing summary: %q", postedBody)
-	}
-}
-
-func TestPublishSummaryCommentUsesChannelMarker(t *testing.T) {
+func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	identity, err := NewReviewIdentity("diffpal-dev")
 	if err != nil {
 		t.Fatalf("NewReviewIdentity() error = %v", err)
 	}
-	var patched bool
+	var posted struct {
+		CommitID string `json:"commit_id"`
+		Event    string `json:"event"`
+		Body     string `json:"body"`
+		Comments []struct {
+			Path string `json:"path"`
+			Line int    `json:"line"`
+			Side string `json:"side"`
+			Body string `json:"body"`
+		} `json:"comments"`
+	}
 	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			if err := json.NewDecoder(r.Body).Decode(&posted); err != nil {
+				handlerErrs <- fmt.Errorf("decode review: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err = PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nNo findings.", identity, CommentPlan{Actions: []CommentAction{{
+		Type: ActionCreate,
+		Body: "finding body",
+		Path: "internal/app.go",
+		Line: 12,
+	}}}, ReviewEventRequestChanges, server.Client())
+	if err != nil {
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if posted.CommitID != "head-a" {
+		t.Fatalf("commit_id = %q, want head-a", posted.CommitID)
+	}
+	if posted.Event != "REQUEST_CHANGES" {
+		t.Fatalf("event = %q, want REQUEST_CHANGES", posted.Event)
+	}
+	if !strings.Contains(posted.Body, "<!-- diffpal:review:diffpal-dev head_sha:head-a -->") {
+		t.Fatalf("body missing review marker:\n%s", posted.Body)
+	}
+	if len(posted.Comments) != 1 {
+		t.Fatalf("comments = %d, want 1", len(posted.Comments))
+	}
+	if posted.Comments[0].Path != "internal/app.go" || posted.Comments[0].Line != 12 || posted.Comments[0].Side != "RIGHT" {
+		t.Fatalf("unexpected review comment: %#v", posted.Comments[0])
+	}
+}
+
+func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var patchedBody string
+	handlerErrs := make(chan error, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
 			_, _ = w.Write([]byte(`[
-				{"id":41,"body":"<!-- diffpal:summary -->\nstable"},
-				{"id":42,"body":"<!-- diffpal:summary:diffpal-dev -->\ndev"}
+				{"id":41,"body":"<!-- diffpal:review:diffpal head_sha:old-head -->\nold"},
+				{"id":42,"body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
 			]`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
-			patched = true
+		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews/42":
+			var payload struct {
+				Body string `json:"body"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode review update: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			patchedBody = payload.Body
 			w.WriteHeader(http.StatusOK)
 		default:
 			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -80,100 +112,31 @@ func TestPublishSummaryCommentUsesChannelMarker(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
 
-	err = PublishSummaryCommentWithIdentity(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", identity, server.Client())
+	err := PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nUpdated.", ReviewIdentity{}, CommentPlan{}, ReviewEventComment, server.Client())
 	if err != nil {
-		t.Fatalf("PublishSummaryCommentWithIdentity() error = %v", err)
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
 	}
 	select {
 	case err := <-handlerErrs:
 		t.Fatal(err)
 	default:
 	}
-	if !patched {
-		t.Fatal("channel summary comment was not updated")
+	if !strings.Contains(patchedBody, "Updated.") {
+		t.Fatalf("patched body missing summary:\n%s", patchedBody)
 	}
 }
 
-func TestPublishSummaryCommentFindsMarkerOnNextPage(t *testing.T) {
-	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
-	var patched bool
-	handlerErrs := make(chan error, 3)
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments" && r.URL.Query().Get("page") == "":
-			w.Header().Set("Link", `<`+server.URL+`/repos/acme/diffpal/issues/7/comments?per_page=100&page=2>; rel="next"`)
-			_, _ = w.Write([]byte(`[{"id":41,"body":"not diffpal"}]`))
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments" && r.URL.Query().Get("page") == "2":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary -->\nold"}]`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
-			patched = true
-			w.WriteHeader(http.StatusOK)
-		default:
-			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-		}
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
-
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
-	if err != nil {
-		t.Fatalf("PublishSummaryComment() error = %v", err)
-	}
-	select {
-	case err := <-handlerErrs:
-		t.Fatal(err)
-	default:
-	}
-	if !patched {
-		t.Fatal("summary comment from second page was not updated")
-	}
-}
-
-func TestPublishSummaryCommentFollowsRelativeNextPage(t *testing.T) {
-	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
-	var patched bool
-	handlerErrs := make(chan error, 3)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments" && r.URL.Query().Get("page") == "":
-			w.Header().Set("Link", `</repos/acme/diffpal/issues/7/comments?per_page=100&page=2>; rel="next"`)
-			_, _ = w.Write([]byte(`[{"id":41,"body":"not diffpal"}]`))
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments" && r.URL.Query().Get("page") == "2":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary -->\nold"}]`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
-			patched = true
-			w.WriteHeader(http.StatusOK)
-		default:
-			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-		}
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
-
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
-	if err != nil {
-		t.Fatalf("PublishSummaryComment() error = %v", err)
-	}
-	select {
-	case err := <-handlerErrs:
-		t.Fatal(err)
-	default:
-	}
-	if !patched {
-		t.Fatal("summary comment from relative next page was not updated")
-	}
-}
-
-func TestPublishSummaryCommentRejectsCrossHostPagination(t *testing.T) {
+func TestPublishPullRequestReviewRejectsCrossHostPagination(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	handlerErrs := make(chan error, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			w.Header().Set("Link", `<https://evil.example/repos/acme/diffpal/issues/7/comments?per_page=100&page=2>; rel="next"`)
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			w.Header().Set("Link", `<https://evil.example/repos/acme/diffpal/pulls/7/reviews?per_page=100&page=2>; rel="next"`)
 			_, _ = w.Write([]byte(`[{"id":41,"body":"not diffpal"}]`))
 		default:
 			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -183,89 +146,20 @@ func TestPublishSummaryCommentRejectsCrossHostPagination(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
 
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
+	err := PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nNo findings.", ReviewIdentity{}, CommentPlan{}, ReviewEventComment, server.Client())
 	if err == nil {
-		t.Fatal("PublishSummaryComment() error = nil, want untrusted pagination error")
+		t.Fatal("PublishPullRequestReviewWithIdentity() error = nil, want untrusted pagination error")
 	}
 	if !strings.Contains(err.Error(), "untrusted GitHub pagination URL") {
-		t.Fatalf("PublishSummaryComment() error = %v, want untrusted pagination error", err)
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v, want untrusted pagination error", err)
 	}
 	select {
 	case err := <-handlerErrs:
 		t.Fatal(err)
 	default:
-	}
-}
-
-func TestPublishSummaryCommentIgnoresQuotedMarker(t *testing.T) {
-	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
-	var posted bool
-	var patched bool
-	handlerErrs := make(chan error, 3)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"user quote: <!-- diffpal:summary --> old"}]`))
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			posted = true
-			w.WriteHeader(http.StatusCreated)
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
-			patched = true
-			w.WriteHeader(http.StatusOK)
-		default:
-			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-		}
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
-
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
-	if err != nil {
-		t.Fatalf("PublishSummaryComment() error = %v", err)
-	}
-	select {
-	case err := <-handlerErrs:
-		t.Fatal(err)
-	default:
-	}
-	if patched {
-		t.Fatal("quoted summary marker was updated")
-	}
-	if !posted {
-		t.Fatal("summary comment was not created")
-	}
-}
-
-func TestPublishSummaryCommentUpdatesExistingMarker(t *testing.T) {
-	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
-	var patched bool
-	handlerErrs := make(chan error, 2)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/issues/7/comments":
-			_, _ = w.Write([]byte(`[{"id":42,"body":"<!-- diffpal:summary -->\nold"}]`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/issues/comments/42":
-			patched = true
-			w.WriteHeader(http.StatusOK)
-		default:
-			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-		}
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
-
-	err := PublishSummaryComment(context.Background(), "token", Context{Repo: "acme/diffpal", PRNumber: 7}, "# Summary\n\nNo findings.", server.Client())
-	if err != nil {
-		t.Fatalf("PublishSummaryComment() error = %v", err)
-	}
-	select {
-	case err := <-handlerErrs:
-		t.Fatal(err)
-	default:
-	}
-	if !patched {
-		t.Fatal("summary comment was not updated")
 	}
 }

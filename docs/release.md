@@ -131,8 +131,8 @@ npm install "@diffpal/diffpal@${VERSION}"
 ```
 
 Open a same-repository pull request and confirm the `diffpal` workflow
-publishes the `diffpal-checks` check run, posts a PR-level summary comment even
-when no findings are present, and posts inline review comments when findings are
+publishes the `diffpal-checks` check run, submits a PR review even when no
+findings are present, and includes inline review comments when findings are
 present. The GitHub Action smoke path should use `diffpal/action@v1` with
 default `install: true`; provider setup such as `@openai/codex` and
 `@normahq/codex-acp-bridge` remains a separate explicit step.
@@ -162,8 +162,8 @@ default `install: true`; provider setup such as `@openai/codex` and
 DiffPal keeps three automated core workflows: `ci`, `diffpal-dev`, and
 `omnidist-release`. Before promoting a release beyond the initial npm package,
 open a maintainer-controlled same-repository pull request and verify that
-`diffpal-dev` publishes the `diffpal-dev-checks` check run, posts the PR-level
-summary comment, and leaves the PR in the expected pass/fail state. Verify the
+`diffpal-dev` publishes the `diffpal-dev-checks` check run, submits the PR
+review, and leaves the PR in the expected pass/fail state. Verify the
 released GitHub Action from the separate `diffpal/action` repository.
 
 ## Change log and audits
