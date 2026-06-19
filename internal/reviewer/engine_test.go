@@ -89,7 +89,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if result.Bundle.Language != "en" {
 		t.Fatalf("Bundle.Language = %q, want en", result.Bundle.Language)
 	}
-	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != "v1.2.1" {
+	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptID != "diffpal.review" || result.Bundle.Prompt.PromptVersion != promptpack.ReviewPromptVersion {
 		t.Fatalf("Bundle.Prompt = %+v, want prompt pack metadata", result.Bundle.Prompt)
 	}
 	if strings.Join(result.Bundle.ReviewChecks, ",") != "security,bugs,performance,best-practices" {
@@ -238,8 +238,8 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunWithRuntime() error = %v", err)
 	}
-	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptVersion != "v1.2.1" {
-		t.Fatalf("Bundle.Prompt = %+v, want prompt v1.2.1", result.Bundle.Prompt)
+	if result.Bundle.Prompt == nil || result.Bundle.Prompt.PromptVersion != promptpack.ReviewPromptVersion {
+		t.Fatalf("Bundle.Prompt = %+v, want prompt %s", result.Bundle.Prompt, promptpack.ReviewPromptVersion)
 	}
 	if len(runtime.inputs) != 1 {
 		t.Fatalf("runtime input = %+v, want one input", runtime.inputs)
