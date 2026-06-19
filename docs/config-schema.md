@@ -32,9 +32,7 @@ diffpal:
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
   platforms:
-    github:
-      summary_comment:
-        enabled: true
+    github: {}
     gitlab: {}
     azure: {}
 
@@ -88,9 +86,8 @@ The default public onboarding recipe selects `codex-acp`. Install it with
 `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`
 and authenticate Codex with `OPENAI_API_KEY` in CI.
 
-`diffpal.platforms.github.summary_comment.enabled` defaults to `true`. When
-`summary` mode is selected, DiffPal submits or updates a GitHub pull request
-review summary even if there are no findings.
+For GitHub, DiffPal always publishes a pull request review. Findings are
+published as inline review comments.
 
 Validation requires `version: v1`, a `diffpal.provider` key present in
 `runtime.providers`, and a valid `diffpal.gate.block_on` severity. Changing

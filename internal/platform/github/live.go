@@ -13,28 +13,6 @@ import (
 	"github.com/diffpal/diffpal/internal/platformapi"
 )
 
-func PublishCheckRun(ctx context.Context, token string, reviewCtx Context, payload CheckRunPayload, client *http.Client) error {
-	if strings.TrimSpace(reviewCtx.Repo) == "" {
-		return fmt.Errorf("missing GitHub repository")
-	}
-	req := map[string]any{
-		"name":       payload.Name,
-		"head_sha":   payload.HeadSHA,
-		"status":     payload.Status,
-		"conclusion": payload.Conclusion,
-		"output": map[string]any{
-			"title":       payload.Name,
-			"summary":     payload.Summary,
-			"annotations": payload.Annotations,
-		},
-	}
-	url := strings.TrimRight(githubAPIBaseURL(), "/") + "/repos/" + reviewCtx.Repo + "/check-runs"
-	return platformapi.DoJSON(ctx, client, http.MethodPost, url, map[string]string{
-		"Authorization": "Bearer " + token,
-		"Accept":        "application/vnd.github+json",
-	}, req)
-}
-
 type ReviewEvent string
 
 const (

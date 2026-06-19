@@ -15,7 +15,7 @@ func TestRecorderTracksProviderUsageAndPublishOutcomes(t *testing.T) {
 		Success:    true,
 		TokenUsage: 0,
 		LatencyMs:  12,
-		Outcome:    "publish:check_run",
+		Outcome:    "publish:review",
 	})
 	rec.Record(Event{
 		Name:       "publish",

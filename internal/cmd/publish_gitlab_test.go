@@ -114,7 +114,7 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"check-run", "comments"}, "balanced", true, "", "")
+	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", []string{"comments"}, "balanced", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -124,24 +124,20 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 	if len(outputs) != 2 {
 		t.Fatalf("outputs = %d, want 2", len(outputs))
 	}
-	for _, path := range []string{
-		filepath.Join(".artifacts", "diffpal", "github-checkrun.json"),
-		filepath.Join(".artifacts", "diffpal", "github-comments.json"),
-	} {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("ReadFile(%q) error = %v", path, err)
-		}
-		text := string(raw)
-		if !strings.Contains(text, "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L3-L5") {
-			t.Fatalf("%s missing GitHub permanent link:\n%s", path, text)
-		}
-		if strings.Contains(text, "```") || strings.Contains(text, "func deleteSessions(user string)") {
-			t.Fatalf("%s contains fenced or embedded code snippet:\n%s", path, text)
-		}
-		if !strings.Contains(text, "Use a parameterized statement.") {
-			t.Fatalf("%s missing suggestion:\n%s", path, text)
-		}
+	path := filepath.Join(".artifacts", "diffpal", "github-comments.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L3-L5") {
+		t.Fatalf("%s missing GitHub permanent link:\n%s", path, text)
+	}
+	if strings.Contains(text, "```") || strings.Contains(text, "func deleteSessions(user string)") {
+		t.Fatalf("%s contains fenced or embedded code snippet:\n%s", path, text)
+	}
+	if !strings.Contains(text, "Use a parameterized statement.") {
+		t.Fatalf("%s missing suggestion:\n%s", path, text)
 	}
 }
 
@@ -190,7 +186,7 @@ func TestPublishBundleToFilesGitHubCommentsReportsBlocking(t *testing.T) {
 }
 
 func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
-	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"check-run", "summary"}, "", true, "review.out", "")
+	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", []string{"comments", "summary"}, "", true, "review.out", "")
 	if err == nil {
 		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-mode error")
 	}

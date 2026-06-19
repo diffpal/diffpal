@@ -16,7 +16,6 @@
 - `.artifacts/diffpal/summary.md`
 - `.artifacts/diffpal/diffpal.sarif`
 - `.artifacts/diffpal/codequality.json`
-- `.artifacts/diffpal/github-checkrun.json`
 - `.artifacts/diffpal/github-comments.json`
 - `.artifacts/diffpal/gitlab-discussions.json`
 - `.artifacts/diffpal/azure-threads.json`
@@ -86,7 +85,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: write
 ```
 
 Inject `OPENAI_API_KEY` only inside a job with that guard.
@@ -131,9 +129,8 @@ npm install "@diffpal/diffpal@${VERSION}"
 ```
 
 Open a same-repository pull request and confirm the `diffpal` workflow
-publishes the `diffpal-checks` check run, submits a PR review even when no
-findings are present, and includes inline review comments when findings are
-present. The GitHub Action smoke path should use `diffpal/action@v1` with
+submits a PR review even when no findings are present, and includes inline
+review comments when findings are present. The GitHub Action smoke path should use `diffpal/action@v1` with
 default `install: true`; provider setup such as `@openai/codex` and
 `@normahq/codex-acp-bridge` remains a separate explicit step.
 

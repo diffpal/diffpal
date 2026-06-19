@@ -21,6 +21,7 @@ type SummaryOptions struct {
 	PublishSurfaces []string
 	ShowMetadata    bool
 	HideOverview    bool
+	HideDetails     bool
 	Snippets        SnippetProvider
 	Links           FindingLinkProvider
 }
@@ -59,6 +60,9 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	}
 
 	if len(sortedFindings) == 0 {
+		return out.String()
+	}
+	if opts.HideDetails {
 		return out.String()
 	}
 

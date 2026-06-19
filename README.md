@@ -98,9 +98,8 @@ cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 
 Expected result:
 
-- a `diffpal-checks` check run
-- a `DiffPal Review Summary` PR comment with an overview of the change
-- inline comments only for actionable findings
+- a `DiffPal Review Summary` PR review with an overview of the change
+- inline review comments for actionable findings
 - `.artifacts/diffpal/findings.json` in the job workspace
 - a failed job only when `gate: true` and blocking findings exist, or when setup
   or publishing fails
@@ -168,7 +167,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: write
     steps:
       - uses: actions/checkout@v6
         with:

@@ -33,11 +33,6 @@ func (id ReviewIdentity) channel() string {
 	return id.Channel
 }
 
-// CheckRunName returns the GitHub check run name for the review channel.
-func (id ReviewIdentity) CheckRunName() string {
-	return id.channel() + "-checks"
-}
-
 // ReviewMarker returns the hidden marker used to reconcile one PR review per
 // publishing channel and head commit.
 func (id ReviewIdentity) ReviewMarker(headSHA string) string {

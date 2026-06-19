@@ -86,7 +86,6 @@ Required permissions:
 permissions:
   contents: read
   pull-requests: write
-  checks: write
 ```
 
 Use a same-repository PR guard before exposing provider secrets:
@@ -104,8 +103,8 @@ GitHub Actions settings checklist for fork PRs:
 - Do not enable settings that send secrets or write tokens to fork pull request
   workflows.
 - Keep explicit minimal `permissions`; start with `contents: read` for no-secret
-  PR CI and grant `pull-requests: write` or `checks: write` only to jobs that
-  need to publish feedback.
+  PR CI and grant `pull-requests: write` only to jobs that need to publish
+  feedback.
 - Prefer GitHub-hosted runners for untrusted PRs. Self-hosted runners can be
   persistently affected by untrusted workflow code.
 - Pin third-party actions to full commit SHAs where practical, especially in
@@ -121,7 +120,6 @@ automation that does not execute fork code.
 
 What you should see:
 
-- `diffpal-checks` check run on the PR head commit.
 - A PR review headed `DiffPal Review Summary`.
 - Inline review comments when DiffPal finds actionable issues.
 - Job failure only when `gate` is set and blocking findings exist, or when setup/publish fails.
@@ -130,7 +128,6 @@ Common fixes:
 
 - `GITHUB_TOKEN is required`: keep `GITHUB_TOKEN` on the review step.
 - No PR review: confirm `pull-requests: write`.
-- No check run: confirm `checks: write`.
 - Fork PRs do not run: this is intentional when using secrets.
 
 ## GitLab CI
@@ -219,14 +216,13 @@ Use `feedback` for normal setup:
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
 
-The semantic change overview is shown by default in PR reviews and checks.
+The semantic change overview is shown by default in PR reviews.
 Turn it off with `summary-overview: false` in GitHub Actions or
 `--summary-overview=false` on the CLI.
 
 For parallel GitHub review channels, set `review-channel`. The default channel
-is `diffpal`, which publishes `diffpal-checks` and a DiffPal PR review. A dev
-channel such as `diffpal-dev` publishes `diffpal-dev-checks` and a separate PR
-review:
+is `diffpal`, which publishes a DiffPal PR review. A dev channel such as
+`diffpal-dev` publishes a separate PR review:
 
 ```yaml
 with:
@@ -238,7 +234,7 @@ Default balanced publish modes:
 
 | Platform | Default modes |
 | --- | --- |
-| GitHub | `check-run,comments,sarif,summary` |
+| GitHub | `comments,sarif,summary` |
 | GitLab | `code-quality,discussions,sarif,summary` |
 | Azure | `threads,status,summary` |
 

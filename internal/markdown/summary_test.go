@@ -191,7 +191,6 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	}, SummaryOptions{
 		FeedbackProfile: "balanced",
 		PublishSurfaces: []string{
-			"check-run",
 			"comments",
 			"sarif",
 			"summary",
@@ -203,7 +202,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	assertContains(t, got, "- Review ID: review-feedback")
 	assertContains(t, got, "- Reviewed files: 1")
 	assertContains(t, got, "- Feedback profile: balanced")
-	assertContains(t, got, "- Publish surfaces: check-run, comments, sarif, summary")
+	assertContains(t, got, "- Publish surfaces: comments, sarif, summary")
 }
 
 func TestRenderSummaryDoesNotInventSemanticChangeOverview(t *testing.T) {

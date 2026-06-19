@@ -450,26 +450,22 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			return err
 		}
 		commentPlan := github.PlanInlineCommentsWithOptions(nil, bundle.Findings, github.CommentOptions{
-			Profile: string(profile),
-			Links:   github.NewPermanentLinkProvider(reviewCtx),
+			Profile:     string(profile),
+			Links:       github.NewPermanentLinkProvider(reviewCtx),
+			AllFindings: true,
 		})
-		summaryReviewEnabled := cfg.Platforms.GitHub.SummaryCommentEnabled()
+		if err := github.ValidateInlineFindings(bundle.Findings); err != nil {
+			return err
+		}
 		return auth.WithToken(func(token string) error {
 			publishReview := false
 			includeInline := false
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
-				case "check_run":
-					if err := github.PublishCheckRun(ctx, token, reviewCtx, github.BuildCheckRunPayloadWithIdentity(reviewCtx, bundle, summary, identity), nil); err != nil {
-						return err
-					}
 				case "github_comments":
 					publishReview = true
 					includeInline = true
 				case "summary":
-					if !summaryReviewEnabled {
-						continue
-					}
 					publishReview = true
 				}
 			}

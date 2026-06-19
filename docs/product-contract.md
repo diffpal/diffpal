@@ -54,7 +54,6 @@
 - Markdown summary: `.artifacts/diffpal/summary.md`
 - SARIF export: `.artifacts/diffpal/diffpal.sarif`
 - Code Quality export: `.artifacts/diffpal/codequality.json`
-- GitHub check-run payload: `.artifacts/diffpal/github-checkrun.json`
 - GitHub inline comment plan: `.artifacts/diffpal/github-comments.json`
 - GitLab discussions plan: `.artifacts/diffpal/gitlab-discussions.json`
 - Azure threads plan: `.artifacts/diffpal/azure-threads.json`

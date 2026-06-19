@@ -133,7 +133,6 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
-	var checkRunName string
 	var summaryBody string
 	var reviewEvent string
 	var reviewComments int
@@ -146,17 +145,6 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 			return
 		}
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/check-runs":
-			var payload struct {
-				Name string `json:"name"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				handlerErrs <- fmt.Errorf("decode check run: %w", err)
-				http.Error(w, "bad payload", http.StatusBadRequest)
-				return
-			}
-			checkRunName = payload.Name
-			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
@@ -195,23 +183,20 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "check-run,summary",
+		"--mode", "summary",
 		"--review-channel", "diffpal-dev",
 	})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 3 {
-		t.Fatalf("requests = %d, want 3", got)
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("requests = %d, want 2", got)
 	}
 	select {
 	case err := <-handlerErrs:
 		t.Fatal(err)
 	default:
-	}
-	if checkRunName != "diffpal-dev-checks" {
-		t.Fatalf("check run name = %q, want diffpal-dev-checks", checkRunName)
 	}
 	if !strings.Contains(summaryBody, "<!-- diffpal:review:diffpal-dev head_sha:head-a -->") {
 		t.Fatalf("summary body missing channel marker:\n%s", summaryBody)
@@ -222,14 +207,17 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if reviewEvent != "COMMENT" {
 		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
 	}
-	if reviewComments != 0 {
-		t.Fatalf("review comments = %d, want 0 for summary-only mode", reviewComments)
+	if reviewComments != 1 {
+		t.Fatalf("review comments = %d, want 1 inline finding", reviewComments)
+	}
+	if strings.Contains(summaryBody, "## Detailed Comments") {
+		t.Fatalf("summary body duplicates detailed comments:\n%s", summaryBody)
 	}
 	text := out.String()
 	for _, needle := range []string{
 		"findings=1",
 		"bundle=",
-		"mode=check_run path=.artifacts/diffpal/github-checkrun.json",
+		"mode=github_comments path=.artifacts/diffpal/github-comments.json",
 		"mode=summary path=.artifacts/diffpal/summary.md",
 	} {
 		if !strings.Contains(text, needle) {
@@ -413,14 +401,13 @@ func TestReviewGitHubDryRunPrintsMarkdownWithoutPublishing(t *testing.T) {
 	text := out.String()
 	for _, want := range []string{
 		"# DiffPal Review Summary",
-		"https://github.com/acme/diffpal/blob/head-a/main.go#L4",
-		"example evidence",
+		"DiffPal found 1 actionable finding(s), including 1 blocking finding(s).",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("dry-run output missing %q:\n%s", want, text)
 		}
 	}
-	for _, forbidden := range []string{"findings=", "bundle=", "```"} {
+	for _, forbidden := range []string{"findings=", "bundle=", "```", "## Detailed Comments", "example evidence"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("dry-run output contains %q:\n%s", forbidden, text)
 		}
@@ -561,7 +548,7 @@ func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
 	}
 }
 
-func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
+func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("GITHUB_TOKEN", "token")
@@ -574,7 +561,14 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		http.Error(w, "unexpected request", http.StatusBadRequest)
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/10/reviews":
+			w.WriteHeader(http.StatusCreated)
+		default:
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
@@ -595,8 +589,8 @@ func TestReviewGitHubSummaryCommentCanBeDisabled(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 0 {
-		t.Fatalf("requests = %d, want 0", got)
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("requests = %d, want 2", got)
 	}
 	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())
@@ -904,11 +898,12 @@ func writeHostTestConfig(t *testing.T, dir string) {
 
 func writeHostTestConfigWithGitHubSummary(t *testing.T, dir string, enabled bool) {
 	t.Helper()
+	_ = enabled
 	configDir := filepath.Join(dir, ".config", "diffpal")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(%s) error = %v", configDir, err)
 	}
-	payload := fmt.Sprintf(`version: v1
+	const payload = `version: v1
 runtime:
   providers:
     openai-fast:
@@ -921,12 +916,10 @@ diffpal:
   gate:
     block_on: high
   platforms:
-    github:
-      summary_comment:
-        enabled: %t
+    github: {}
     gitlab: {}
     azure: {}
-`, enabled)
+`
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("WriteFile(config.yaml) error = %v", err)
 	}
