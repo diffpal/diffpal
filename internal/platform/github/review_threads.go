@@ -9,8 +9,24 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/platformapi"
 )
+
+func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, items []findings.Finding, client *http.Client) map[string]string {
+	ids := activeReviewThreadFindingIDs(ctx, token, reviewCtx, identity, client)
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(ids))
+	for _, item := range items {
+		if _, ok := ids[item.ID]; !ok {
+			continue
+		}
+		out[commentKey(item.Path, item.StartLine, item.Category, item.ID)] = item.ID
+	}
+	return out
+}
 
 func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, plan CommentPlan, client *http.Client) {
 	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
@@ -44,6 +60,35 @@ func resolveSupersededFindingThreads(ctx context.Context, token string, reviewCt
 	}
 }
 
+func activeReviewThreadFindingIDs(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, client *http.Client) map[string]struct{} {
+	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
+	if !ok || strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" || reviewCtx.PRNumber <= 0 {
+		return nil
+	}
+	out := map[string]struct{}{}
+	cursor := ""
+	for {
+		page, err := queryReviewThreads(ctx, token, owner, repo, reviewCtx.PRNumber, cursor, client)
+		if err != nil {
+			return out
+		}
+		for _, thread := range page.Threads {
+			if thread.ID == "" || thread.IsResolved {
+				continue
+			}
+			findingID := threadFindingID(thread, identity)
+			if findingID == "" {
+				continue
+			}
+			out[findingID] = struct{}{}
+		}
+		if !page.HasNextPage || page.EndCursor == "" {
+			return out
+		}
+		cursor = page.EndCursor
+	}
+}
+
 func currentFindingMarkers(plan CommentPlan, identity ReviewIdentity) map[string]struct{} {
 	out := map[string]struct{}{}
 	for _, state := range plan.State {
@@ -60,6 +105,16 @@ func currentFindingMarkers(plan CommentPlan, identity ReviewIdentity) map[string
 }
 
 func threadFindingMarker(thread reviewThread, identity ReviewIdentity) string {
+	marker, _ := threadFindingMarkerParts(thread, identity)
+	return marker
+}
+
+func threadFindingID(thread reviewThread, identity ReviewIdentity) string {
+	_, findingID := threadFindingMarkerParts(thread, identity)
+	return findingID
+}
+
+func threadFindingMarkerParts(thread reviewThread, identity ReviewIdentity) (string, string) {
 	prefix := "<!-- diffpal:finding:" + identity.channel() + " "
 	for _, comment := range thread.Comments {
 		body := strings.TrimSpace(comment.Body)
@@ -71,7 +126,19 @@ func threadFindingMarker(thread reviewThread, identity ReviewIdentity) string {
 		if end < 0 {
 			continue
 		}
-		return body[idx : idx+end+3]
+		marker := body[idx : idx+end+3]
+		return marker, findingIDFromMarker(marker)
+	}
+	return "", ""
+}
+
+func findingIDFromMarker(marker string) string {
+	inner := strings.TrimSuffix(strings.TrimPrefix(marker, "<!--"), "-->")
+	for _, part := range strings.Fields(inner) {
+		key, value, ok := strings.Cut(part, ":")
+		if ok && key == "id" {
+			return value
+		}
 	}
 	return ""
 }

@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/diffpal/diffpal/internal/findings"
 )
 
 func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
@@ -324,6 +326,54 @@ func TestPublishPullRequestReviewResolvesSupersededFindingThreads(t *testing.T) 
 	}
 	if len(resolved) != 1 || resolved[0] != "old-thread" {
 		t.Fatalf("resolved threads = %#v, want [old-thread]", resolved)
+	}
+}
+
+func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	handlerErrs := make(chan error, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/graphql" {
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`{
+			"data": {"repository": {"pullRequest": {"reviewThreads": {
+				"nodes": [
+					{"id":"active-thread","isResolved":false,"comments":{"nodes":[{"body":"active\n<!-- diffpal:finding:diffpal-dev id:current-finding -->"}]}},
+					{"id":"resolved-thread","isResolved":true,"comments":{"nodes":[{"body":"resolved\n<!-- diffpal:finding:diffpal-dev id:resolved-finding -->"}]}},
+					{"id":"other-channel","isResolved":false,"comments":{"nodes":[{"body":"other\n<!-- diffpal:finding:diffpal id:other-finding -->"}]}}
+				],
+				"pageInfo": {"hasNextPage":false,"endCursor":""}
+			}}}}
+		}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	state := ActiveReviewThreadState(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+	}, ReviewIdentity{Channel: "diffpal-dev"}, []findings.Finding{{
+		ID:        "current-finding",
+		Path:      "internal/app.go",
+		StartLine: 12,
+		Category:  "security",
+	}, {
+		ID:        "resolved-finding",
+		Path:      "internal/app.go",
+		StartLine: 24,
+		Category:  "security",
+	}}, server.Client())
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	wantKey := commentKey("internal/app.go", 12, "security", "current-finding")
+	if len(state) != 1 || state[wantKey] != "current-finding" {
+		t.Fatalf("state = %#v, want only active current finding", state)
 	}
 }
 

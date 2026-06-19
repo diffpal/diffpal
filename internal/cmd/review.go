@@ -449,10 +449,6 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		commentPlan := github.PlanInlineCommentsWithOptions(nil, bundle.Findings, github.CommentOptions{
-			Profile:     string(profile),
-			AllFindings: true,
-		})
 		if err := github.ValidateInlineFindings(bundle.Findings); err != nil {
 			return err
 		}
@@ -471,7 +467,11 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			if publishReview {
 				plan := github.CommentPlan{}
 				if includeInline {
-					plan = commentPlan
+					existing := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, bundle.Findings, nil)
+					plan = github.PlanInlineCommentsWithOptions(existing, bundle.Findings, github.CommentOptions{
+						Profile:     string(profile),
+						AllFindings: true,
+					})
 				}
 				// GitHub Actions cannot approve pull requests with GITHUB_TOKEN.
 				// DiffPal publishes comment reviews; --gate is enforced by the

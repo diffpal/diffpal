@@ -196,8 +196,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 3 {
-		t.Fatalf("requests = %d, want 3", got)
+	if got := requests.Load(); got != 4 {
+		t.Fatalf("requests = %d, want 4", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -675,8 +675,8 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 3 {
-		t.Fatalf("requests = %d, want 3", got)
+	if got := requests.Load(); got != 4 {
+		t.Fatalf("requests = %d, want 4", got)
 	}
 	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())
