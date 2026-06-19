@@ -129,12 +129,164 @@ func nonEmptyChangeSummary(items []string) []string {
 }
 
 func reviewPermissionHandler(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	for _, option := range req.Options {
-		if option.Kind == acp.PermissionOptionKindRejectOnce || option.Kind == acp.PermissionOptionKindRejectAlways {
+	if reviewToolCallIsReadOnly(req.ToolCall) {
+		if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
 			return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
 		}
 	}
+	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways); ok {
+		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
+	}
 	return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeCancelled()}, nil
+}
+
+func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOption, bool) {
+	for _, kind := range kinds {
+		for _, option := range options {
+			if option.Kind == kind {
+				return option, true
+			}
+		}
+	}
+	return acp.PermissionOption{}, false
+}
+
+func reviewToolCallIsReadOnly(tool acp.ToolCallUpdate) bool {
+	if tool.Kind != nil {
+		switch *tool.Kind {
+		case acp.ToolKindRead, acp.ToolKindSearch:
+			return true
+		case acp.ToolKindEdit, acp.ToolKindDelete, acp.ToolKindMove, acp.ToolKindFetch:
+			return false
+		}
+	}
+	for _, argv := range reviewToolCommandArgs(tool.RawInput) {
+		if reviewCommandIsReadOnly(argv) {
+			return true
+		}
+	}
+	return false
+}
+
+func reviewToolCommandArgs(raw any) [][]string {
+	switch v := raw.(type) {
+	case map[string]any:
+		var out [][]string
+		for _, key := range []string{"cmd", "command"} {
+			if command, ok := v[key].(string); ok {
+				if argv := simpleShellFields(command); len(argv) > 0 {
+					out = append(out, argv)
+				}
+			}
+		}
+		for _, key := range []string{"args", "argv"} {
+			if argv := stringSlice(v[key]); len(argv) > 0 {
+				out = append(out, argv)
+			}
+		}
+		return out
+	case []any:
+		if argv := stringSlice(v); len(argv) > 0 {
+			return [][]string{argv}
+		}
+	case []string:
+		if len(v) > 0 {
+			return [][]string{v}
+		}
+	case string:
+		if argv := simpleShellFields(v); len(argv) > 0 {
+			return [][]string{argv}
+		}
+	}
+	return nil
+}
+
+func stringSlice(raw any) []string {
+	switch v := raw.(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			text, ok := item.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil
+			}
+			out = append(out, text)
+		}
+		return out
+	}
+	return nil
+}
+
+func simpleShellFields(command string) []string {
+	command = strings.TrimSpace(command)
+	if command == "" || strings.ContainsAny(command, "\n\r;&|<>`$\\") {
+		return nil
+	}
+	fields := strings.Fields(command)
+	for _, field := range fields {
+		if strings.ContainsAny(field, "*?[]{}()") {
+			return nil
+		}
+	}
+	return fields
+}
+
+func reviewCommandIsReadOnly(argv []string) bool {
+	if len(argv) == 0 {
+		return false
+	}
+	switch argv[0] {
+	case "pwd", "cat", "ls", "head", "tail", "wc", "rg":
+		return true
+	case "sed":
+		return !hasArg(argv[1:], "-i") && !hasArgPrefix(argv[1:], "-i")
+	case "find":
+		return !hasArg(argv[1:], "-delete") && !hasArg(argv[1:], "-exec") && !hasArg(argv[1:], "-execdir")
+	case "git":
+		return gitCommandIsReadOnly(argv[1:])
+	default:
+		return false
+	}
+}
+
+func gitCommandIsReadOnly(argv []string) bool {
+	if len(argv) == 0 {
+		return false
+	}
+	subcommand := ""
+	for _, arg := range argv {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		subcommand = arg
+		break
+	}
+	switch subcommand {
+	case "branch", "diff", "grep", "log", "ls-files", "merge-base", "rev-parse", "show", "status":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasArg(args []string, needle string) bool {
+	for _, arg := range args {
+		if arg == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func hasArgPrefix(args []string, prefix string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func reviewSystemInstruction(instructions string) string {

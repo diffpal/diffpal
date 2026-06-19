@@ -29,13 +29,59 @@ func TestReviewSystemInstructionIsAppliedByStructuredWrapperOnly(t *testing.T) {
 	}
 }
 
-func TestReviewPermissionHandlerSelectsRejectOption(t *testing.T) {
+func TestReviewPermissionHandlerAllowsReadTool(t *testing.T) {
 	t.Parallel()
 
+	kind := acp.ToolKindRead
 	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		ToolCall: acp.ToolCallUpdate{Kind: &kind},
 		Options: []acp.PermissionOption{
 			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
 			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewPermissionHandler() error = %v", err)
+	}
+	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow" {
+		t.Fatalf("selected option = %+v, want allow", got)
+	}
+}
+
+func TestReviewPermissionHandlerAllowsReadOnlyGitInspection(t *testing.T) {
+	t.Parallel()
+
+	kind := acp.ToolKindExecute
+	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		ToolCall: acp.ToolCallUpdate{
+			Kind:     &kind,
+			RawInput: map[string]any{"cmd": "git diff --name-only HEAD~1 HEAD"},
+		},
+		Options: []acp.PermissionOption{
+			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewPermissionHandler() error = %v", err)
+	}
+	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow" {
+		t.Fatalf("selected option = %+v, want allow", got)
+	}
+}
+
+func TestReviewPermissionHandlerRejectsWriteCommand(t *testing.T) {
+	t.Parallel()
+
+	kind := acp.ToolKindExecute
+	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
+		ToolCall: acp.ToolCallUpdate{
+			Kind:     &kind,
+			RawInput: map[string]any{"command": "git checkout main"},
+		},
+		Options: []acp.PermissionOption{
+			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
 		},
 	})
 	if err != nil {
@@ -46,7 +92,7 @@ func TestReviewPermissionHandlerSelectsRejectOption(t *testing.T) {
 	}
 }
 
-func TestReviewPermissionHandlerCancelsWithoutRejectOption(t *testing.T) {
+func TestReviewPermissionHandlerCancelsUnknownRequestWithoutRejectOption(t *testing.T) {
 	t.Parallel()
 
 	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
