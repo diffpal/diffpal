@@ -306,7 +306,7 @@ func TestReviewGitHubGateRequestsChanges(t *testing.T) {
 	}
 }
 
-func TestReviewGitHubGateApprovesPassingReview(t *testing.T) {
+func TestReviewGitHubGateCommentsOnPassingReview(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("GITHUB_TOKEN", "token")
@@ -372,8 +372,8 @@ func TestReviewGitHubGateApprovesPassingReview(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
-	if reviewEvent != "APPROVE" {
-		t.Fatalf("review event = %q, want APPROVE", reviewEvent)
+	if reviewEvent != "COMMENT" {
+		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
 	}
 }
 
