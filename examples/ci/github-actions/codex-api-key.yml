@@ -34,7 +34,7 @@ jobs:
         run: |
           printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
           {
-            echo 'sandbox = "danger-full-access"'
+            echo 'sandbox_mode = "danger-full-access"'
             echo 'approval_policy = "untrusted"'
           } > "$HOME/.codex/config.toml"
         env:
