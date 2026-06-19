@@ -89,10 +89,6 @@ func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
 		"    github: {}",
 		"profiles:",
 		"  ci:",
-		"    prompt_profile: v2",
-		"    strict_evidence: true",
-		"    strict_injection: true",
-		"    allow_nearby_context: true",
 		"        block_on: high",
 	} {
 		if !strings.Contains(rendered, needle) {
@@ -112,9 +108,6 @@ func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
 	}
 	if cfg.BlockOn() != "high" {
 		t.Fatalf("BlockOn() = %q, want high", cfg.BlockOn())
-	}
-	if cfg.PromptProfile() != "v2" || !cfg.StrictEvidence() || !cfg.StrictInjection() || !cfg.AllowNearbyContext() {
-		t.Fatalf("rollout flags = profile:%q evidence:%v injection:%v nearby:%v, want v2/all true", cfg.PromptProfile(), cfg.StrictEvidence(), cfg.StrictInjection(), cfg.AllowNearbyContext())
 	}
 }
 

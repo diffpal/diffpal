@@ -229,10 +229,6 @@ diffpal:
     block_on: high
   review:
     language: en
-    prompt_profile: v2
-    strict_evidence: true
-    strict_injection: true
-    allow_nearby_context: true
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
     checks:
@@ -250,11 +246,6 @@ profiles:
     diffpal:
       gate:
         block_on: high
-      review:
-        prompt_profile: v2
-        strict_evidence: true
-        strict_injection: true
-        allow_nearby_context: true
 ```
 
 Review checks are intentionally simple. They ask the agent what to focus on;
@@ -272,11 +263,6 @@ matrix is in the [config reference](docs/config-reference.md#severity-matrix).
 
 Use `diffpal.review.instructions`, the `instructions` action input, or
 `--instructions-file` for repository-specific review guidance.
-
-The review rollout fields are safe to canary per profile. Keep the repository
-default conservative if needed, then set `profiles.ci.diffpal.review` to
-`prompt_profile: v2`, `strict_evidence: true`, `strict_injection: true`, and
-`allow_nearby_context: true` before making the gate blocking.
 
 ## Provider Recipes and Runtime Types
 
