@@ -130,6 +130,60 @@ func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 	}
 }
 
+func TestPublishPullRequestReviewCreatesNewReviewWithCommentsWhenExistingHeadReviewExists(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var posted struct {
+		Body     string           `json:"body"`
+		Comments []map[string]any `json:"comments"`
+	}
+	handlerErrs := make(chan error, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			_, _ = w.Write([]byte(`[
+				{"id":42,"state":"COMMENTED","body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
+			]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			if err := json.NewDecoder(r.Body).Decode(&posted); err != nil {
+				handlerErrs <- fmt.Errorf("decode review create: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err := PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nUpdated.", ReviewIdentity{}, CommentPlan{Actions: []CommentAction{{
+		Type: ActionCreate,
+		Body: "new finding",
+		Path: "internal/app.go",
+		Line: 12,
+	}}}, ReviewEventComment, server.Client())
+	if err != nil {
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if !strings.Contains(posted.Body, "Updated.") {
+		t.Fatalf("posted body missing summary:\n%s", posted.Body)
+	}
+	if len(posted.Comments) != 1 {
+		t.Fatalf("comments = %d, want 1", len(posted.Comments))
+	}
+}
+
 func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var postedEvent string

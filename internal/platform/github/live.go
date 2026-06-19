@@ -52,7 +52,8 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 	if err != nil {
 		return err
 	}
-	if existingID > 0 {
+	comments := pullRequestReviewComments(plan)
+	if existingID > 0 && len(comments) == 0 {
 		updateURL := baseURL + "/" + fmt.Sprint(existingID)
 		return platformapi.DoJSON(ctx, client, http.MethodPatch, updateURL, headers, map[string]any{"body": body})
 	}
@@ -61,7 +62,6 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 		"event":     string(event),
 		"body":      body,
 	}
-	comments := pullRequestReviewComments(plan)
 	if len(comments) > 0 {
 		req["comments"] = comments
 	}
