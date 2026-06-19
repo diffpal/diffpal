@@ -287,6 +287,9 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	if strings.Contains(body, "`L12-L17`") {
 		t.Fatalf("comment body repeats linked line range in header:\n%s", body)
 	}
+	if strings.Contains(body, "**Confidence**") {
+		t.Fatalf("comment body contains confidence:\n%s", body)
+	}
 }
 
 func TestPlanInlineCommentsKeepsFindingLineRange(t *testing.T) {

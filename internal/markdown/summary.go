@@ -271,7 +271,6 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	if finding.Suggestion != "" {
 		fmt.Fprintf(&out, "%s**Suggestion**: %s\n", detailPrefix, finding.Suggestion)
 	}
-	fmt.Fprintf(&out, "%s**Confidence**: %.2f\n", detailPrefix, finding.Confidence)
 	return out.String()
 }
 

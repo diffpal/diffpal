@@ -233,7 +233,7 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	}
 }
 
-func TestReviewGitHubGateRequestsChanges(t *testing.T) {
+func TestReviewGitHubGateFailsWithCommentReview(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("GITHUB_TOKEN", "token")
@@ -298,8 +298,8 @@ func TestReviewGitHubGateRequestsChanges(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
-	if reviewEvent != "REQUEST_CHANGES" {
-		t.Fatalf("review event = %q, want REQUEST_CHANGES", reviewEvent)
+	if reviewEvent != "COMMENT" {
+		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
 	}
 	if !strings.Contains(err.Error(), "review blocked: blocking findings detected: 1") {
 		t.Fatalf("error = %v, want blocking gate", err)

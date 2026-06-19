@@ -470,9 +470,6 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			}
 			if publishReview {
 				event := github.ReviewEventComment
-				if gate && countBlockingFindings(bundle) > 0 {
-					event = github.ReviewEventRequestChanges
-				}
 				plan := github.CommentPlan{}
 				if includeInline {
 					plan = commentPlan
