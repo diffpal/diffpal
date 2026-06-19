@@ -90,8 +90,8 @@ func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
 			_, _ = w.Write([]byte(`[
-				{"id":41,"body":"<!-- diffpal:review:diffpal head_sha:old-head -->\nold"},
-				{"id":42,"body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
+				{"id":41,"state":"COMMENTED","body":"<!-- diffpal:review:diffpal head_sha:old-head -->\nold"},
+				{"id":42,"state":"COMMENTED","body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
 			]`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews/42":
 			var payload struct {
@@ -127,6 +127,53 @@ func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 	}
 	if !strings.Contains(patchedBody, "Updated.") {
 		t.Fatalf("patched body missing summary:\n%s", patchedBody)
+	}
+}
+
+func TestPublishPullRequestReviewCreatesWhenExistingStateDoesNotMatchEvent(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var postedEvent string
+	handlerErrs := make(chan error, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			_, _ = w.Write([]byte(`[
+				{"id":42,"state":"COMMENTED","body":"<!-- diffpal:review:diffpal head_sha:head-a -->\ncurrent"}
+			]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/acme/diffpal/pulls/7/reviews":
+			var payload struct {
+				Event string `json:"event"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode review create: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			postedEvent = payload.Event
+			w.WriteHeader(http.StatusCreated)
+		default:
+			handlerErrs <- fmt.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	err := PublishPullRequestReviewWithIdentity(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+		HeadSHA:  "head-a",
+	}, "# Summary\n\nBlocking.", ReviewIdentity{}, CommentPlan{}, ReviewEventRequestChanges, server.Client())
+	if err != nil {
+		t.Fatalf("PublishPullRequestReviewWithIdentity() error = %v", err)
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+	if postedEvent != "REQUEST_CHANGES" {
+		t.Fatalf("posted event = %q, want REQUEST_CHANGES", postedEvent)
 	}
 }
 

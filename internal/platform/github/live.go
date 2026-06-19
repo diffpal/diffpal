@@ -46,6 +46,7 @@ type pullReview struct {
 	ID       int64  `json:"id"`
 	Body     string `json:"body"`
 	CommitID string `json:"commit_id"`
+	State    string `json:"state"`
 }
 
 func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, reviewCtx Context, summary string, identity ReviewIdentity, plan CommentPlan, event ReviewEvent, client *http.Client) error {
@@ -69,7 +70,7 @@ func PublishPullRequestReviewWithIdentity(ctx context.Context, token string, rev
 		"Accept":        "application/vnd.github+json",
 	}
 	body := pullRequestReviewBody(summary, identity, reviewCtx.HeadSHA)
-	existingID, err := findPullRequestReview(ctx, token, baseURL, identity, reviewCtx.HeadSHA, client)
+	existingID, err := findPullRequestReview(ctx, token, baseURL, identity, reviewCtx.HeadSHA, event, client)
 	if err != nil {
 		return err
 	}
@@ -109,22 +110,23 @@ func pullRequestReviewComments(plan CommentPlan) []map[string]any {
 	return out
 }
 
-func findPullRequestReview(ctx context.Context, token, url string, identity ReviewIdentity, headSHA string, client *http.Client) (int64, error) {
+func findPullRequestReview(ctx context.Context, token, url string, identity ReviewIdentity, headSHA string, event ReviewEvent, client *http.Client) (int64, error) {
 	marker := identity.ReviewMarker(headSHA)
 	nextURL := url + "?per_page=100"
+	var existingID int64
 	for nextURL != "" {
 		resp, err := getGitHubPullReviewsPage(ctx, token, nextURL, client)
 		if err != nil {
 			return 0, err
 		}
 		for _, review := range resp.reviews {
-			if hasReviewMarker(review.Body, marker) {
-				return review.ID, nil
+			if hasReviewMarker(review.Body, marker) && reviewStateMatchesEvent(review.State, event) {
+				existingID = review.ID
 			}
 		}
 		nextURL = resp.nextURL
 	}
-	return 0, nil
+	return existingID, nil
 }
 
 type pullReviewsPage struct {
@@ -169,6 +171,17 @@ func getGitHubPullReviewsPage(ctx context.Context, token, pageURL string, client
 func hasReviewMarker(body, marker string) bool {
 	body = strings.TrimLeft(body, " \t\r\n")
 	return body == marker || strings.HasPrefix(body, marker+"\n")
+}
+
+func reviewStateMatchesEvent(state string, event ReviewEvent) bool {
+	switch strings.ToUpper(strings.TrimSpace(state)) {
+	case "COMMENTED":
+		return event == ReviewEventComment
+	case "CHANGES_REQUESTED":
+		return event == ReviewEventRequestChanges
+	default:
+		return false
+	}
 }
 
 func nextLinkURL(header, currentPageURL string) (string, error) {
