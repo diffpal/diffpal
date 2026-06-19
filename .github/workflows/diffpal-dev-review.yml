@@ -45,6 +45,10 @@ jobs:
           mkdir -p "$HOME/.codex"
           printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
           chmod 600 "$HOME/.codex/auth.json"
+          {
+            echo 'sandbox = "danger-full-access"'
+            echo 'approval_policy = "untrusted"'
+          } > "$HOME/.codex/config.toml"
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 

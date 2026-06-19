@@ -31,7 +31,12 @@ jobs:
         run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
       - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        run: |
+          printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+          {
+            echo 'sandbox = "danger-full-access"'
+            echo 'approval_policy = "untrusted"'
+          } > "$HOME/.codex/config.toml"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
