@@ -11,9 +11,11 @@ var (
 
 func NewRootCommand() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "diffpal",
-		Short: "DiffPal CLI for local and CI code review",
-		Long:  "DiffPal runs provider-backed review locally and emits host-specific artifacts for GitHub, GitLab, and Azure DevOps.",
+		Use:           "diffpal",
+		Short:         "DiffPal CLI for local and CI code review",
+		Long:          "DiffPal runs provider-backed review locally and emits host-specific artifacts for GitHub, GitLab, and Azure DevOps.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 	root.PersistentFlags().StringVar(&rootConfigDir, "config-dir", "", "extra config root directory (highest priority)")
 	root.PersistentFlags().StringVar(&rootProfile, "profile", "", "config profile name")
@@ -27,5 +29,17 @@ func NewRootCommand() *cobra.Command {
 		newVersionCommand(),
 	)
 
+	silenceRuntimeErrorOutput(root)
 	return root
+}
+
+func silenceRuntimeErrorOutput(cmd *cobra.Command) {
+	if cmd == nil {
+		return
+	}
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	for _, child := range cmd.Commands() {
+		silenceRuntimeErrorOutput(child)
+	}
 }
