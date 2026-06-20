@@ -1161,6 +1161,269 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 	}
 }
 
+func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("AZURE_DEVOPS_EXT_PAT", "ado-token")
+	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("SYSTEM_TEAMPROJECT", "proj")
+	t.Setenv("BUILD_REPOSITORY_ID", "repo-1")
+	t.Setenv("SYSTEM_PULLREQUEST_PULLREQUESTID", "55")
+	t.Setenv("SYSTEM_PULLREQUEST_TARGETCOMMITID", "base-a")
+	t.Setenv("BUILD_SOURCEVERSION", "head-a")
+
+	reviewerID := "11111111-1111-1111-1111-111111111111"
+	var sawAdvisoryThread atomic.Bool
+	var sawSummaryThread atomic.Bool
+	var sawSucceededStatus atomic.Bool
+	var sawApproveVote atomic.Bool
+	handlerErrs := make(chan error, 8)
+	serverURL := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Basic auth", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodOptions && r.URL.Path == "/_apis":
+			_, _ = w.Write([]byte(`{
+  "count": 5,
+  "value": [
+    {
+      "id": "e81700f7-3be2-46de-8624-2eb35882fcaa",
+      "area": "Location",
+      "resourceName": "ResourceAreas",
+      "routeTemplate": "_apis/resourceAreas",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "00d9565f-ed9c-4a06-9a50-00e7896ccab4",
+      "area": "Location",
+      "resourceName": "ConnectionData",
+      "routeTemplate": "_apis/connectionData",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "ab6e2e5d-a0b7-4153-b64a-a4efe0d49449",
+      "area": "git",
+      "resourceName": "pullRequestThreads",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "b5f6bb4f-8d1e-4d79-8d11-4c9172c99c35",
+      "area": "git",
+      "resourceName": "pullRequestStatuses",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "4b6702c7-aa35-4b89-9c96-b9abf6d3e540",
+      "area": "git",
+      "resourceName": "pullRequestReviewers",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    }
+  ]
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/_apis/resourceAreas":
+			_, _ = w.Write([]byte(`{
+  "count": 1,
+  "value": [
+    {
+      "id": "4e080c62-fa21-4fbc-8fef-2a10a2b38049",
+      "locationUrl": "` + serverURL + `",
+      "name": "git"
+    }
+  ]
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/_apis/connectionData":
+			_, _ = w.Write([]byte(`{
+  "authorizedUser": {"id": "` + reviewerID + `"},
+  "authenticatedUser": {"id": "` + reviewerID + `"}
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			_, _ = w.Write([]byte(`{"count":0,"value":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			var payload struct {
+				Status        string `json:"status"`
+				ThreadContext *struct {
+					FilePath       string `json:"filePath"`
+					RightFileStart *struct {
+						Line int `json:"line"`
+					} `json:"rightFileStart"`
+				} `json:"threadContext"`
+				Comments []struct {
+					Content string `json:"content"`
+				} `json:"comments"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode thread payload: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			if len(payload.Comments) == 0 {
+				handlerErrs <- fmt.Errorf("thread payload has no comments")
+				http.Error(w, "missing comments", http.StatusBadRequest)
+				return
+			}
+			switch {
+			case payload.ThreadContext != nil:
+				if payload.ThreadContext.FilePath != "main.go" {
+					handlerErrs <- fmt.Errorf("thread file path = %q, want main.go", payload.ThreadContext.FilePath)
+					http.Error(w, "unexpected file path", http.StatusBadRequest)
+					return
+				}
+				if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line != 8 {
+					handlerErrs <- fmt.Errorf("thread start line = %#v, want 8", payload.ThreadContext.RightFileStart)
+					http.Error(w, "unexpected thread line", http.StatusBadRequest)
+					return
+				}
+				if !strings.Contains(payload.Comments[0].Content, "medium advisory") {
+					handlerErrs <- fmt.Errorf("advisory thread body = %q, want advisory message", payload.Comments[0].Content)
+					http.Error(w, "unexpected advisory body", http.StatusBadRequest)
+					return
+				}
+				if payload.Status != "closed" {
+					handlerErrs <- fmt.Errorf("advisory thread status = %q, want closed", payload.Status)
+					http.Error(w, "unexpected advisory status", http.StatusBadRequest)
+					return
+				}
+				sawAdvisoryThread.Store(true)
+			default:
+				if !strings.Contains(payload.Comments[0].Content, "<!-- diffpal:summary -->") {
+					handlerErrs <- fmt.Errorf("summary thread body = %q, want summary marker", payload.Comments[0].Content)
+					http.Error(w, "unexpected summary body", http.StatusBadRequest)
+					return
+				}
+				if payload.Status != "closed" {
+					handlerErrs <- fmt.Errorf("summary thread status = %q, want closed", payload.Status)
+					http.Error(w, "unexpected summary status", http.StatusBadRequest)
+					return
+				}
+				sawSummaryThread.Store(true)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/statuses":
+			var payload struct {
+				State       string `json:"state"`
+				Description string `json:"description"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode status payload: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			if payload.State != "succeeded" {
+				handlerErrs <- fmt.Errorf("status state = %q, want succeeded", payload.State)
+				http.Error(w, "unexpected status", http.StatusBadRequest)
+				return
+			}
+			if !strings.Contains(payload.Description, "Advisory findings") {
+				handlerErrs <- fmt.Errorf("status description = %q, want advisory description", payload.Description)
+				http.Error(w, "unexpected status description", http.StatusBadRequest)
+				return
+			}
+			sawSucceededStatus.Store(true)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/reviewers/"+reviewerID:
+			var payload struct {
+				Id   string `json:"id"`
+				Vote int    `json:"vote"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode reviewer vote payload: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			if payload.Id != reviewerID {
+				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.Id, reviewerID)
+				http.Error(w, "unexpected reviewer id", http.StatusBadRequest)
+				return
+			}
+			if payload.Vote != 10 {
+				handlerErrs <- fmt.Errorf("reviewer payload vote = %d, want 10", payload.Vote)
+				http.Error(w, "unexpected reviewer vote", http.StatusBadRequest)
+				return
+			}
+			sawApproveVote.Store(true)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"` + reviewerID + `","vote":10}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	serverURL = server.URL
+	t.Setenv("SYSTEM_COLLECTIONURI", server.URL+"/")
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewAdvisoryResult("ado"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"ado",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--feedback", "balanced",
+		"--gate",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !sawAdvisoryThread.Load() {
+		t.Fatal("advisory thread publish was not called")
+	}
+	if !sawSummaryThread.Load() {
+		t.Fatal("summary thread publish was not called")
+	}
+	if !sawSucceededStatus.Load() {
+		t.Fatal("succeeded status publish was not called")
+	}
+	if !sawApproveVote.Load() {
+		t.Fatal("approve vote publish was not called")
+	}
+	for _, needle := range []string{
+		"findings=1",
+		"mode=threads path=.artifacts/diffpal/azure-threads.json",
+		"mode=status path=.artifacts/diffpal/azure-status.json",
+		"mode=summary path=.artifacts/diffpal/summary.md",
+	} {
+		if !strings.Contains(out.String(), needle) {
+			t.Fatalf("output missing %q:\n%s", needle, out.String())
+		}
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+}
+
 func TestReviewRequiresConfigWithExitCode2(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -1201,6 +1464,35 @@ func testReviewResult(reviewID string) reviewer.Result {
 				Evidence:   findings.NewEvidence("example evidence"),
 				Provider:   "openai-fast",
 				Blocking:   true,
+			}},
+		},
+		Files: []diff.FileChange{{
+			FromPath: "main.go",
+			ToPath:   "main.go",
+		}},
+		ChangedFiles: 1,
+	}
+}
+
+func testReviewAdvisoryResult(reviewID string) reviewer.Result {
+	return reviewer.Result{
+		Bundle: findings.FindingsBundle{
+			Version:  findings.VersionV1,
+			ReviewID: reviewID,
+			BaseSHA:  "base-a",
+			HeadSHA:  "head-a",
+			Findings: []findings.Finding{{
+				ReviewID:   reviewID,
+				Category:   "security",
+				Severity:   "medium",
+				Confidence: 0.91,
+				Path:       "main.go",
+				StartLine:  8,
+				EndLine:    8,
+				Title:      "advisory finding",
+				Message:    "medium advisory",
+				Evidence:   findings.NewEvidence("evidence"),
+				Provider:   "openai-fast",
 			}},
 		},
 		Files: []diff.FileChange{{
