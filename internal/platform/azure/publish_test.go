@@ -57,20 +57,29 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		HeadSHA:       "head-a",
 	})
 
-	if len(plan.Actions) != 1 {
-		t.Fatalf("len(Actions) = %d, want 1 blocking thread", len(plan.Actions))
+	if len(plan.Actions) != 3 {
+		t.Fatalf("len(Actions) = %d, want 3 thread actions", len(plan.Actions))
 	}
 	if plan.Actions[0].Type != ActionCreate {
 		t.Fatalf("first action = %q, want create", plan.Actions[0].Type)
 	}
+	if plan.Actions[1].Type != ActionUpdate {
+		t.Fatalf("second action = %q, want update", plan.Actions[1].Type)
+	}
+	if plan.Actions[1].Status != ThreadStatusClosed {
+		t.Fatalf("second status = %q, want closed", plan.Actions[1].Status)
+	}
 	if plan.Actions[0].Status != ThreadStatusActive {
 		t.Fatalf("first status = %q, want active", plan.Actions[0].Status)
+	}
+	if plan.Actions[2].Status != ThreadStatusClosed {
+		t.Fatalf("third status = %q, want closed", plan.Actions[2].Status)
 	}
 	if plan.Comparison.PullRequestID != "42" || plan.Comparison.BaseSHA != "base-a" || plan.Comparison.HeadSHA != "head-a" {
 		t.Fatalf("unexpected comparison: %+v", plan.Comparison)
 	}
-	if len(plan.State) != 1 {
-		t.Fatalf("len(State) = %d, want 1 blocking state", len(plan.State))
+	if len(plan.State) != 3 {
+		t.Fatalf("len(State) = %d, want 3 thread states", len(plan.State))
 	}
 }
 
@@ -177,7 +186,7 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 		Blocking:   true,
 	}}
 	existing := map[string]string{
-		threadKey("main.go", 12, "security", "fp-old"): "fp-old",
+		threadKey("main.go", 12, "security", "fp-old"): threadStateSignature([]string{"fp-old"}, ThreadStatusActive),
 	}
 
 	plan := PlanThreads(existing, items, Context{})
@@ -192,6 +201,35 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 	}
 	if plan.State[0].ThreadID != plan.Actions[0].ThreadID {
 		t.Fatalf("state ThreadID = %q, want action ThreadID %q", plan.State[0].ThreadID, plan.Actions[0].ThreadID)
+	}
+}
+
+func TestPlanThreadsUpdatesWhenBlockingStatusChanges(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-same",
+		Category:   "security",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		Message:    "escalated issue",
+		Blocking:   true,
+	}}
+	existing := map[string]string{
+		threadKey("main.go", 12, "security", "fp-same"): threadStateSignature([]string{"fp-same"}, ThreadStatusClosed),
+	}
+
+	plan := PlanThreads(existing, items, Context{})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionUpdate {
+		t.Fatalf("action = %q, want update", plan.Actions[0].Type)
+	}
+	if plan.Actions[0].Status != ThreadStatusActive {
+		t.Fatalf("status = %q, want active", plan.Actions[0].Status)
 	}
 }
 
@@ -226,7 +264,7 @@ func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	raw := []byte(`{
   "actions": [],
   "state": [
-    {"thread_id":"a.go:10:rule-a","finding_id":"fp-a"}
+    {"thread_id":"a.go:10:rule-a","finding_id":"fp-a","finding_ids":["fp-a"],"status":"active"}
   ],
   "comparison": {"pull_request_id":"11","base_sha":"b","head_sha":"h"}
 }`)
@@ -238,29 +276,108 @@ func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadExistingState() error = %v", err)
 	}
-	if state["a.go:10:rule-a"] != "fp-a" {
+	if state["a.go:10:rule-a"] != "fp-a|active" {
 		t.Fatalf("unexpected state map: %#v", state)
 	}
 }
 
-func TestPlanThreadsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
+func TestPlanThreadsWithProfilePublishesAllFindingsInBothProfiles(t *testing.T) {
 	t.Parallel()
 
 	items := []findings.Finding{{
 		ID:         "fp-inline",
 		Category:   "correctness",
 		Severity:   "medium",
-		Confidence: 0.7,
+		Confidence: 0.1,
 		Path:       "main.go",
 		StartLine:  12,
 		Message:    "edge case",
-		Blocking:   true,
 	}}
-	if got := PlanThreadsWithProfile(nil, items, Context{}, "balanced"); len(got.Actions) != 0 {
-		t.Fatalf("balanced actions = %d, want 0", len(got.Actions))
+	if got := PlanThreadsWithProfile(nil, items, Context{}, "balanced"); len(got.Actions) != 1 {
+		t.Fatalf("balanced actions = %d, want 1", len(got.Actions))
 	}
 	if got := PlanThreadsWithProfile(nil, items, Context{}, "inline"); len(got.Actions) != 1 {
 		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	}
+}
+
+func TestPlanThreadsClosesAdvisoryFinding(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-advisory",
+		Category:   "security",
+		Severity:   "medium",
+		Confidence: 0.01,
+		Path:       "main.go",
+		StartLine:  18,
+		Message:    "advisory issue",
+	}}
+
+	plan := PlanThreadsWithProfile(nil, items, Context{}, "balanced")
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Type != ActionCreate {
+		t.Fatalf("action = %q, want create", plan.Actions[0].Type)
+	}
+	if plan.Actions[0].Status != ThreadStatusClosed {
+		t.Fatalf("status = %q, want closed", plan.Actions[0].Status)
+	}
+}
+
+func TestPlanThreadsGroupsFallbackThreadsByBlockingStatus(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{
+			ID:         "fp-blocking-no-path",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.0,
+			StartLine:  12,
+			Message:    "missing path",
+			Blocking:   true,
+		},
+		{
+			ID:         "fp-advisory-no-line",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.0,
+			Path:       "main.go",
+			Message:    "missing line",
+		},
+		{
+			ID:         "fp-advisory-no-category",
+			Severity:   "high",
+			Confidence: 0.0,
+			Path:       "main.go",
+			StartLine:  14,
+			Message:    "missing category",
+		},
+	}
+
+	plan := PlanThreads(nil, items, Context{})
+	if len(plan.Actions) != 2 {
+		t.Fatalf("actions = %d, want 2", len(plan.Actions))
+	}
+	if plan.Actions[0].ThreadID != fallbackBlockingThreadID || plan.Actions[0].Status != ThreadStatusActive {
+		t.Fatalf("first fallback action = %#v, want blocking active fallback", plan.Actions[0])
+	}
+	if plan.Actions[1].ThreadID != fallbackAdvisoryThreadID || plan.Actions[1].Status != ThreadStatusClosed {
+		t.Fatalf("second fallback action = %#v, want advisory closed fallback", plan.Actions[1])
+	}
+	if len(plan.Actions[0].FindingIDs) != 1 || plan.Actions[0].FindingIDs[0] != "fp-blocking-no-path" {
+		t.Fatalf("blocking fallback finding ids = %#v, want blocking finding", plan.Actions[0].FindingIDs)
+	}
+	if len(plan.Actions[1].FindingIDs) != 2 {
+		t.Fatalf("advisory fallback finding ids = %#v, want 2 advisory findings", plan.Actions[1].FindingIDs)
+	}
+	if plan.Actions[1].Path != "" || plan.Actions[1].Line != 0 || plan.Actions[1].EndLine != 0 {
+		t.Fatalf("advisory fallback location = %q:%d-%d, want no file context", plan.Actions[1].Path, plan.Actions[1].Line, plan.Actions[1].EndLine)
+	}
+	if !strings.Contains(plan.Actions[1].Body, "Non-blocking findings without canonical file/line mapping") {
+		t.Fatalf("advisory fallback body = %q, want fallback heading", plan.Actions[1].Body)
 	}
 }
 

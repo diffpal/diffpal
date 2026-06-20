@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
 )
-
-const MinThreadConfidence = 0.8
-const MinExpandedThreadConfidence = 0.65
 
 type ThreadActionType string
 type ThreadStatus string
@@ -24,20 +22,28 @@ const (
 	ThreadStatusClosed ThreadStatus = "closed"
 )
 
+const (
+	fallbackBlockingThreadID = "fallback:blocking"
+	fallbackAdvisoryThreadID = "fallback:advisory"
+)
+
 type ThreadAction struct {
-	Type      ThreadActionType `json:"type"`
-	Status    ThreadStatus     `json:"status"`
-	FindingID string           `json:"finding_id"`
-	Path      string           `json:"path"`
-	Line      int              `json:"line"`
-	EndLine   int              `json:"end_line"`
-	Body      string           `json:"body"`
-	ThreadID  string           `json:"thread_id"`
+	Type       ThreadActionType `json:"type"`
+	Status     ThreadStatus     `json:"status"`
+	FindingID  string           `json:"finding_id"`
+	FindingIDs []string         `json:"finding_ids,omitempty"`
+	Path       string           `json:"path"`
+	Line       int              `json:"line"`
+	EndLine    int              `json:"end_line"`
+	Body       string           `json:"body"`
+	ThreadID   string           `json:"thread_id"`
 }
 
 type ThreadState struct {
-	ThreadID  string `json:"thread_id"`
-	FindingID string `json:"finding_id"`
+	ThreadID   string       `json:"thread_id"`
+	FindingID  string       `json:"finding_id,omitempty"`
+	FindingIDs []string     `json:"finding_ids,omitempty"`
+	Status     ThreadStatus `json:"status,omitempty"`
 }
 
 type Comparison struct {
@@ -56,51 +62,28 @@ func PlanThreads(existing map[string]string, findingsList []findings.Finding, ct
 	return PlanThreadsWithProfile(existing, findingsList, ctx, "")
 }
 
-func PlanThreadsWithProfile(existing map[string]string, findingsList []findings.Finding, ctx Context, profile string) ThreadPlan {
-	return planThreads(existing, findingsList, ctx, threadConfidenceThreshold(profile))
+func PlanThreadsWithProfile(existing map[string]string, findingsList []findings.Finding, ctx Context, _ string) ThreadPlan {
+	return planThreads(existing, findingsList, ctx)
 }
 
-func planThreads(existing map[string]string, findingsList []findings.Finding, ctx Context, minConfidence float64) ThreadPlan {
+func planThreads(existing map[string]string, findingsList []findings.Finding, ctx Context) ThreadPlan {
 	out := make([]ThreadAction, 0, len(findingsList))
 	state := make([]ThreadState, 0, len(findingsList))
+	blockingFallback := make([]findings.Finding, 0, len(findingsList))
+	advisoryFallback := make([]findings.Finding, 0, len(findingsList))
 	for _, f := range findingsList {
-		if !f.Blocking || f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
+		if !hasCanonicalThreadLocation(f) {
+			if f.Blocking {
+				blockingFallback = append(blockingFallback, f)
+			} else {
+				advisoryFallback = append(advisoryFallback, f)
+			}
 			continue
 		}
-		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
-		actionThreadID := key
-		action := ActionCreate
-		prior, ok := existing[key]
-		if !ok {
-			var priorThreadID string
-			priorThreadID, prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
-			if ok {
-				actionThreadID = priorThreadID
-			}
-		}
-		if ok {
-			if prior == f.ID {
-				action = ActionSkip
-			} else {
-				action = ActionUpdate
-			}
-		}
-		endLine := f.EndLine
-		if endLine < f.StartLine {
-			endLine = f.StartLine
-		}
-		state = append(state, ThreadState{ThreadID: actionThreadID, FindingID: f.ID})
-		out = append(out, ThreadAction{
-			Type:      action,
-			Status:    ThreadStatusActive,
-			FindingID: f.ID,
-			Path:      f.Path,
-			Line:      f.StartLine,
-			EndLine:   endLine,
-			Body:      threadBody(f),
-			ThreadID:  actionThreadID,
-		})
+		out, state = appendFindingThread(out, state, existing, f)
 	}
+	out, state = appendFallbackThread(out, state, existing, fallbackBlockingThreadID, ThreadStatusActive, blockingFallback)
+	out, state = appendFallbackThread(out, state, existing, fallbackAdvisoryThreadID, ThreadStatusClosed, advisoryFallback)
 	return ThreadPlan{
 		Actions: out,
 		State:   state,
@@ -112,11 +95,90 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 	}
 }
 
-func threadConfidenceThreshold(profile string) float64 {
-	if profile == "inline" {
-		return MinExpandedThreadConfidence
+func appendFindingThread(out []ThreadAction, state []ThreadState, existing map[string]string, f findings.Finding) ([]ThreadAction, []ThreadState) {
+	status := threadStatusForFinding(f)
+	signature := threadStateSignature([]string{f.ID}, status)
+	key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
+	actionThreadID := key
+	action := ActionCreate
+	prior, ok := existing[key]
+	if !ok {
+		var priorThreadID string
+		priorThreadID, prior, ok = singleExistingForLocation(existing, threadLocationKey(f.Path, f.StartLine, f.Category))
+		if ok {
+			actionThreadID = priorThreadID
+		}
 	}
-	return MinThreadConfidence
+	if ok {
+		if prior == signature {
+			action = ActionSkip
+		} else {
+			action = ActionUpdate
+		}
+	}
+	endLine := f.EndLine
+	if endLine < f.StartLine {
+		endLine = f.StartLine
+	}
+	state = append(state, ThreadState{
+		ThreadID:   actionThreadID,
+		FindingID:  f.ID,
+		FindingIDs: []string{f.ID},
+		Status:     status,
+	})
+	out = append(out, ThreadAction{
+		Type:       action,
+		Status:     status,
+		FindingID:  f.ID,
+		FindingIDs: []string{f.ID},
+		Path:       f.Path,
+		Line:       f.StartLine,
+		EndLine:    endLine,
+		Body:       threadBody(f),
+		ThreadID:   actionThreadID,
+	})
+	return out, state
+}
+
+func appendFallbackThread(out []ThreadAction, state []ThreadState, existing map[string]string, threadID string, status ThreadStatus, items []findings.Finding) ([]ThreadAction, []ThreadState) {
+	if len(items) == 0 {
+		return out, state
+	}
+	ordered := orderedFindings(items)
+	findingIDs := findingIDsForState(ordered)
+	signature := threadStateSignature(findingIDs, status)
+	action := ActionCreate
+	if prior, ok := existing[threadID]; ok {
+		if prior == signature {
+			action = ActionSkip
+		} else {
+			action = ActionUpdate
+		}
+	}
+	state = append(state, ThreadState{
+		ThreadID:   threadID,
+		FindingIDs: findingIDs,
+		Status:     status,
+	})
+	out = append(out, ThreadAction{
+		Type:       action,
+		Status:     status,
+		FindingIDs: findingIDs,
+		Body:       fallbackThreadBody(ordered, status),
+		ThreadID:   threadID,
+	})
+	return out, state
+}
+
+func hasCanonicalThreadLocation(f findings.Finding) bool {
+	return strings.TrimSpace(f.Path) != "" && f.StartLine > 0 && strings.TrimSpace(f.Category) != ""
+}
+
+func threadStatusForFinding(f findings.Finding) ThreadStatus {
+	if f.Blocking {
+		return ThreadStatusActive
+	}
+	return ThreadStatusClosed
 }
 
 func threadKey(path string, line int, category string, findingID string) string {
@@ -146,6 +208,47 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 	return priorKey, prior, found
 }
 
+func orderedFindings(items []findings.Finding) []findings.Finding {
+	out := append([]findings.Finding(nil), items...)
+	sort.SliceStable(out, func(i, j int) bool {
+		left, right := out[i], out[j]
+		if left.Blocking != right.Blocking {
+			return left.Blocking
+		}
+		if left.Category != right.Category {
+			return left.Category < right.Category
+		}
+		if left.Severity != right.Severity {
+			return left.Severity < right.Severity
+		}
+		if left.Path != right.Path {
+			return left.Path < right.Path
+		}
+		if left.StartLine != right.StartLine {
+			return left.StartLine < right.StartLine
+		}
+		if left.Message != right.Message {
+			return left.Message < right.Message
+		}
+		return left.ID < right.ID
+	})
+	return out
+}
+
+func findingIDsForState(items []findings.Finding) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	return ids
+}
+
+func threadStateSignature(findingIDs []string, status ThreadStatus) string {
+	parts := append([]string(nil), findingIDs...)
+	sort.Strings(parts)
+	return strings.Join(parts, ",") + "|" + string(status)
+}
+
 func threadBody(f findings.Finding) string {
 	out := strings.Builder{}
 	fmt.Fprintf(&out, "%s\n", firstAzureNonEmpty(strings.TrimSpace(f.Message), strings.TrimSpace(f.Title)))
@@ -157,6 +260,19 @@ func threadBody(f findings.Finding) string {
 	}
 	if suggestion := strings.TrimSpace(f.Suggestion); suggestion != "" {
 		fmt.Fprintf(&out, "- **Suggestion**: %s\n", suggestion)
+	}
+	return strings.TrimSpace(out.String())
+}
+
+func fallbackThreadBody(items []findings.Finding, status ThreadStatus) string {
+	out := strings.Builder{}
+	if status == ThreadStatusActive {
+		out.WriteString("Blocking findings without canonical file/line mapping")
+	} else {
+		out.WriteString("Non-blocking findings without canonical file/line mapping")
+	}
+	for _, item := range items {
+		fmt.Fprintf(&out, "\n\n%s", threadBody(item))
 	}
 	return strings.TrimSpace(out.String())
 }
@@ -302,7 +418,11 @@ func LoadExistingState(path string) (map[string]string, error) {
 	}
 	out := make(map[string]string, len(plan.State))
 	for _, item := range plan.State {
-		out[item.ThreadID] = item.FindingID
+		ids := item.FindingIDs
+		if len(ids) == 0 && item.FindingID != "" {
+			ids = []string{item.FindingID}
+		}
+		out[item.ThreadID] = threadStateSignature(ids, item.Status)
 	}
 	return out, nil
 }

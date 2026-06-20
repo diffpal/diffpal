@@ -37,12 +37,18 @@ Required:
 
 ## PR thread publishing
 
-- Only actionable findings with canonical `start_line > 0` and high confidence produce inline thread actions.
+- Thread modes publish all findings.
+- Findings with canonical `path`, `start_line > 0`, and `category` produce file-bound Azure threads.
+- Findings without canonical file/line mapping are grouped into fallback non-file threads:
+  - one active fallback thread for blocking findings
+  - one closed fallback thread for non-blocking findings
+- Merge blocking is evaluated separately by `block_on` and `gate`.
+- Blocking finding threads stay active; non-blocking finding threads are published as closed immediately.
 - Key model:
   - `path + ":" + start_line + ":" + category`
-- Re-runs are idempotent via stored key + finding ID:
-  - same key + same finding ID → skip
-  - same key + different finding ID → update
+- Re-runs are idempotent via stored key + thread state:
+  - same key + same finding set + same open/closed status → skip
+  - same key + changed finding set or changed open/closed status → update
 - Thread plans also carry the PR comparison pair (`base_sha`, `head_sha`) used to map comments to the reviewed change range.
 
 ## Status mapping
@@ -67,7 +73,7 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
   `feedback` map to the CLI flags `--language`, `--instructions`,
   `--instructions-file`, and `--feedback`.
 - `feedback: balanced` is the default and publishes status, a PR summary
-  thread, and actionable high-confidence inline threads.
+  thread, and Azure threads for all findings.
 - Config auth values:
   - `diffpal.platforms.azure.auth.system_access_token`
   - `diffpal.platforms.azure.auth.pat`
