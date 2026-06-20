@@ -23,7 +23,7 @@ func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Cont
 			continue
 		}
 		if _, err := gitClient.CreateThread(ctx, azgit.CreateThreadArgs{
-			CommentThread: threadPayload(action.Body, action.Status, action.Path, action.Line),
+			CommentThread: threadPayload(action.Body, action.Status, action.Path, action.Line, action.EndLine),
 			RepositoryId:  args.RepositoryID,
 			PullRequestId: args.PullRequestID,
 			Project:       args.Project,
@@ -69,7 +69,7 @@ func PublishSummaryThread(ctx context.Context, tokenMode, token string, reviewCt
 		return nil
 	}
 	_, err = gitClient.CreateThread(ctx, azgit.CreateThreadArgs{
-		CommentThread: threadPayload(body, ThreadStatusClosed, "", 0),
+		CommentThread: threadPayload(body, ThreadStatusClosed, "", 0, 0),
 		RepositoryId:  args.RepositoryID,
 		PullRequestId: args.PullRequestID,
 		Project:       args.Project,
@@ -183,7 +183,7 @@ func azureConnection(collectionURI, tokenMode, token string) *azuredevops.Connec
 	return connection
 }
 
-func threadPayload(content string, status ThreadStatus, path string, line int) *azgit.GitPullRequestCommentThread {
+func threadPayload(content string, status ThreadStatus, path string, line int, endLine int) *azgit.GitPullRequestCommentThread {
 	commentType := azgit.CommentTypeValues.Text
 	parentID := 0
 	comments := []azgit.Comment{{
@@ -194,15 +194,22 @@ func threadPayload(content string, status ThreadStatus, path string, line int) *
 	payload := threadStatusPayload(status)
 	payload.Comments = &comments
 	if strings.TrimSpace(path) != "" && line > 0 {
+		if endLine < line {
+			endLine = line
+		}
 		offset := 1
-		position := azgit.CommentPosition{
+		start := azgit.CommentPosition{
 			Line:   &line,
+			Offset: &offset,
+		}
+		end := azgit.CommentPosition{
+			Line:   &endLine,
 			Offset: &offset,
 		}
 		payload.ThreadContext = &azgit.CommentThreadContext{
 			FilePath:       &path,
-			RightFileStart: &position,
-			RightFileEnd:   &position,
+			RightFileStart: &start,
+			RightFileEnd:   &end,
 		}
 	}
 	return payload

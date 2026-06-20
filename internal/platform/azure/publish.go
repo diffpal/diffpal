@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/diffpal/diffpal/internal/findings"
-	"github.com/diffpal/diffpal/internal/markdown"
 )
 
 const MinThreadConfidence = 0.8
@@ -31,6 +30,7 @@ type ThreadAction struct {
 	FindingID string           `json:"finding_id"`
 	Path      string           `json:"path"`
 	Line      int              `json:"line"`
+	EndLine   int              `json:"end_line"`
 	Body      string           `json:"body"`
 	ThreadID  string           `json:"thread_id"`
 }
@@ -85,6 +85,10 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 				action = ActionUpdate
 			}
 		}
+		endLine := f.EndLine
+		if endLine < f.StartLine {
+			endLine = f.StartLine
+		}
 		state = append(state, ThreadState{ThreadID: actionThreadID, FindingID: f.ID})
 		out = append(out, ThreadAction{
 			Type:      action,
@@ -92,6 +96,7 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 			FindingID: f.ID,
 			Path:      f.Path,
 			Line:      f.StartLine,
+			EndLine:   endLine,
 			Body:      threadBody(f),
 			ThreadID:  actionThreadID,
 		})
@@ -142,9 +147,64 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 }
 
 func threadBody(f findings.Finding) string {
-	return markdown.RenderFindingDetail(f, markdown.FindingDetailOptions{
-		HideConfidence: true,
-	})
+	out := strings.Builder{}
+	fmt.Fprintf(&out, "%s\n", firstAzureNonEmpty(strings.TrimSpace(f.Message), strings.TrimSpace(f.Title)))
+	if evidence := compactEvidenceText(f); evidence != "" {
+		fmt.Fprintf(&out, "- **Evidence**: %s\n", evidence)
+	}
+	if impact := compactImpactText(f); impact != "" {
+		fmt.Fprintf(&out, "- **Impact**: %s\n", impact)
+	}
+	if suggestion := strings.TrimSpace(f.Suggestion); suggestion != "" {
+		fmt.Fprintf(&out, "- **Suggestion**: %s\n", suggestion)
+	}
+	return strings.TrimSpace(out.String())
+}
+
+func compactEvidenceText(f findings.Finding) string {
+	parts := make([]string, 0, 3)
+	appendUnique := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		for _, part := range parts {
+			if strings.EqualFold(part, value) {
+				return
+			}
+		}
+		parts = append(parts, value)
+	}
+
+	appendUnique(f.Evidence.Anchor)
+	appendUnique(f.Evidence.ReasoningBasis)
+	source := strings.TrimSpace(f.Evidence.Source)
+	if source != "" && source != "changed_line" && source != "legacy" {
+		appendUnique(source)
+	}
+	return strings.Join(parts, " ")
+}
+
+func compactImpactText(f findings.Finding) string {
+	summary := strings.TrimSpace(f.Impact.Summary)
+	scope := strings.TrimSpace(f.Impact.Scope)
+	switch scope {
+	case "", "legacy", "changed behavior":
+		return summary
+	}
+	if summary == "" {
+		return scope
+	}
+	return summary + " Scope: " + scope
+}
+
+func firstAzureNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 type StatusState string

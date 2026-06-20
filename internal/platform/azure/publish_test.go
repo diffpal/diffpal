@@ -78,26 +78,28 @@ func TestThreadBodyIncludesImpactWhenPresent(t *testing.T) {
 	t.Parallel()
 
 	body := threadBody(findings.Finding{
+		Title:      "possible regression",
 		Category:   "security",
 		Severity:   "high",
 		Confidence: 0.91,
 		Message:    "unsafe SQL concatenation",
 		Evidence:   findings.NewEvidence("query concatenates input"),
 		Impact:     findings.NewImpact("malicious users can delete unrelated sessions"),
+		Suggestion: "Use a parameterized query.",
 	})
 	if !strings.Contains(body, "unsafe SQL concatenation") {
 		t.Fatalf("thread body missing finding message:\n%s", body)
 	}
-	if !strings.Contains(body, "- **Finding**: High security") {
-		t.Fatalf("thread body missing compact finding label:\n%s", body)
-	}
-	if !strings.Contains(body, "- **Evidence**:") || !strings.Contains(body, "query concatenates input") {
+	if !strings.Contains(body, "- **Evidence**: query concatenates input") {
 		t.Fatalf("thread body missing compact evidence:\n%s", body)
 	}
 	if !strings.Contains(body, "- **Impact**: malicious users can delete unrelated sessions") {
 		t.Fatalf("thread body missing impact:\n%s", body)
 	}
-	for _, noisy := range []string{"Category:", "Severity:", "Confidence:", "### HIGH"} {
+	if !strings.Contains(body, "- **Suggestion**: Use a parameterized query.") {
+		t.Fatalf("thread body missing suggestion:\n%s", body)
+	}
+	for _, noisy := range []string{"Category:", "Severity:", "Confidence:", "High security", "changed_line"} {
 		if strings.Contains(body, noisy) {
 			t.Fatalf("thread body contains noisy %q:\n%s", noisy, body)
 		}
@@ -107,7 +109,7 @@ func TestThreadBodyIncludesImpactWhenPresent(t *testing.T) {
 func TestThreadPayloadAttachesFileContext(t *testing.T) {
 	t.Parallel()
 
-	payload := threadPayload("body", ThreadStatusActive, "internal/app/service.go", 27)
+	payload := threadPayload("body", ThreadStatusActive, "internal/app/service.go", 27, 29)
 	if payload.ThreadContext == nil {
 		t.Fatal("ThreadContext = nil, want file context")
 	}
@@ -116,6 +118,9 @@ func TestThreadPayloadAttachesFileContext(t *testing.T) {
 	}
 	if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line == nil || *payload.ThreadContext.RightFileStart.Line != 27 {
 		t.Fatalf("RightFileStart = %#v, want line 27", payload.ThreadContext.RightFileStart)
+	}
+	if payload.ThreadContext.RightFileEnd == nil || payload.ThreadContext.RightFileEnd.Line == nil || *payload.ThreadContext.RightFileEnd.Line != 29 {
+		t.Fatalf("RightFileEnd = %#v, want line 29", payload.ThreadContext.RightFileEnd)
 	}
 	if payload.Status == nil || string(*payload.Status) != string(ThreadStatusActive) {
 		t.Fatalf("Status = %v, want active", payload.Status)
@@ -187,6 +192,30 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 	}
 	if plan.State[0].ThreadID != plan.Actions[0].ThreadID {
 		t.Fatalf("state ThreadID = %q, want action ThreadID %q", plan.State[0].ThreadID, plan.Actions[0].ThreadID)
+	}
+}
+
+func TestPlanThreadsKeepsLineRange(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{{
+		ID:         "fp-range",
+		Category:   "correctness",
+		Severity:   "high",
+		Confidence: 0.95,
+		Path:       "main.go",
+		StartLine:  12,
+		EndLine:    16,
+		Message:    "range issue",
+		Blocking:   true,
+	}}
+
+	plan := PlanThreads(nil, items, Context{})
+	if len(plan.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(plan.Actions))
+	}
+	if plan.Actions[0].Line != 12 || plan.Actions[0].EndLine != 16 {
+		t.Fatalf("action range = %d-%d, want 12-16", plan.Actions[0].Line, plan.Actions[0].EndLine)
 	}
 }
 
