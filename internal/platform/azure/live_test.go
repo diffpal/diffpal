@@ -8,15 +8,15 @@ import (
 )
 
 type fakeGateVoteClient struct {
-	args azgit.UpdatePullRequestReviewerArgs
+	args azgit.CreatePullRequestReviewerArgs
 }
 
-func (f *fakeGateVoteClient) UpdatePullRequestReviewer(_ context.Context, args azgit.UpdatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error) {
+func (f *fakeGateVoteClient) CreatePullRequestReviewer(_ context.Context, args azgit.CreatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error) {
 	f.args = args
 	return args.Reviewer, nil
 }
 
-func TestApplyGateVoteUsesSingleReviewerUpdate(t *testing.T) {
+func TestApplyGateVoteUsesReviewerUpsert(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeGateVoteClient{}

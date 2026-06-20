@@ -22,5 +22,5 @@
   line range while removing duplicated severity/category metadata from thread
   bodies.
 - Fixed Azure DevOps PR gate publishing to update the active reviewer vote with
-  the single-reviewer API instead of resetting reviewer state through the bulk
-  endpoint.
+  the Azure reviewer upsert API instead of reviewer patch endpoints that do not
+  accept vote updates.

@@ -1008,6 +1008,159 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	}
 }
 
+func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("AZURE_DEVOPS_EXT_PAT", "ado-token")
+	t.Setenv("DIFFPAL_GITHUB_TOKEN_TEST", "unused")
+	t.Setenv("DIFFPAL_GITLAB_TOKEN_TEST", "unused")
+	writeHostTestConfig(t, dir)
+	t.Setenv("SYSTEM_TEAMPROJECT", "proj")
+	t.Setenv("BUILD_REPOSITORY_ID", "repo-1")
+	t.Setenv("SYSTEM_PULLREQUEST_PULLREQUESTID", "55")
+	t.Setenv("SYSTEM_PULLREQUEST_TARGETCOMMITID", "base-a")
+	t.Setenv("BUILD_SOURCEVERSION", "head-a")
+
+	reviewerID := "11111111-1111-1111-1111-111111111111"
+	var sawStatus atomic.Bool
+	var sawVote atomic.Bool
+	handlerErrs := make(chan error, 4)
+	serverURL := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Basic ") {
+			handlerErrs <- fmt.Errorf("Authorization = %q, want Basic auth", got)
+			http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodOptions && r.URL.Path == "/_apis":
+			_, _ = w.Write([]byte(`{
+  "count": 4,
+  "value": [
+    {
+      "id": "e81700f7-3be2-46de-8624-2eb35882fcaa",
+      "area": "Location",
+      "resourceName": "ResourceAreas",
+      "routeTemplate": "_apis/resourceAreas",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "00d9565f-ed9c-4a06-9a50-00e7896ccab4",
+      "area": "Location",
+      "resourceName": "ConnectionData",
+      "routeTemplate": "_apis/connectionData",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "b5f6bb4f-8d1e-4d79-8d11-4c9172c99c35",
+      "area": "git",
+      "resourceName": "pullRequestStatuses",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "4b6702c7-aa35-4b89-9c96-b9abf6d3e540",
+      "area": "git",
+      "resourceName": "pullRequestReviewers",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    }
+  ]
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/_apis/resourceAreas":
+			_, _ = w.Write([]byte(`{
+  "count": 1,
+  "value": [
+    {
+      "id": "4e080c62-fa21-4fbc-8fef-2a10a2b38049",
+      "locationUrl": "` + serverURL + `",
+      "name": "git"
+    }
+  ]
+}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/_apis/connectionData":
+			_, _ = w.Write([]byte(`{
+  "authorizedUser": {"id": "` + reviewerID + `"},
+  "authenticatedUser": {"id": "` + reviewerID + `"}
+}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/statuses":
+			sawStatus.Store(true)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/reviewers/"+reviewerID:
+			var payload struct {
+				Id   string `json:"id"`
+				Vote int    `json:"vote"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode reviewer vote payload: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			if payload.Id != reviewerID {
+				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.Id, reviewerID)
+				http.Error(w, "unexpected reviewer id", http.StatusBadRequest)
+				return
+			}
+			if payload.Vote != -5 {
+				handlerErrs <- fmt.Errorf("reviewer payload vote = %d, want -5", payload.Vote)
+				http.Error(w, "unexpected reviewer vote", http.StatusBadRequest)
+				return
+			}
+			sawVote.Store(true)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"` + reviewerID + `","vote":-5}`))
+		default:
+			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+	serverURL = server.URL
+	t.Setenv("SYSTEM_COLLECTIONURI", server.URL+"/")
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("ado"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"ado",
+		"--out", filepath.Join(dir, "findings.json"),
+		"--mode", "status",
+		"--gate",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !sawStatus.Load() {
+		t.Fatal("status publish was not called")
+	}
+	if !sawVote.Load() {
+		t.Fatal("reviewer vote publish was not called")
+	}
+	select {
+	case err := <-handlerErrs:
+		t.Fatal(err)
+	default:
+	}
+}
+
 func TestReviewRequiresConfigWithExitCode2(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
