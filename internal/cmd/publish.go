@@ -428,21 +428,3 @@ func publishableInlineFindings(items []findings.Finding) []findings.Finding {
 	}
 	return out
 }
-
-func severityAtOrAbove(value string, threshold string) bool {
-	ranks := map[string]int{
-		"low":      1,
-		"medium":   2,
-		"high":     3,
-		"critical": 4,
-	}
-	valueRank, ok := ranks[strings.ToLower(strings.TrimSpace(value))]
-	if !ok {
-		return false
-	}
-	thresholdRank, ok := ranks[strings.ToLower(strings.TrimSpace(threshold))]
-	if !ok {
-		return false
-	}
-	return valueRank >= thresholdRank
-}
