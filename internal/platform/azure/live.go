@@ -14,7 +14,7 @@ import (
 )
 
 type gateVoteClient interface {
-	UpdatePullRequestReviewer(context.Context, azgit.UpdatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error)
+	CreatePullRequestReviewer(context.Context, azgit.CreatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error)
 }
 
 func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Context, plan ThreadPlan, client *http.Client) error {
@@ -126,7 +126,7 @@ func applyGateVote(ctx context.Context, client gateVoteClient, args gitClientArg
 		Id:   &reviewerID,
 		Vote: &vote,
 	}
-	_, err := client.UpdatePullRequestReviewer(ctx, azgit.UpdatePullRequestReviewerArgs{
+	_, err := client.CreatePullRequestReviewer(ctx, azgit.CreatePullRequestReviewerArgs{
 		Reviewer:      &reviewer,
 		RepositoryId:  args.RepositoryID,
 		PullRequestId: args.PullRequestID,
