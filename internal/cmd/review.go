@@ -463,7 +463,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 			if publishReview {
 				plan := github.CommentPlan{}
 				if includeInline {
-					inlineFindings := blockingInlineFindings(bundle.Findings, blockOn)
+					inlineFindings := publishableInlineFindings(bundle.Findings)
 					if err := github.ValidateInlineFindings(inlineFindings); err != nil {
 						return err
 					}
