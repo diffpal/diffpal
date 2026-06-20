@@ -29,6 +29,16 @@ func TestRootHelpShowsCanonicalCommands(t *testing.T) {
 	}
 }
 
+func TestRootSilencesUsageAndErrorsForRunErrors(t *testing.T) {
+	cmd := NewRootCommand()
+	if !cmd.SilenceUsage {
+		t.Fatal("root command should silence usage for runtime errors")
+	}
+	if !cmd.SilenceErrors {
+		t.Fatal("root command should let main print runtime errors")
+	}
+}
+
 func TestReviewHelpShowsModeSubcommands(t *testing.T) {
 	cmd := NewRootCommand()
 	var out bytes.Buffer

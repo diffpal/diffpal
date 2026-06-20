@@ -115,6 +115,12 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	if !strings.Contains(err.Error(), "review blocked: blocking findings detected: 1") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if strings.Contains(out.String(), "Usage:") {
+		t.Fatalf("gate failure should not print command usage:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "Error:") {
+		t.Fatalf("gate failure should not print cobra error prefix:\n%s", out.String())
+	}
 }
 
 func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {

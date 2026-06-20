@@ -46,6 +46,7 @@ func newReviewCommandWithRunner(run reviewRunner) *cobra.Command {
 		newHostReviewSubcommand(run, "ado", "azure", []string{"azure"}),
 	)
 
+	silenceRuntimeErrorOutput(review)
 	return review
 }
 
