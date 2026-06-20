@@ -29,9 +29,6 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 		if opts.ReviewID != "local" {
 			t.Fatalf("ReviewID = %q, want local default", opts.ReviewID)
 		}
-		if opts.MaxFiles != 200 {
-			t.Fatalf("MaxFiles = %d, want 200 default", opts.MaxFiles)
-		}
 		if opts.Language != "en" {
 			t.Fatalf("Language = %q, want en from config", opts.Language)
 		}

@@ -100,10 +100,7 @@ var validSeverityThresholds = map[string]struct{}{
 	"critical": {},
 }
 
-const (
-	DefaultReviewMaxFiles = 200
-	defaultBlockOn        = "high"
-)
+const defaultBlockOn = "high"
 
 func LoadConfig(workingDir, configDir, profile string) (Config, error) {
 	loaded, err := LoadConfigWithMetadata(workingDir, configDir, profile)

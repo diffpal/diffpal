@@ -25,7 +25,6 @@ type Options struct {
 	ReviewID     string
 	BaseSHA      string
 	HeadSHA      string
-	MaxFiles     int
 	BlockOn      string
 	Language     string
 	Instructions string
@@ -116,10 +115,9 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		workingDir = cwd
 	}
 	result, err := diff.Collect(diff.Options{
-		BaseSHA:  opts.BaseSHA,
-		HeadSHA:  opts.HeadSHA,
-		MaxFiles: opts.MaxFiles,
-		WorkDir:  workingDir,
+		BaseSHA: opts.BaseSHA,
+		HeadSHA: opts.HeadSHA,
+		WorkDir: workingDir,
 	})
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
