@@ -13,18 +13,24 @@ const MinThreadConfidence = 0.8
 const MinExpandedThreadConfidence = 0.65
 
 type ThreadActionType string
+type ThreadStatus string
 
 const (
 	ActionCreate ThreadActionType = "create"
 	ActionUpdate ThreadActionType = "update"
 	ActionSkip   ThreadActionType = "skip"
+
+	ThreadStatusActive ThreadStatus = "active"
+	ThreadStatusClosed ThreadStatus = "closed"
 )
 
 type ThreadAction struct {
 	Type      ThreadActionType `json:"type"`
+	Status    ThreadStatus     `json:"status"`
 	FindingID string           `json:"finding_id"`
 	Path      string           `json:"path"`
 	Line      int              `json:"line"`
+	EndLine   int              `json:"end_line"`
 	Body      string           `json:"body"`
 	ThreadID  string           `json:"thread_id"`
 }
@@ -58,7 +64,7 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 	out := make([]ThreadAction, 0, len(findingsList))
 	state := make([]ThreadState, 0, len(findingsList))
 	for _, f := range findingsList {
-		if f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
+		if !f.Blocking || f.Path == "" || f.StartLine <= 0 || f.Category == "" || f.Confidence < minConfidence {
 			continue
 		}
 		key := threadKey(f.Path, f.StartLine, f.Category, f.ID)
@@ -79,12 +85,18 @@ func planThreads(existing map[string]string, findingsList []findings.Finding, ct
 				action = ActionUpdate
 			}
 		}
+		endLine := f.EndLine
+		if endLine < f.StartLine {
+			endLine = f.StartLine
+		}
 		state = append(state, ThreadState{ThreadID: actionThreadID, FindingID: f.ID})
 		out = append(out, ThreadAction{
 			Type:      action,
+			Status:    ThreadStatusActive,
 			FindingID: f.ID,
 			Path:      f.Path,
 			Line:      f.StartLine,
+			EndLine:   endLine,
 			Body:      threadBody(f),
 			ThreadID:  actionThreadID,
 		})
@@ -135,23 +147,64 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 }
 
 func threadBody(f findings.Finding) string {
-	body := "### " + strings.ToUpper(f.Severity) + " " + f.Category + "\n\n" +
-		"Category: **" + f.Category + "**\n\n" +
-		"Severity: **" + f.Severity + "**\n\n" +
-		f.Message + "\n\n" +
-		"Evidence: " + f.EvidenceText() + "\n\n" +
-		"Confidence: " + formatConfidence(f.Confidence)
-	if impact := f.ImpactText(); impact != "" {
-		body += "\n\nImpact: " + impact
+	out := strings.Builder{}
+	fmt.Fprintf(&out, "%s\n", firstAzureNonEmpty(strings.TrimSpace(f.Message), strings.TrimSpace(f.Title)))
+	if evidence := compactEvidenceText(f); evidence != "" {
+		fmt.Fprintf(&out, "- **Evidence**: %s\n", evidence)
 	}
-	return body
+	if impact := compactImpactText(f); impact != "" {
+		fmt.Fprintf(&out, "- **Impact**: %s\n", impact)
+	}
+	if suggestion := strings.TrimSpace(f.Suggestion); suggestion != "" {
+		fmt.Fprintf(&out, "- **Suggestion**: %s\n", suggestion)
+	}
+	return strings.TrimSpace(out.String())
 }
 
-func formatConfidence(v float64) string {
-	if v <= 0 {
-		return "0.00"
+func compactEvidenceText(f findings.Finding) string {
+	parts := make([]string, 0, 3)
+	appendUnique := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		for _, part := range parts {
+			if strings.EqualFold(part, value) {
+				return
+			}
+		}
+		parts = append(parts, value)
 	}
-	return fmt.Sprintf("%.2f", v)
+
+	appendUnique(f.Evidence.Anchor)
+	appendUnique(f.Evidence.ReasoningBasis)
+	source := strings.TrimSpace(f.Evidence.Source)
+	if source != "" && source != "changed_line" && source != "legacy" {
+		appendUnique(source)
+	}
+	return strings.Join(parts, " ")
+}
+
+func compactImpactText(f findings.Finding) string {
+	summary := strings.TrimSpace(f.Impact.Summary)
+	scope := strings.TrimSpace(f.Impact.Scope)
+	switch scope {
+	case "", "legacy", "changed behavior":
+		return summary
+	}
+	if summary == "" {
+		return scope
+	}
+	return summary + " Scope: " + scope
+}
+
+func firstAzureNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 type StatusState string
@@ -166,6 +219,7 @@ const (
 type PolicyContext struct {
 	StatusName      string
 	BlockOn         string
+	GateEnabled     bool
 	FatalOnFailures bool
 }
 
@@ -176,7 +230,7 @@ type StatusPayload struct {
 	Context     string      `json:"context"`
 }
 
-func EvaluateStatus(bundleCount int, blockingCount int, failed bool) StatusPayload {
+func EvaluateStatus(bundleCount int, blockingCount int, gateEnabled bool, failed bool) StatusPayload {
 	name := "DiffPal Review"
 	ctx := "diffpal/review"
 	if failed {
@@ -188,6 +242,14 @@ func EvaluateStatus(bundleCount int, blockingCount int, failed bool) StatusPaylo
 		}
 	}
 	if blockingCount > 0 {
+		if !gateEnabled {
+			return StatusPayload{
+				Name:        name,
+				State:       StatusStateSucceeded,
+				Description: fmt.Sprintf("%d blocking findings; gate disabled", blockingCount),
+				Context:     ctx,
+			}
+		}
 		return StatusPayload{
 			Name:        name,
 			State:       StatusStateFailed,
@@ -220,7 +282,7 @@ func IsPass(blockingCount int, failedPolicy bool, toolError bool) bool {
 
 func PolicyStatus(ctx PolicyContext, blockingCount int, advisoryCount int, toolFailure bool) StatusPayload {
 	toolError := toolFailure && ctx.FatalOnFailures
-	return EvaluateStatus(blockingCount+advisoryCount, blockingCount, toolError)
+	return EvaluateStatus(blockingCount+advisoryCount, blockingCount, ctx.GateEnabled, toolError)
 }
 
 func LoadExistingState(path string) (map[string]string, error) {

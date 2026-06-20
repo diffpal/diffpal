@@ -171,7 +171,8 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 
 func formatBody(f findings.Finding, links markdown.FindingLinkProvider) string {
 	return markdown.RenderFindingDetail(f, markdown.FindingDetailOptions{
-		Link: linkForFinding(links, f),
+		Link:           linkForFinding(links, f),
+		HideConfidence: true,
 	})
 }
 

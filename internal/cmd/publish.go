@@ -31,7 +31,7 @@ const (
 	FeedbackInline   FeedbackProfile = "inline"
 )
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -150,7 +150,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
 		case "status":
 			blocking = max(blocking, decision.BlockCount)
-			payload := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, decision.BlockCount, decision.AdvisoryCount, false)
+			payload := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, decision.BlockCount, decision.AdvisoryCount, false)
 			decisions := map[string]interface{}{
 				"decision": decision.Decision,
 				"status":   payload,

@@ -18,3 +18,9 @@
 - Fixed Azure DevOps Marketplace task UUIDs for the corrected extension identity.
 - Fixed Azure DevOps Marketplace release cleanup for stale extension IDs.
 - Fixed Azure DevOps Marketplace task UUIDs for the final `diffpal.diffpal` extension identity.
+- Fixed Azure DevOps review threads to bind comments to the reviewed file and
+  line range while removing duplicated severity/category metadata from thread
+  bodies.
+- Fixed Azure DevOps PR gate publishing to update the active reviewer vote with
+  the single-reviewer API instead of resetting reviewer state through the bulk
+  endpoint.

@@ -198,9 +198,10 @@ func lineRange(start, end int) string {
 }
 
 type FindingDetailOptions struct {
-	ListItem bool
-	Snippet  CodeSnippet
-	Link     string
+	ListItem       bool
+	Snippet        CodeSnippet
+	Link           string
+	HideConfidence bool
 }
 
 type summaryFindingDetailOptions struct {
@@ -267,6 +268,9 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	}
 	if finding.Suggestion != "" {
 		fmt.Fprintf(&out, "%s**Suggestion**: %s\n", detailPrefix, finding.Suggestion)
+	}
+	if !opts.HideConfidence {
+		fmt.Fprintf(&out, "%s**Confidence**: %.2f\n", detailPrefix, finding.Confidence)
 	}
 	return out.String()
 }
