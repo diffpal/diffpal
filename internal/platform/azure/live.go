@@ -13,6 +13,10 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/v7/location"
 )
 
+type gateVoteClient interface {
+	UpdatePullRequestReviewer(context.Context, azgit.UpdatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error)
+}
+
 func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Context, plan ThreadPlan, client *http.Client) error {
 	gitClient, args, err := newGitClient(ctx, tokenMode, token, reviewCtx, client)
 	if err != nil {
@@ -114,16 +118,22 @@ func PublishGateVote(ctx context.Context, tokenMode, token string, reviewCtx Con
 	if err != nil {
 		return err
 	}
-	votes := []azgit.IdentityRefWithVote{{
+	return applyGateVote(ctx, gitClient, args, reviewerID, vote)
+}
+
+func applyGateVote(ctx context.Context, client gateVoteClient, args gitClientArgs, reviewerID string, vote int) error {
+	reviewer := azgit.IdentityRefWithVote{
 		Id:   &reviewerID,
 		Vote: &vote,
-	}}
-	return gitClient.UpdatePullRequestReviewers(ctx, azgit.UpdatePullRequestReviewersArgs{
-		PatchVotes:    &votes,
+	}
+	_, err := client.UpdatePullRequestReviewer(ctx, azgit.UpdatePullRequestReviewerArgs{
+		Reviewer:      &reviewer,
 		RepositoryId:  args.RepositoryID,
 		PullRequestId: args.PullRequestID,
+		ReviewerId:    &reviewerID,
 		Project:       args.Project,
 	})
+	return err
 }
 
 type gitClientArgs struct {
