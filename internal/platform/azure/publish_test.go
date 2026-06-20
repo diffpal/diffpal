@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/google/uuid"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/v7/identity"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/v7/location"
 )
 
 func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
@@ -22,6 +25,7 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 			StartLine:  10,
 			Message:    "possible nil dereference",
 			Evidence:   findings.NewEvidence("client may be nil"),
+			Blocking:   true,
 		},
 		{
 			ID:         "fp-update",
@@ -53,20 +57,20 @@ func TestPlanThreadsUsesComparisonContextAndReconciles(t *testing.T) {
 		HeadSHA:       "head-a",
 	})
 
-	if len(plan.Actions) != 2 {
-		t.Fatalf("len(Actions) = %d, want 2 actionable threads", len(plan.Actions))
+	if len(plan.Actions) != 1 {
+		t.Fatalf("len(Actions) = %d, want 1 blocking thread", len(plan.Actions))
 	}
 	if plan.Actions[0].Type != ActionCreate {
 		t.Fatalf("first action = %q, want create", plan.Actions[0].Type)
 	}
-	if plan.Actions[1].Type != ActionUpdate {
-		t.Fatalf("second action = %q, want update", plan.Actions[1].Type)
+	if plan.Actions[0].Status != ThreadStatusActive {
+		t.Fatalf("first status = %q, want active", plan.Actions[0].Status)
 	}
 	if plan.Comparison.PullRequestID != "42" || plan.Comparison.BaseSHA != "base-a" || plan.Comparison.HeadSHA != "head-a" {
 		t.Fatalf("unexpected comparison: %+v", plan.Comparison)
 	}
-	if len(plan.State) != 2 {
-		t.Fatalf("len(State) = %d, want 2 actionable states", len(plan.State))
+	if len(plan.State) != 1 {
+		t.Fatalf("len(State) = %d, want 1 blocking state", len(plan.State))
 	}
 }
 
@@ -81,8 +85,40 @@ func TestThreadBodyIncludesImpactWhenPresent(t *testing.T) {
 		Evidence:   findings.NewEvidence("query concatenates input"),
 		Impact:     findings.NewImpact("malicious users can delete unrelated sessions"),
 	})
-	if !strings.Contains(body, "Impact: malicious users can delete unrelated sessions") {
+	if !strings.Contains(body, "unsafe SQL concatenation") {
+		t.Fatalf("thread body missing finding message:\n%s", body)
+	}
+	if !strings.Contains(body, "- **Finding**: High security") {
+		t.Fatalf("thread body missing compact finding label:\n%s", body)
+	}
+	if !strings.Contains(body, "- **Evidence**:") || !strings.Contains(body, "query concatenates input") {
+		t.Fatalf("thread body missing compact evidence:\n%s", body)
+	}
+	if !strings.Contains(body, "- **Impact**: malicious users can delete unrelated sessions") {
 		t.Fatalf("thread body missing impact:\n%s", body)
+	}
+	for _, noisy := range []string{"Category:", "Severity:", "Confidence:", "### HIGH"} {
+		if strings.Contains(body, noisy) {
+			t.Fatalf("thread body contains noisy %q:\n%s", noisy, body)
+		}
+	}
+}
+
+func TestThreadPayloadAttachesFileContext(t *testing.T) {
+	t.Parallel()
+
+	payload := threadPayload("body", ThreadStatusActive, "internal/app/service.go", 27)
+	if payload.ThreadContext == nil {
+		t.Fatal("ThreadContext = nil, want file context")
+	}
+	if payload.ThreadContext.FilePath == nil || *payload.ThreadContext.FilePath != "internal/app/service.go" {
+		t.Fatalf("FilePath = %v, want internal/app/service.go", payload.ThreadContext.FilePath)
+	}
+	if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line == nil || *payload.ThreadContext.RightFileStart.Line != 27 {
+		t.Fatalf("RightFileStart = %#v, want line 27", payload.ThreadContext.RightFileStart)
+	}
+	if payload.Status == nil || string(*payload.Status) != string(ThreadStatusActive) {
+		t.Fatalf("Status = %v, want active", payload.Status)
 	}
 }
 
@@ -98,6 +134,7 @@ func TestPlanThreadsKeepsSameLineFindingsDistinct(t *testing.T) {
 			Path:       "main.go",
 			StartLine:  12,
 			Message:    "first issue",
+			Blocking:   true,
 		},
 		{
 			ID:         "fp-b",
@@ -107,6 +144,7 @@ func TestPlanThreadsKeepsSameLineFindingsDistinct(t *testing.T) {
 			Path:       "main.go",
 			StartLine:  12,
 			Message:    "second issue",
+			Blocking:   true,
 		},
 	}
 
@@ -131,6 +169,7 @@ func TestPlanThreadsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T)
 		StartLine:  12,
 		Message:    "updated issue",
 		Evidence:   findings.NewEvidence("same location"),
+		Blocking:   true,
 	}}
 	existing := map[string]string{
 		threadKey("main.go", 12, "security", "fp-old"): "fp-old",
@@ -186,6 +225,7 @@ func TestPlanThreadsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
 		Path:       "main.go",
 		StartLine:  12,
 		Message:    "edge case",
+		Blocking:   true,
 	}}
 	if got := PlanThreadsWithProfile(nil, items, Context{}, "balanced"); len(got.Actions) != 0 {
 		t.Fatalf("balanced actions = %d, want 0", len(got.Actions))
@@ -200,6 +240,7 @@ func TestPolicyStatusDistinguishesBlockedReviewAndToolingError(t *testing.T) {
 
 	policyFail := PolicyStatus(PolicyContext{
 		BlockOn:         "high",
+		GateEnabled:     true,
 		FatalOnFailures: true,
 	}, 2, 1, false)
 	if policyFail.State != StatusStateFailed {
@@ -207,6 +248,18 @@ func TestPolicyStatusDistinguishesBlockedReviewAndToolingError(t *testing.T) {
 	}
 	if policyFail.Context != "diffpal/review" {
 		t.Fatalf("Context = %q, want diffpal/review", policyFail.Context)
+	}
+
+	gateDisabled := PolicyStatus(PolicyContext{
+		BlockOn:         "high",
+		GateEnabled:     false,
+		FatalOnFailures: true,
+	}, 2, 1, false)
+	if gateDisabled.State != StatusStateSucceeded {
+		t.Fatalf("gate-disabled state = %q, want succeeded", gateDisabled.State)
+	}
+	if !strings.Contains(gateDisabled.Description, "gate disabled") {
+		t.Fatalf("gate-disabled description = %q, want gate disabled", gateDisabled.Description)
 	}
 
 	toolError := PolicyStatus(PolicyContext{
@@ -223,5 +276,26 @@ func TestPolicyStatusDistinguishesBlockedReviewAndToolingError(t *testing.T) {
 	}, 0, 2, false)
 	if advisoryOnly.State != StatusStateSucceeded {
 		t.Fatalf("advisory state = %q, want succeeded", advisoryOnly.State)
+	}
+}
+
+func TestReviewerIDFromConnectionDataPrefersAuthorizedUser(t *testing.T) {
+	t.Parallel()
+
+	authorizedID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	authenticatedID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	got, err := reviewerIDFromConnectionData(&location.ConnectionData{
+		AuthorizedUser: &identity.Identity{
+			Id: &authorizedID,
+		},
+		AuthenticatedUser: &identity.Identity{
+			Id: &authenticatedID,
+		},
+	})
+	if err != nil {
+		t.Fatalf("reviewerIDFromConnectionData() error = %v", err)
+	}
+	if got != authorizedID.String() {
+		t.Fatalf("reviewer id = %q, want authorized user %q", got, authorizedID.String())
 	}
 }

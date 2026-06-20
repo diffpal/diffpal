@@ -114,7 +114,7 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return err
 	}
 	blocking := countBlockingFindings(execution.Result.Bundle)
-	if execution.Gate && blocking > 0 {
+	if shouldReturnGateError("", execution.Gate, blocking) {
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
@@ -124,6 +124,10 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return nil
 	}
 	return nil
+}
+
+func shouldReturnGateError(platform string, gateEnabled bool, blocking int) bool {
+	return gateEnabled && blocking > 0 && platform != "azure"
 }
 
 func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
@@ -178,7 +182,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(summary)); err != nil {
 			return withExitCode(5, err)
 		}
-		if execution.Gate && blocking > 0 {
+		if shouldReturnGateError(platform, execution.Gate, blocking) {
 			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 		}
 		return nil
@@ -193,7 +197,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
 				return withExitCode(5, err)
 			}
-			if execution.Gate && blocking > 0 {
+			if shouldReturnGateError(platform, execution.Gate, blocking) {
 				return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 			}
 			if blocking > 0 {
@@ -206,7 +210,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, "", execution.ReviewChannel)
+	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, "", execution.ReviewChannel)
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -214,7 +218,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, modes, feedback, summaryOverview, execution.ReviewChannel, execution.Gate); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -223,7 +227,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			return withExitCode(5, err)
 		}
 	}
-	if execution.Gate && blocking > 0 {
+	if shouldReturnGateError(platform, execution.Gate, blocking) {
 		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
 	}
 	if blocking > 0 {
@@ -420,7 +424,7 @@ func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
 	return ctx.IsFork, nil
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, modes []string, feedback string, summaryOverview bool, reviewChannel string, gate bool) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -515,7 +519,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		}
 		plan := azure.PlanThreadsWithProfile(existing, bundle.Findings, reviewCtx, string(profile))
 		blocking := countBlockingFindings(bundle)
-		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
+		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {
 			for _, mode := range modes {
 				switch normalizePublishMode(platform, mode) {
@@ -531,6 +535,15 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
 						return err
 					}
+				}
+			}
+			if gateEnabled {
+				vote := 10
+				if blocking > 0 {
+					vote = -5
+				}
+				if err := azure.PublishGateVote(ctx, auth.Mode, token, reviewCtx, vote, nil); err != nil {
+					return err
 				}
 			}
 			return nil

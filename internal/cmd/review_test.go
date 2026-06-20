@@ -51,6 +51,20 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	}
 }
 
+func TestShouldReturnGateErrorSkipsAzure(t *testing.T) {
+	t.Parallel()
+
+	if shouldReturnGateError("azure", true, 1) {
+		t.Fatal("Azure gate returned CLI error, want status/vote-only gating")
+	}
+	if !shouldReturnGateError("github", true, 1) {
+		t.Fatal("GitHub gate did not return CLI error")
+	}
+	if shouldReturnGateError("github", false, 1) {
+		t.Fatal("gate disabled returned CLI error")
+	}
+}
+
 func TestReviewLocalSubcommandPassesLanguageAndInstructionsFlags(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
