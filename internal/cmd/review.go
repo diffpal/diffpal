@@ -83,7 +83,6 @@ func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []
 func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 	cmd.Flags().String("base", "", "Base revision")
 	cmd.Flags().String("head", "", "Head revision")
-	cmd.Flags().Int("max-files", 0, "Maximum files from diff")
 	cmd.Flags().String("language", "", "Language for generated review findings")
 	cmd.Flags().String("instructions", "", "Additional review instructions for local prompt tuning")
 	cmd.Flags().String("instructions-file", "", "Path to additional review instructions")
@@ -238,7 +237,6 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
-	maxFiles, _ := cmd.Flags().GetInt("max-files")
 	language, _ := cmd.Flags().GetString("language")
 	instructionsFlag, _ := cmd.Flags().GetString("instructions")
 	instructionsFile, _ := cmd.Flags().GetString("instructions-file")
@@ -256,9 +254,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	cfg, err := loadRequiredConfig()
 	if err != nil {
 		return reviewExecution{}, withExitCode(2, err)
-	}
-	if !cmd.Flags().Changed("max-files") {
-		maxFiles = config.DefaultReviewMaxFiles
 	}
 	if !cmd.Flags().Changed("language") {
 		language = cfg.ReviewLanguage()
@@ -297,7 +292,6 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		ReviewID:     reviewID,
 		BaseSHA:      base,
 		HeadSHA:      head,
-		MaxFiles:     maxFiles,
 		BlockOn:      blockOn,
 		Language:     language,
 		Instructions: instructions,

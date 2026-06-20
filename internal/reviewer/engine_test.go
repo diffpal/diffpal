@@ -49,7 +49,6 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 		WorkingDir: repo,
 		Repo:       "repo-a",
 		ReviewID:   "review-a",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
@@ -111,7 +110,6 @@ func TestRunWithRuntimeDoesNotInventChangeSummaryFromPaths(t *testing.T) {
 		WorkingDir: repo,
 		Repo:       "repo-a",
 		ReviewID:   "review-a",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, &fakeRuntime{
 		outputs: []ReviewOutput{{Findings: nil}},
@@ -167,7 +165,6 @@ func TestRunWithRuntimePassesLanguageAndKeepsAllSupportedCategories(t *testing.T
 		WorkingDir: repo,
 		Repo:       "repo-taxonomy",
 		ReviewID:   "review-taxonomy",
-		MaxFiles:   20,
 		BlockOn:    "high",
 		Language:   "Russian",
 	}, runtime)
@@ -211,7 +208,6 @@ func TestRunWithRuntimeLabelsPromptInjectionDiffAsUntrusted(t *testing.T) {
 		WorkingDir:   repo,
 		Repo:         "repo-injection",
 		ReviewID:     "review-injection",
-		MaxFiles:     20,
 		BlockOn:      "high",
 		Instructions: "Report actionable documentation review issues.",
 	}, runtime)
@@ -304,7 +300,6 @@ func TestRunWithRuntimeDoesNotPreloadInjectionFixtureContent(t *testing.T) {
 		WorkingDir:   repo,
 		Repo:         "repo-injection-fixtures",
 		ReviewID:     "review-injection-fixtures",
-		MaxFiles:     20,
 		BlockOn:      "high",
 		Instructions: "Report actionable documentation, comment, and fixture review issues.",
 	}, runtime)
@@ -358,7 +353,6 @@ func TestRunWithRuntimeReviewsDeleteOnlyDiffWithoutPreloadingFileList(t *testing
 		WorkingDir: repo,
 		Repo:       "repo-delete-only",
 		ReviewID:   "review-delete-only",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
@@ -450,7 +444,6 @@ func TestRunWithRuntimeBlocksProviderSecurityFindingFromUnsafeCode(t *testing.T)
 		WorkingDir:   repo,
 		Repo:         "repo-security",
 		ReviewID:     "review-security",
-		MaxFiles:     20,
 		BlockOn:      "high",
 		Instructions: "Focus on externally reachable handlers.",
 	}, runtime)
@@ -557,7 +550,6 @@ func TestRunWithRuntimeDropsInvalidFindingsAndSkipsDeletedFiles(t *testing.T) {
 		WorkingDir: repo,
 		Repo:       "repo-b",
 		ReviewID:   "review-b",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
@@ -644,7 +636,6 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 		WorkingDir: repo,
 		Repo:       "repo-c",
 		ReviewID:   "review-c",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
@@ -694,7 +685,6 @@ func TestRunWithRuntimeFailsMalformedStructuredOutputAfterRetries(t *testing.T) 
 		WorkingDir: repo,
 		Repo:       "repo-d",
 		ReviewID:   "review-d",
-		MaxFiles:   20,
 		BlockOn:    "high",
 	}, runtime)
 	if err == nil {

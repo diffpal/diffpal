@@ -57,30 +57,6 @@ func TestCollectResolvesRefsAndParsesRename(t *testing.T) {
 	}
 }
 
-func TestCollectLimitsFilesDeterministically(t *testing.T) {
-	t.Parallel()
-
-	repo := newGitRepo(t)
-	writeFile(t, filepath.Join(repo, "a.txt"), "a\n")
-	writeFile(t, filepath.Join(repo, "b.txt"), "b\n")
-	runGitCmd(t, repo, "add", ".")
-	runGitCmd(t, repo, "commit", "-m", "initial")
-
-	writeFile(t, filepath.Join(repo, "a.txt"), "aa\n")
-	writeFile(t, filepath.Join(repo, "b.txt"), "bb\n")
-
-	result, err := Collect(Options{WorkDir: repo, MaxFiles: 1})
-	if err != nil {
-		t.Fatalf("Collect() error = %v", err)
-	}
-	if result.ChangedFiles != 1 {
-		t.Fatalf("ChangedFiles = %d, want 1", result.ChangedFiles)
-	}
-	if len(result.Files) != 1 {
-		t.Fatalf("len(Files) = %d, want 1", len(result.Files))
-	}
-}
-
 func TestCollectDefaultsHeadToHEAD(t *testing.T) {
 	t.Parallel()
 

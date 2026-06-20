@@ -41,10 +41,9 @@ type DiffResult struct {
 }
 
 type Options struct {
-	BaseSHA  string
-	HeadSHA  string
-	MaxFiles int
-	WorkDir  string
+	BaseSHA string
+	HeadSHA string
+	WorkDir string
 }
 
 func Collect(opts Options) (DiffResult, error) {
@@ -78,9 +77,6 @@ func Collect(opts Options) (DiffResult, error) {
 	}
 	raw = normalizeDiff(raw)
 	files := normalizeDiffFiles(raw)
-	if opts.MaxFiles > 0 && len(files) > opts.MaxFiles {
-		files = files[:opts.MaxFiles]
-	}
 
 	return DiffResult{
 		BaseSHA:      baseSHA,
