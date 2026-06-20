@@ -185,7 +185,7 @@ func TestPublishBundleToFilesGitHubCommentsReportsBlocking(t *testing.T) {
 	}
 }
 
-func TestPublishBundleToFilesGitHubCommentsSkipsNonBlockingFindings(t *testing.T) {
+func TestPublishBundleToFilesGitHubCommentsIncludeAdvisoryFindings(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("GITHUB_EVENT_PATH", "")
@@ -237,11 +237,10 @@ func TestPublishBundleToFilesGitHubCommentsSkipsNonBlockingFindings(t *testing.T
 		t.Fatalf("ReadFile(github-comments.json) error = %v", err)
 	}
 	text := string(raw)
-	if strings.Contains(text, "fp-medium") || strings.Contains(text, "medium advisory") {
-		t.Fatalf("github comments include non-blocking finding:\n%s", text)
-	}
-	if !strings.Contains(text, "fp-high") || !strings.Contains(text, "high finding") {
-		t.Fatalf("github comments missing blocking finding:\n%s", text)
+	for _, needle := range []string{"fp-medium", "medium advisory", "fp-high", "high finding"} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("github comments missing %q:\n%s", needle, text)
+		}
 	}
 }
 
