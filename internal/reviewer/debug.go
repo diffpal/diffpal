@@ -38,6 +38,7 @@ func (r *debugRuntime) Review(_ context.Context, _ RuntimeConfig, input ReviewIn
 	r.taskSnapshot = renderReviewTaskInput(input)
 	return ReviewOutput{
 			ChangeSummary: []string{"Debug harness rendered the review task without contacting a provider."},
+			ReviewResult:  "",
 			Findings:      []ReviewFinding{},
 		},
 		RuntimeUsage{},

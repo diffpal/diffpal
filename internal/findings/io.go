@@ -83,7 +83,7 @@ func FormatBundle(bundle FindingsBundle, repo string) ([]byte, error) {
 
 func ensureWriteVersion(v string) string {
 	if v == "" {
-		return VersionV2
+		return VersionV3
 	}
 	return v
 }

@@ -50,14 +50,19 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	}
 
 	out.WriteString("## Review Result\n\n")
-	if len(sortedFindings) == 0 {
-		out.WriteString("DiffPal found no actionable issues in the reviewed diff.\n\n")
+	if result := strings.TrimSpace(bundle.ReviewResult); result != "" {
+		out.WriteString(result)
+		out.WriteString("\n\n")
 	} else {
-		fmt.Fprintf(&out, "DiffPal found %d actionable finding(s)", len(sortedFindings))
-		if blocking > 0 {
-			fmt.Fprintf(&out, ", including %d blocking finding(s)", blocking)
+		if len(sortedFindings) == 0 {
+			out.WriteString("DiffPal found no actionable issues in the reviewed diff.\n\n")
+		} else {
+			fmt.Fprintf(&out, "DiffPal found %d actionable finding(s)", len(sortedFindings))
+			if blocking > 0 {
+				fmt.Fprintf(&out, ", including %d blocking finding(s)", blocking)
+			}
+			out.WriteString(".\n\n")
 		}
-		out.WriteString(".\n\n")
 	}
 
 	if opts.ShowMetadata {

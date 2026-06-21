@@ -119,6 +119,49 @@ func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	}
 }
 
+func TestRenderSummaryUsesModelRenderedReviewResultWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummary(findings.FindingsBundle{
+		ReviewID:      "review-localized-result",
+		ReviewResult:  "Найдено 2 замечания, одно из них блокирует слияние.",
+		ChangeSummary: []string{"Updated review summary rendering."},
+		Findings: []findings.Finding{{
+			Severity:  "high",
+			Category:  "security",
+			Path:      "internal/app/service.go",
+			StartLine: 7,
+			EndLine:   7,
+			Message:   "query concatenates user input",
+			Blocking:  true,
+		}},
+	})
+
+	assertContains(t, got, "## Review Result")
+	assertContains(t, got, "Найдено 2 замечания, одно из них блокирует слияние.")
+	assertNotContains(t, got, "DiffPal found 1 actionable finding(s)")
+}
+
+func TestRenderSummaryFallsBackWhenReviewResultEmpty(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummary(findings.FindingsBundle{
+		ReviewID:     "review-empty-result",
+		ReviewResult: "   ",
+		Findings: []findings.Finding{{
+			Severity:  "high",
+			Category:  "security",
+			Path:      "internal/app/service.go",
+			StartLine: 7,
+			EndLine:   7,
+			Message:   "query concatenates user input",
+			Blocking:  true,
+		}},
+	})
+
+	assertContains(t, got, "DiffPal found 1 actionable finding(s), including 1 blocking finding(s).")
+}
+
 func TestRenderSummaryOmitsChangedFileInventory(t *testing.T) {
 	t.Parallel()
 

@@ -115,6 +115,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	if len(nonEmptyChangeSummary(output.ChangeSummary)) == 0 {
 		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("provider returned no change_summary"))
 	}
+	output.ReviewResult = strings.TrimSpace(output.ReviewResult)
 	return output, usage, nil
 }
 
@@ -197,6 +198,7 @@ func renderReviewTaskInput(input ReviewInput) string {
 	fmt.Fprintf(&out, "Repository: %s\n", promptpack.EscapeUntrustedField(input.Repo))
 	fmt.Fprintf(&out, "Base: %s\n", promptpack.EscapeUntrustedField(input.BaseSHA))
 	fmt.Fprintf(&out, "Head: %s\n", promptpack.EscapeUntrustedField(input.HeadSHA))
+	fmt.Fprintf(&out, "Block on: %s\n", promptpack.EscapeUntrustedField(input.BlockOn))
 	fmt.Fprintf(&out, "Language: %s\n", promptpack.EscapeUntrustedField(input.Language))
 	if trimmed := strings.TrimSpace(input.Instructions); trimmed != "" {
 		fmt.Fprintf(&out, "\nRepository-local instructions:\n%s\n", promptpack.EscapeUntrusted(trimmed))

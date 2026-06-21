@@ -30,6 +30,7 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 			ChangeSummary: []string{
 				"Changed the command output behavior used by the sample entrypoint.",
 			},
+			ReviewResult: "Найдено 1 замечание, оно блокирует слияние.",
 			Findings: []ReviewFinding{{
 				Category:   "correctness",
 				Severity:   "high",
@@ -60,6 +61,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	if runtime.inputs[0].Language != "en" {
 		t.Fatalf("runtime input language = %q, want en", runtime.inputs[0].Language)
 	}
+	if runtime.inputs[0].BlockOn != "high" {
+		t.Fatalf("runtime input block_on = %q, want high", runtime.inputs[0].BlockOn)
+	}
 	if !strings.Contains(runtime.inputs[0].ReviewTask, "Perform a DiffPal CI code review") {
 		t.Fatalf("runtime input review task = %q, want DiffPal CI review task", runtime.inputs[0].ReviewTask)
 	}
@@ -71,6 +75,9 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Changed the command output behavior used by the sample entrypoint." {
 		t.Fatalf("ChangeSummary = %v", result.Bundle.ChangeSummary)
+	}
+	if result.Bundle.ReviewResult != "Найдено 1 замечание, оно блокирует слияние." {
+		t.Fatalf("ReviewResult = %q, want localized output", result.Bundle.ReviewResult)
 	}
 	got := result.Bundle.Findings[0]
 	if !got.Blocking {
@@ -254,6 +261,9 @@ func TestRenderReviewTaskInputEscapesCommitAndPathInjectionFixtures(t *testing.T
 	}
 
 	got := renderReviewTaskInput(input)
+	if !strings.Contains(got, "Block on: ") {
+		t.Fatalf("renderReviewTaskInput() missing block_on metadata:\n%s", got)
+	}
 	for _, marker := range []string{
 		promptpack.TrustedControlStart,
 		promptpack.TrustedControlEnd,

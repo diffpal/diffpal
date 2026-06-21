@@ -46,6 +46,7 @@ type ReviewInput struct {
 	Repo                  string   `json:"repo"`
 	BaseSHA               string   `json:"base_sha"`
 	HeadSHA               string   `json:"head_sha"`
+	BlockOn               string   `json:"block_on"`
 	ReviewTask            string   `json:"review_task"`
 	UntrustedInputWarning string   `json:"untrusted_input_warning"`
 	UntrustedInputStart   string   `json:"untrusted_input_start"`
@@ -73,6 +74,7 @@ type ReviewFinding struct {
 
 type ReviewOutput struct {
 	ChangeSummary []string        `json:"change_summary"`
+	ReviewResult  string          `json:"review_result,omitempty"`
 	Findings      []ReviewFinding `json:"findings"`
 }
 
@@ -157,7 +159,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:  findings.VersionV2,
+		Version:  findings.VersionV3,
 		ReviewID: reviewID,
 		BaseSHA:  result.BaseSHA,
 		HeadSHA:  result.HeadSHA,
@@ -187,7 +189,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	collected := make([]findings.Finding, 0)
 	summaries := make([]string, 0)
 	var inspection *findings.Inspection
-	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, language, instructions, commitMessages)
+	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, blockOn, language, instructions, commitMessages)
 	var output ReviewOutput
 	var usage RuntimeUsage
 	err = reliability.RetryWithPolicy(ctx, reliability.Policy{
@@ -219,6 +221,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	bundle.ChangeSummary = normalizeChangeSummary(summaries)
+	bundle.ReviewResult = normalizeReviewResult(output.ReviewResult)
 	bundle.Findings = dedupeAndSortFindings(collected, repo, reviewID, result.HeadSHA)
 	bundle.Inspection = inspection
 	if err := applyBlockingPolicy(&bundle, blockOn); err != nil {
@@ -329,12 +332,17 @@ func normalizeChangeSummary(items []string) []string {
 	return out
 }
 
-func reviewInputFromChanges(reviewID, repo, baseSHA, headSHA, language string, instructions string, commitMessages []string) ReviewInput {
+func normalizeReviewResult(value string) string {
+	return strings.TrimSpace(value)
+}
+
+func reviewInputFromChanges(reviewID, repo, baseSHA, headSHA, blockOn, language string, instructions string, commitMessages []string) ReviewInput {
 	return ReviewInput{
 		ReviewID:              reviewID,
 		Repo:                  repo,
 		BaseSHA:               baseSHA,
 		HeadSHA:               headSHA,
+		BlockOn:               strings.TrimSpace(blockOn),
 		ReviewTask:            promptpack.DefaultReviewPrompt().ReviewTask(),
 		UntrustedInputWarning: promptpack.UntrustedInputWarning,
 		UntrustedInputStart:   promptpack.UntrustedInputStart,
