@@ -51,8 +51,8 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle(default path) error = %v", err)
 	}
-	if readBack.Version != VersionV2 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV2)
+	if readBack.Version != VersionV3 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
 	}
 	if got := readBack.Findings[0].Severity; got != "medium" {
 		t.Fatalf("Severity = %q, want medium", got)
@@ -64,7 +64,7 @@ func TestReadBundleRejectsUnsupportedVersion(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "findings.json")
-	raw := []byte(`{"version":"v3","review_id":"review","findings":[]}`)
+	raw := []byte(`{"version":"v4","review_id":"review","findings":[]}`)
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
@@ -103,8 +103,8 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &readBack); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
-	if readBack.Version != VersionV2 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV2)
+	if readBack.Version != VersionV3 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")

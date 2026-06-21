@@ -1,8 +1,8 @@
-# Findings Schema v2
+# Findings Schema v3
 
 Canonical output is `internal/findings.FindingsBundle` serialized to JSON.
-New DiffPal review runs write `version: v2` and prompt metadata
-`schema_version: findings.v2`.
+New DiffPal review runs write `version: v3` and prompt metadata
+`schema_version: findings.v3`.
 
 Required top-level fields:
 
@@ -27,6 +27,7 @@ Optional top-level fields:
   - `diff_inspected`
   - `context_inspected`
 - `change_summary[]` human-readable overview bullets
+- `review_result` optional human-readable review outcome sentence
 - `files[]` reviewed file list
 
 ## Prompt Versioning
@@ -35,9 +36,9 @@ Prompt metadata is resolved from the versioned prompt registry in
 `internal/reviewer/promptpack`. The current default review prompt is:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.3.0`
+- `prompt_version`: `v1.4.0`
 - `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v2`
+- `schema_version`: `findings.v3`
 
 Prompt body, output schema, and task instructions are treated as a versioned
 product surface. When changing the prompt contract, add a new registered prompt
@@ -129,6 +130,7 @@ older bundles and debug runtimes that can still emit inspection metadata.
 ## Compatibility
 
 DiffPal can still read existing `version: v1` bundles where `evidence` and
-`impact` are strings. New writes use `version: v2`; prompt output validation
-requires structured `evidence` and `impact` and rejects unexpected provider
-properties.
+`impact` are strings, plus `version: v2` bundles without `review_result`.
+New writes use `version: v3`; prompt output validation requires structured
+`evidence` and `impact`, accepts optional `review_result`, and rejects
+unexpected provider properties.

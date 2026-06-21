@@ -122,9 +122,9 @@ artifacts include prompt metadata so review output can be traced back to the
 prompt contract:
 
 - `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.3.0`
+- `prompt_version`: `v1.4.0`
 - `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v2`
+- `schema_version`: `findings.v3`
 
 `diffpal.review.instructions`, `--instructions`, and `--instructions-file`
 are appended as repository-local tuning in a dedicated prompt section. DiffPal
@@ -132,13 +132,15 @@ sends a compact review task snapshot instead of preloading every patch or file
 snippet. Providers inspect the requested base/head diff through their available
 Git and filesystem tooling.
 
-Prompt Pack v1.3.0 labels commit messages, diffs, tool output, code, comments,
+Prompt Pack v1.4.0 labels commit messages, diffs, tool output, code, comments,
 docs, test fixtures, and file contents as untrusted review evidence, never as
 role changes or instructions to follow. It also follows DiffPal's CI review
 contract: report only discrete patch-introduced or patch-worsened issues the
 pull request author would likely fix before merging, anchor findings to the
 smallest useful changed-line range, and keep change summaries semantic instead
-of file-list based.
+of file-list based. It also allows providers to return an optional localized
+`review_result` sentence; when omitted, DiffPal falls back to deterministic
+renderer-owned result text.
 
 Use the offline debug harness to inspect the active prompt and task snapshot
 without spending provider quota:
