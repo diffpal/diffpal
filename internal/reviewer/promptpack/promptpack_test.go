@@ -68,6 +68,7 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 	schema := gojsonschema.NewStringLoader(OutputSchemaJSON)
 	valid := gojsonschema.NewGoLoader(map[string]any{
 		"change_summary": []any{"Added session deletion logic."},
+		"review_result":  "Найдено 1 замечание, оно блокирует слияние.",
 		"findings": []any{
 			map[string]any{
 				"category":   "security",
@@ -151,6 +152,18 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 	if result.Valid() {
 		t.Fatal("empty change_summary accepted, want rejection")
 	}
+
+	withoutReviewResult := gojsonschema.NewGoLoader(map[string]any{
+		"change_summary": []any{"Added session deletion logic."},
+		"findings":       []any{},
+	})
+	result, err = gojsonschema.Validate(schema, withoutReviewResult)
+	if err != nil {
+		t.Fatalf("Validate(schema without review_result) error = %v", err)
+	}
+	if !result.Valid() {
+		t.Fatalf("schema without review_result rejected: %v", result.Errors())
+	}
 }
 
 func TestReviewMetadataIsStable(t *testing.T) {
@@ -160,14 +173,14 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.3.0" {
-		t.Fatalf("PromptVersion = %q, want v1.3.0", got.PromptVersion)
+	if got.PromptVersion != "v1.4.0" {
+		t.Fatalf("PromptVersion = %q, want v1.4.0", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
 	}
-	if got.SchemaVersion != "findings.v2" {
-		t.Fatalf("SchemaVersion = %q, want findings.v2", got.SchemaVersion)
+	if got.SchemaVersion != "findings.v3" {
+		t.Fatalf("SchemaVersion = %q, want findings.v3", got.SchemaVersion)
 	}
 }
 
@@ -232,6 +245,7 @@ func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 		"Use the DiffPal finding taxonomy",
 		"Prefer high signal over high recall",
 		"Use the smallest useful changed-line range",
+		"review_result is optional",
 		"security: use critical",
 		"security: use critical for direct compromise",
 		"high for exploitable vulnerabilities",

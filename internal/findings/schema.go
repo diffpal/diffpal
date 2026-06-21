@@ -10,6 +10,7 @@ import (
 const (
 	VersionV1 = "v1"
 	VersionV2 = "v2"
+	VersionV3 = "v3"
 )
 
 var validSeverities = map[string]struct{}{
@@ -28,6 +29,7 @@ type FindingsBundle struct {
 	Prompt        *PromptMetadata `json:"prompt,omitempty"`
 	Inspection    *Inspection     `json:"inspection,omitempty"`
 	ChangeSummary []string        `json:"change_summary,omitempty"`
+	ReviewResult  string          `json:"review_result,omitempty"`
 	Files         []ReviewedFile  `json:"files,omitempty"`
 	Findings      []Finding       `json:"findings"`
 }
@@ -154,8 +156,8 @@ func (e ValidationError) Error() string {
 
 func Validate(bundle FindingsBundle) error {
 	version := ensureVersion(bundle.Version)
-	if version != VersionV1 && version != VersionV2 {
-		return ValidationError{Field: "version", Msg: "must be v1 or v2"}
+	if version != VersionV1 && version != VersionV2 && version != VersionV3 {
+		return ValidationError{Field: "version", Msg: "must be v1, v2, or v3"}
 	}
 	if bundle.ReviewID == "" {
 		return ValidationError{Field: "review_id", Msg: "review_id is required"}
@@ -184,7 +186,7 @@ func Validate(bundle FindingsBundle) error {
 		if f.Message == "" {
 			return ValidationError{Field: "finding.message", Msg: "message is required"}
 		}
-		if version == VersionV2 {
+		if version == VersionV2 || version == VersionV3 {
 			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true); err != nil {
 				return err
 			}

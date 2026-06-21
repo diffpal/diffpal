@@ -146,7 +146,7 @@ func TestValidateV2RequiresStructuredEvidenceAndImpact(t *testing.T) {
 	t.Parallel()
 
 	valid := FindingsBundle{
-		Version:  VersionV2,
+		Version:  VersionV3,
 		ReviewID: "review-v2",
 		Findings: []Finding{{
 			Category:    "security",
@@ -170,21 +170,21 @@ func TestValidateV2RequiresStructuredEvidenceAndImpact(t *testing.T) {
 		}},
 	}
 	if err := Validate(valid); err != nil {
-		t.Fatalf("Validate(v2) error = %v", err)
+		t.Fatalf("Validate(v3) error = %v", err)
 	}
 
 	missingEvidence := valid
 	missingEvidence.Findings = append([]Finding(nil), valid.Findings...)
 	missingEvidence.Findings[0].Evidence = FindingEvidence{}
 	if err := Validate(missingEvidence); err == nil {
-		t.Fatal("Validate(v2 missing evidence) error = nil, want validation error")
+		t.Fatal("Validate(v3 missing evidence) error = nil, want validation error")
 	}
 
 	missingImpact := valid
 	missingImpact.Findings = append([]Finding(nil), valid.Findings...)
 	missingImpact.Findings[0].Impact = FindingImpact{}
 	if err := Validate(missingImpact); err == nil {
-		t.Fatal("Validate(v2 missing impact) error = nil, want validation error")
+		t.Fatal("Validate(v3 missing impact) error = nil, want validation error")
 	}
 }
 
@@ -192,7 +192,7 @@ func TestValidateV2AllowsSupportingContextWithChangedAnchor(t *testing.T) {
 	t.Parallel()
 
 	bundle := FindingsBundle{
-		Version:  VersionV2,
+		Version:  VersionV3,
 		ReviewID: "review-context",
 		Findings: []Finding{{
 			Category:       "correctness",
@@ -217,7 +217,7 @@ func TestValidateV2AllowsSupportingContextWithChangedAnchor(t *testing.T) {
 		}},
 	}
 	if err := Validate(bundle); err != nil {
-		t.Fatalf("Validate(v2 supporting context) error = %v", err)
+		t.Fatalf("Validate(v3 supporting context) error = %v", err)
 	}
 }
 
@@ -233,8 +233,9 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			PromptID:      "diffpal.review",
 			PromptVersion: "v1.2.0",
 			Purpose:       "review_changed_diff",
-			SchemaVersion: "findings.v2",
+			SchemaVersion: "findings.v3",
 		},
+		ReviewResult: "Найдено 1 замечание, оно блокирует слияние.",
 		Findings: []Finding{{
 			Category:   "security",
 			Severity:   "HIGH",
@@ -255,8 +256,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle() error = %v", err)
 	}
-	if readBack.Version != VersionV2 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV2)
+	if readBack.Version != VersionV3 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")
@@ -266,6 +267,9 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	}
 	if readBack.Prompt.PromptVersion != "v1.2.0" {
 		t.Fatalf("Prompt = %+v, want persisted prompt metadata", readBack.Prompt)
+	}
+	if readBack.ReviewResult != "Найдено 1 замечание, оно блокирует слияние." {
+		t.Fatalf("ReviewResult = %q, want persisted review_result", readBack.ReviewResult)
 	}
 	if readBack.Findings[0].ImpactText() != "attackers can execute script in another user's browser" {
 		t.Fatalf("Impact = %q, want persisted impact", readBack.Findings[0].ImpactText())
