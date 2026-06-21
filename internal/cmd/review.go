@@ -168,14 +168,18 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		return err
 	}
 
-	blocking := countBlockingFindings(execution.Result.Bundle)
+	bundle, err := normalizeBundleBlocking(execution.Result.Bundle, execution.BlockOn)
+	if err != nil {
+		return withExitCode(2, err)
+	}
+	blocking := countBlockingFindings(bundle)
 
 	if dryRun {
 		resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
 		if err != nil {
 			return withExitCode(2, err)
 		}
-		summary, err := renderPublishSummary(platform, execution.Result.Bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel, execution.Repo)
+		summary, err := renderPublishSummary(platform, bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel, execution.Repo)
 		if err != nil {
 			return withExitCode(2, err)
 		}
@@ -189,7 +193,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	}
 
 	if platform == "github" {
-		skipPublish, err := shouldSkipGitHubPublish(execution.Result.Bundle)
+		skipPublish, err := shouldSkipGitHubPublish(bundle)
 		if err != nil {
 			return withExitCode(4, err)
 		}
@@ -210,7 +214,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, execution.Result.Bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, "", execution.ReviewChannel)
+	outputs, _, err := publishBundleToFiles(platform, bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, "", execution.ReviewChannel)
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -218,7 +222,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, execution.Result.Bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -427,6 +431,11 @@ func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
 func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	var err error
+	bundle, err = normalizeBundleBlocking(bundle, blockOn)
+	if err != nil {
+		return err
 	}
 	resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
 	if err != nil {

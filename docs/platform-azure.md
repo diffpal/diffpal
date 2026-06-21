@@ -53,8 +53,7 @@ Required:
 
 ## Status mapping
 
-- `succeeded`: no blocking findings
-- `pending`: findings exist but no merge blockers
+- `succeeded`: no blocking findings, including advisory-only runs
 - `failed`: blocking findings or tooling error
 
 Status payload name should be stable and branch-policy-compatible, e.g.:
@@ -74,6 +73,8 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
   `--instructions-file`, and `--feedback`.
 - `feedback: balanced` is the default and publishes status, a PR summary
   thread, and Azure threads for all findings.
+- `feedback: summary` keeps the PR summary thread and status but does not
+  publish file-bound Azure threads.
 - Config auth values:
   - `diffpal.platforms.azure.auth.system_access_token`
   - `diffpal.platforms.azure.auth.pat`

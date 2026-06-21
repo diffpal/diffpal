@@ -35,7 +35,7 @@ func TestResolvePublishModesUsesFeedbackWhenModeIsEmpty(t *testing.T) {
 		feedback string
 		want     []string
 	}{
-		{name: "github summary", platform: "github", feedback: "summary", want: []string{"comments", "sarif", "summary"}},
+		{name: "github summary", platform: "github", feedback: "summary", want: []string{"sarif", "summary"}},
 		{name: "github balanced", platform: "github", feedback: "balanced", want: []string{"comments", "sarif", "summary"}},
 		{name: "azure summary", platform: "azure", feedback: "summary", want: []string{"status", "summary"}},
 		{name: "azure balanced", platform: "azure", feedback: "balanced", want: []string{"threads", "status", "summary"}},
@@ -168,6 +168,43 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 
 	if strings.Contains(got, "## Summary of Changes") {
 		t.Fatalf("summary contains hidden overview:\n%s", got)
+	}
+}
+
+func TestRenderPublishSummarySummaryOnlyOmitsFindingsResult(t *testing.T) {
+	t.Parallel()
+
+	got, err := renderPublishSummary("github", findings.FindingsBundle{
+		ReviewID: "github-pr-2",
+		ChangeSummary: []string{
+			"Documented the GitHub setup flow for DiffPal users.",
+		},
+		Findings: []findings.Finding{{
+			Severity:  "high",
+			Category:  "security",
+			Path:      "internal/file.go",
+			StartLine: 7,
+			EndLine:   7,
+			Message:   "query concatenates user input",
+			Blocking:  true,
+		}},
+	}, FeedbackSummary, []string{"summary", "sarif"}, true, "", "")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
+
+	assertions := []string{
+		"## Review Result",
+		"## Detailed Comments",
+		"DiffPal found 1 actionable finding(s)",
+	}
+	for _, unwanted := range assertions {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("summary-only output contains %q:\n%s", unwanted, got)
+		}
+	}
+	if !strings.Contains(got, "## Summary of Changes") {
+		t.Fatalf("summary-only output missing change overview:\n%s", got)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/diffpal/diffpal/internal/platform/azure"
 	"github.com/diffpal/diffpal/internal/platform/github"
 	gitlabpub "github.com/diffpal/diffpal/internal/platform/gitlab"
+	"github.com/diffpal/diffpal/internal/policy"
 	"github.com/diffpal/diffpal/internal/sarif"
 )
 
@@ -34,6 +35,10 @@ const (
 func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
+	if err != nil {
+		return nil, 0, err
+	}
+	bundle, err = normalizeBundleBlocking(bundle, blockOn)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -219,7 +224,8 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 		FeedbackProfile: string(profile),
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
-		HideDetails:     strings.ToLower(strings.TrimSpace(platform)) == "github",
+		HideResult:      !publishesFileLevelFindings(platform, modes),
+		HideDetails:     strings.ToLower(strings.TrimSpace(platform)) == "github" || !publishesFileLevelFindings(platform, modes),
 		Links:           githubLinkProvider(platform, bundle, repo),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts), nil
@@ -315,6 +321,8 @@ func modesForFeedback(platform string, feedback FeedbackProfile) []string {
 		}
 	default:
 		switch feedback {
+		case FeedbackSummary:
+			return []string{"sarif", "summary"}
 		default:
 			return []string{"comments", "sarif", "summary"}
 		}
@@ -384,6 +392,16 @@ func defaultModes(platform string) []string {
 	return modesForFeedback(platform, FeedbackBalanced)
 }
 
+func publishesFileLevelFindings(platform string, modes []string) bool {
+	for _, mode := range modes {
+		switch normalizePublishMode(platform, mode) {
+		case "github_comments", "threads", "discussions":
+			return true
+		}
+	}
+	return false
+}
+
 func defaultModeOutput(platform string, mode string) string {
 	switch mode {
 	case "summary":
@@ -416,6 +434,32 @@ func normalizeSeverity(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid block-on severity %q", value)
 	}
+}
+
+func normalizeBundleBlocking(bundle findings.FindingsBundle, blockOn string) (findings.FindingsBundle, error) {
+	sev, err := policy.ParseSeverity(strings.ToLower(strings.TrimSpace(blockOn)))
+	if err != nil {
+		return findings.FindingsBundle{}, err
+	}
+	items := make([]policy.Finding, 0, len(bundle.Findings))
+	for _, item := range bundle.Findings {
+		parsed, err := policy.ParseSeverity(item.Severity)
+		if err != nil {
+			return findings.FindingsBundle{}, err
+		}
+		items = append(items, policy.Finding{
+			Severity:   parsed,
+			Confidence: item.Confidence,
+			Path:       item.Path,
+		})
+	}
+	decisions := policy.ApplyPolicy(policy.Policy{BlockOn: sev}, items)
+	out := bundle
+	out.Findings = append([]findings.Finding(nil), bundle.Findings...)
+	for i := range out.Findings {
+		out.Findings[i].Blocking = decisions[i].Action == "block"
+	}
+	return out, nil
 }
 
 func publishableInlineFindings(items []findings.Finding) []findings.Finding {
