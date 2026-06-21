@@ -21,6 +21,7 @@ type SummaryOptions struct {
 	PublishSurfaces []string
 	ShowMetadata    bool
 	HideOverview    bool
+	HideResult      bool
 	HideDetails     bool
 	Snippets        SnippetProvider
 	Links           FindingLinkProvider
@@ -42,6 +43,10 @@ func RenderSummaryWithOptions(bundle findings.FindingsBundle, opts SummaryOption
 	fmt.Fprintf(&out, "# %s\n\n", title)
 	if !opts.HideOverview {
 		writeChangeOverview(&out, bundle)
+	}
+
+	if opts.HideResult {
+		return out.String()
 	}
 
 	out.WriteString("## Review Result\n\n")

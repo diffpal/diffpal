@@ -244,6 +244,67 @@ func TestPublishBundleToFilesGitHubCommentsIncludeAdvisoryFindings(t *testing.T)
 	}
 }
 
+func TestPublishBundleToFilesNormalizesBlockingFromBlockOn(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GITHUB_EVENT_PATH", "")
+	t.Setenv("GITHUB_REPOSITORY", "acme/diffpal")
+	t.Setenv("GITHUB_BASE_SHA", "base-a")
+	t.Setenv("GITHUB_HEAD_SHA", "head-a")
+
+	bundle := findings.FindingsBundle{
+		Version:  findings.VersionV1,
+		ReviewID: "github-pr-1",
+		BaseSHA:  "base-a",
+		HeadSHA:  "head-a",
+		Findings: []findings.Finding{{
+			ID:         "fp-medium-stale-blocking",
+			ReviewID:   "github-pr-1",
+			Category:   "correctness",
+			Severity:   "medium",
+			Confidence: 0.95,
+			Path:       "internal/db/query.go",
+			StartLine:  3,
+			EndLine:    3,
+			Title:      "advisory",
+			Message:    "medium advisory",
+			Evidence:   findings.NewEvidence("medium evidence"),
+			Blocking:   true,
+		}, {
+			ID:         "fp-high-stale-advisory",
+			ReviewID:   "github-pr-1",
+			Category:   "security",
+			Severity:   "high",
+			Confidence: 0.95,
+			Path:       "internal/db/query.go",
+			StartLine:  5,
+			EndLine:    5,
+			Title:      "blocking",
+			Message:    "high finding",
+			Evidence:   findings.NewEvidence("high evidence"),
+			Blocking:   false,
+		}},
+	}
+
+	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, []string{"comments"}, "balanced", true, "", "")
+	if err != nil {
+		t.Fatalf("publishBundleToFiles() error = %v", err)
+	}
+	if blocking != 1 {
+		t.Fatalf("blocking = %d, want 1 after block_on normalization", blocking)
+	}
+	raw, err := os.ReadFile(filepath.Join(".artifacts", "diffpal", "github-comments.json"))
+	if err != nil {
+		t.Fatalf("ReadFile(github-comments.json) error = %v", err)
+	}
+	text := string(raw)
+	for _, needle := range []string{"fp-medium-stale-blocking", "fp-high-stale-advisory"} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("github comments missing %q after normalization:\n%s", needle, text)
+		}
+	}
+}
+
 func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
 	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", false, []string{"comments", "summary"}, "", true, "review.out", "")
 	if err == nil {

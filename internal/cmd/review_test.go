@@ -865,6 +865,16 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())
 	}
+	raw, err := os.ReadFile(filepath.Join(".artifacts", "diffpal", "summary.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(summary.md) error = %v", err)
+	}
+	text := string(raw)
+	for _, unwanted := range []string{"## Review Result", "## Detailed Comments", "DiffPal found 1 actionable finding(s)"} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("summary-only review contains %q:\n%s", unwanted, text)
+		}
+	}
 }
 
 func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {

@@ -174,6 +174,33 @@ func TestRenderSummaryCanHideChangeOverview(t *testing.T) {
 	assertContains(t, got, "## Review Result")
 }
 
+func TestRenderSummaryCanHideReviewResult(t *testing.T) {
+	t.Parallel()
+
+	got := RenderSummaryWithOptions(findings.FindingsBundle{
+		ReviewID: "review-feedback",
+		ChangeSummary: []string{
+			"Refined application service behavior.",
+		},
+		Findings: []findings.Finding{{
+			Severity:  "high",
+			Category:  "security",
+			Path:      "internal/app/service.go",
+			StartLine: 12,
+			EndLine:   12,
+			Message:   "query concatenates user input",
+			Blocking:  true,
+		}},
+	}, SummaryOptions{
+		HideResult:  true,
+		HideDetails: true,
+	})
+
+	assertContains(t, got, "## Summary of Changes")
+	assertNotContains(t, got, "## Review Result")
+	assertNotContains(t, got, "## Detailed Comments")
+}
+
 func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	t.Parallel()
 

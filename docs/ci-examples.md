@@ -209,9 +209,9 @@ Use `feedback` for normal setup:
 
 | Feedback | Behavior |
 | --- | --- |
-| `summary` | PR/MR summary. On GitHub, actionable findings are still published as inline PR review comments. |
-| `balanced` | Summary plus actionable high-confidence inline comments or threads. |
-| `inline` | Summary plus a more permissive inline threshold for actionable findings. |
+| `summary` | PR/MR summary plus non-file artifacts such as status, SARIF, or Code Quality. No file-level findings are published. |
+| `balanced` | Summary plus file-level comments, threads, or discussions for the platform. Non-blocking findings remain visible without becoming merge blockers. |
+| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. |
 
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.
