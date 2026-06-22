@@ -114,8 +114,8 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return err
 	}
 	blocking := countBlockingFindings(execution.Result.Bundle)
-	if shouldReturnGateError("", execution.Gate, blocking) {
-		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+	if execution.Gate && blocking > 0 {
+		return newReviewBlockedError(blocking)
 	}
 	if blocking > 0 {
 		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
@@ -124,10 +124,6 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		return nil
 	}
 	return nil
-}
-
-func shouldReturnGateError(platform string, gateEnabled bool, blocking int) bool {
-	return gateEnabled && blocking > 0 && platform != "azure"
 }
 
 func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
@@ -186,8 +182,8 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(summary)); err != nil {
 			return withExitCode(5, err)
 		}
-		if shouldReturnGateError(platform, execution.Gate, blocking) {
-			return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+		if execution.Gate && blocking > 0 {
+			return newReviewBlockedError(blocking)
 		}
 		return nil
 	}
@@ -201,8 +197,8 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			if _, err := fmt.Fprintln(cmd.OutOrStdout(), "publish=skipped-fork"); err != nil {
 				return withExitCode(5, err)
 			}
-			if shouldReturnGateError(platform, execution.Gate, blocking) {
-				return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+			if execution.Gate && blocking > 0 {
+				return newReviewBlockedError(blocking)
 			}
 			if blocking > 0 {
 				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
@@ -231,8 +227,8 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 			return withExitCode(5, err)
 		}
 	}
-	if shouldReturnGateError(platform, execution.Gate, blocking) {
-		return withExitCode(1, fmt.Errorf("review blocked: blocking findings detected: %d", blocking))
+	if execution.Gate && blocking > 0 {
+		return newReviewBlockedError(blocking)
 	}
 	if blocking > 0 {
 		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {

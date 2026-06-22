@@ -51,20 +51,6 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	}
 }
 
-func TestShouldReturnGateErrorSkipsAzure(t *testing.T) {
-	t.Parallel()
-
-	if shouldReturnGateError("azure", true, 1) {
-		t.Fatal("Azure gate returned CLI error, want status/vote-only gating")
-	}
-	if !shouldReturnGateError("github", true, 1) {
-		t.Fatal("GitHub gate did not return CLI error")
-	}
-	if shouldReturnGateError("github", false, 1) {
-		t.Fatal("gate disabled returned CLI error")
-	}
-}
-
 func TestReviewLocalSubcommandPassesLanguageAndInstructionsFlags(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -123,8 +109,11 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	if !errors.As(err, &coder) {
 		t.Fatalf("error does not expose ExitCode(): %T", err)
 	}
-	if coder.ExitCode() != 1 {
-		t.Fatalf("ExitCode() = %d, want 1", coder.ExitCode())
+	if coder.ExitCode() != exitCodeReviewBlocked {
+		t.Fatalf("ExitCode() = %d, want %d", coder.ExitCode(), exitCodeReviewBlocked)
+	}
+	if !errors.Is(err, ErrReviewBlocked) {
+		t.Fatalf("error = %v, want ErrReviewBlocked", err)
 	}
 	if !strings.Contains(err.Error(), "review blocked: blocking findings detected: 1") {
 		t.Fatalf("unexpected error: %v", err)
@@ -321,6 +310,16 @@ func TestReviewGitHubGateFailsWithCommentReview(t *testing.T) {
 	}
 	if reviewEvent != "COMMENT" {
 		t.Fatalf("review event = %q, want COMMENT", reviewEvent)
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != exitCodeReviewBlocked {
+		t.Fatalf("ExitCode() = %d, want %d", coder.ExitCode(), exitCodeReviewBlocked)
+	}
+	if !errors.Is(err, ErrReviewBlocked) {
+		t.Fatalf("error = %v, want ErrReviewBlocked", err)
 	}
 	if !strings.Contains(err.Error(), "review blocked: blocking findings detected: 1") {
 		t.Fatalf("error = %v, want blocking gate", err)
@@ -1235,8 +1234,19 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 		"--gate",
 	})
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want blocking gate error")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != exitCodeReviewBlocked {
+		t.Fatalf("ExitCode() = %d, want %d", coder.ExitCode(), exitCodeReviewBlocked)
+	}
+	if !errors.Is(err, ErrReviewBlocked) {
+		t.Fatalf("error = %v, want ErrReviewBlocked", err)
 	}
 	if !sawStatus.Load() {
 		t.Fatal("status publish was not called")
@@ -1323,6 +1333,26 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
       "resourceVersion": 1
     },
     {
+      "id": "d43911ee-6958-46b0-a42b-8445b8a0d004",
+      "area": "git",
+      "resourceName": "pullRequestIterations",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "4216bdcf-b6b1-4d59-8b82-c34cc183fc8b",
+      "area": "git",
+      "resourceName": "pullRequestIterationChanges",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/changes",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
       "id": "4b6702c7-aa35-4b89-9c96-b9abf6d3e540",
       "area": "git",
       "resourceName": "pullRequestReviewers",
@@ -1350,6 +1380,17 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
   "authorizedUser": {"id": "` + reviewerID + `"},
   "authenticatedUser": {"id": "` + reviewerID + `"}
 }`))
+		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/iterations":
+			_, _ = w.Write([]byte(`{"count":1,"value":[{"id":1}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/iterations/1/changes":
+			_, _ = w.Write([]byte(`{
+  "changeEntries": [
+    {
+      "changeTrackingId": 17,
+      "item": {"path": "/main.go"}
+    }
+  ]
+}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
 			_, _ = w.Write([]byte(`{"count":0,"value":[]}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
@@ -1361,6 +1402,9 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
 						Line int `json:"line"`
 					} `json:"rightFileStart"`
 				} `json:"threadContext"`
+				PullRequestThreadContext *struct {
+					ChangeTrackingID *int `json:"changeTrackingId"`
+				} `json:"pullRequestThreadContext"`
 				Comments []struct {
 					Content string `json:"content"`
 				} `json:"comments"`
@@ -1377,14 +1421,19 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
 			}
 			switch {
 			case payload.ThreadContext != nil:
-				if payload.ThreadContext.FilePath != "main.go" {
-					handlerErrs <- fmt.Errorf("thread file path = %q, want main.go", payload.ThreadContext.FilePath)
+				if payload.ThreadContext.FilePath != "/main.go" {
+					handlerErrs <- fmt.Errorf("thread file path = %q, want /main.go", payload.ThreadContext.FilePath)
 					http.Error(w, "unexpected file path", http.StatusBadRequest)
 					return
 				}
 				if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line != 8 {
 					handlerErrs <- fmt.Errorf("thread start line = %#v, want 8", payload.ThreadContext.RightFileStart)
 					http.Error(w, "unexpected thread line", http.StatusBadRequest)
+					return
+				}
+				if payload.PullRequestThreadContext == nil || payload.PullRequestThreadContext.ChangeTrackingID == nil || *payload.PullRequestThreadContext.ChangeTrackingID != 17 {
+					handlerErrs <- fmt.Errorf("thread changeTrackingId = %#v, want 17", payload.PullRequestThreadContext)
+					http.Error(w, "unexpected changeTrackingId", http.StatusBadRequest)
 					return
 				}
 				if !strings.Contains(payload.Comments[0].Content, "medium advisory") {

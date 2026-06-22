@@ -46,3 +46,222 @@ func TestApplyGateVoteUsesReviewerUpsert(t *testing.T) {
 		t.Fatalf("PullRequestId = %v, want %d", client.args.PullRequestId, pullRequestID)
 	}
 }
+
+func TestResolveThreadTargetsMatchesCurrentPath(t *testing.T) {
+	t.Parallel()
+
+	iterationID := 7
+	threadID := "internal/app/service.go:10:correctness:fp-a"
+	targets := resolveThreadTargets([]ThreadAction{{
+		ThreadID: threadID,
+		Path:     "internal/app/service.go",
+		Line:     10,
+		EndLine:  12,
+	}}, iterationID, []pullRequestChangeRef{{
+		Path:             "/internal/app/service.go",
+		ChangeTrackingID: 41,
+	}})
+
+	target, ok := targets[threadID]
+	if !ok {
+		t.Fatal("resolveThreadTargets() did not return a target")
+	}
+	if target.FilePath != "/internal/app/service.go" {
+		t.Fatalf("FilePath = %q, want /internal/app/service.go", target.FilePath)
+	}
+	if target.ChangeTrackingID != 41 {
+		t.Fatalf("ChangeTrackingID = %d, want 41", target.ChangeTrackingID)
+	}
+	if target.IterationID != iterationID {
+		t.Fatalf("IterationID = %d, want %d", target.IterationID, iterationID)
+	}
+}
+
+func TestResolveThreadTargetsFallsBackToOriginalPathForRename(t *testing.T) {
+	t.Parallel()
+
+	threadID := "internal/old/name.go:8:correctness:fp-b"
+	targets := resolveThreadTargets([]ThreadAction{{
+		ThreadID: threadID,
+		Path:     "internal/old/name.go",
+		Line:     8,
+		EndLine:  8,
+	}}, 9, []pullRequestChangeRef{{
+		Path:             "/internal/new/name.go",
+		OriginalPath:     "/internal/old/name.go",
+		ChangeTrackingID: 73,
+	}})
+
+	target, ok := targets[threadID]
+	if !ok {
+		t.Fatal("resolveThreadTargets() did not return a rename target")
+	}
+	if target.FilePath != "/internal/new/name.go" {
+		t.Fatalf("FilePath = %q, want /internal/new/name.go", target.FilePath)
+	}
+	if target.ChangeTrackingID != 73 {
+		t.Fatalf("ChangeTrackingID = %d, want 73", target.ChangeTrackingID)
+	}
+}
+
+func TestThreadPayloadForTargetIncludesAzureFileContext(t *testing.T) {
+	t.Parallel()
+
+	payload := threadPayloadForTarget(ThreadAction{
+		Body:    "body",
+		Status:  ThreadStatusActive,
+		Path:    "internal/app/service.go",
+		Line:    15,
+		EndLine: 18,
+	}, resolvedThreadTarget{
+		FilePath:         "/internal/app/service.go",
+		ChangeTrackingID: 55,
+		IterationID:      11,
+	})
+
+	if payload.ThreadContext == nil || payload.ThreadContext.FilePath == nil {
+		t.Fatal("ThreadContext.FilePath is nil")
+	}
+	if got := *payload.ThreadContext.FilePath; got != "/internal/app/service.go" {
+		t.Fatalf("ThreadContext.FilePath = %q, want /internal/app/service.go", got)
+	}
+	if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line == nil || *payload.ThreadContext.RightFileStart.Line != 15 {
+		t.Fatalf("RightFileStart.Line = %#v, want 15", payload.ThreadContext.RightFileStart)
+	}
+	if payload.ThreadContext.RightFileEnd == nil || payload.ThreadContext.RightFileEnd.Line == nil || *payload.ThreadContext.RightFileEnd.Line != 18 {
+		t.Fatalf("RightFileEnd.Line = %#v, want 18", payload.ThreadContext.RightFileEnd)
+	}
+	if payload.PullRequestThreadContext == nil || payload.PullRequestThreadContext.ChangeTrackingId == nil || *payload.PullRequestThreadContext.ChangeTrackingId != 55 {
+		t.Fatalf("ChangeTrackingId = %#v, want 55", payload.PullRequestThreadContext)
+	}
+	if payload.PullRequestThreadContext.IterationContext == nil {
+		t.Fatal("IterationContext is nil")
+	}
+	if got := payload.PullRequestThreadContext.IterationContext.FirstComparingIteration; got == nil || *got != 11 {
+		t.Fatalf("FirstComparingIteration = %#v, want 11", got)
+	}
+	if got := payload.PullRequestThreadContext.IterationContext.SecondComparingIteration; got == nil || *got != 11 {
+		t.Fatalf("SecondComparingIteration = %#v, want 11", got)
+	}
+}
+
+func TestPublishThreadsUsesResolvedAzureFileContext(t *testing.T) {
+	t.Parallel()
+
+	repoID := "repo-1"
+	project := "proj"
+	prID := 19
+	client := &fakeThreadGitClient{
+		iterations: []azgit.GitPullRequestIteration{{Id: intPtr(3)}},
+		changes: []pullRequestChangeRef{{
+			Path:             "/internal/app/service.go",
+			ChangeTrackingID: 91,
+		}},
+	}
+
+	err := publishThreadsWithClient(context.Background(), client, gitClientArgs{
+		RepositoryID:  &repoID,
+		PullRequestID: &prID,
+		Project:       &project,
+	}, ThreadPlan{
+		Actions: []ThreadAction{{
+			Type:     ActionCreate,
+			ThreadID: "internal/app/service.go:7:correctness:fp-a",
+			Status:   ThreadStatusActive,
+			Path:     "internal/app/service.go",
+			Line:     7,
+			EndLine:  9,
+			Body:     "body",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("publishThreadsWithClient() error = %v", err)
+	}
+	if client.createThreadCalls != 1 {
+		t.Fatalf("CreateThread calls = %d, want 1", client.createThreadCalls)
+	}
+	if client.lastThread == nil || client.lastThread.ThreadContext == nil || client.lastThread.ThreadContext.FilePath == nil {
+		t.Fatal("last thread missing ThreadContext.FilePath")
+	}
+	if got := *client.lastThread.ThreadContext.FilePath; got != "/internal/app/service.go" {
+		t.Fatalf("ThreadContext.FilePath = %q, want /internal/app/service.go", got)
+	}
+	if client.lastThread.PullRequestThreadContext == nil || client.lastThread.PullRequestThreadContext.ChangeTrackingId == nil || *client.lastThread.PullRequestThreadContext.ChangeTrackingId != 91 {
+		t.Fatalf("ChangeTrackingId = %#v, want 91", client.lastThread.PullRequestThreadContext)
+	}
+}
+
+func TestPublishThreadsSkipsUnmatchedInlineThread(t *testing.T) {
+	t.Parallel()
+
+	repoID := "repo-1"
+	project := "proj"
+	prID := 19
+	client := &fakeThreadGitClient{
+		iterations: []azgit.GitPullRequestIteration{{Id: intPtr(3)}},
+		changes:    []pullRequestChangeRef{},
+	}
+
+	err := publishThreadsWithClient(context.Background(), client, gitClientArgs{
+		RepositoryID:  &repoID,
+		PullRequestID: &prID,
+		Project:       &project,
+	}, ThreadPlan{
+		Actions: []ThreadAction{{
+			Type:     ActionCreate,
+			ThreadID: "missing.go:7:correctness:fp-a",
+			Status:   ThreadStatusActive,
+			Path:     "missing.go",
+			Line:     7,
+			EndLine:  7,
+			Body:     "body",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("publishThreadsWithClient() error = %v", err)
+	}
+	if client.createThreadCalls != 0 {
+		t.Fatalf("CreateThread calls = %d, want 0", client.createThreadCalls)
+	}
+}
+
+type fakeThreadGitClient struct {
+	iterations        []azgit.GitPullRequestIteration
+	changes           []pullRequestChangeRef
+	createThreadCalls int
+	lastThread        *azgit.GitPullRequestCommentThread
+}
+
+func (f *fakeThreadGitClient) CreateThread(_ context.Context, args azgit.CreateThreadArgs) (*azgit.GitPullRequestCommentThread, error) {
+	f.createThreadCalls++
+	f.lastThread = args.CommentThread
+	return args.CommentThread, nil
+}
+
+func (f *fakeThreadGitClient) GetPullRequestIterations(_ context.Context, _ azgit.GetPullRequestIterationsArgs) (*[]azgit.GitPullRequestIteration, error) {
+	items := append([]azgit.GitPullRequestIteration(nil), f.iterations...)
+	return &items, nil
+}
+
+func (f *fakeThreadGitClient) GetPullRequestIterationChanges(_ context.Context, _ azgit.GetPullRequestIterationChangesArgs) (*azgit.GitPullRequestIterationChanges, error) {
+	entries := make([]azgit.GitPullRequestChange, 0, len(f.changes))
+	for _, change := range f.changes {
+		path := change.Path
+		originalPath := change.OriginalPath
+		changeTrackingID := change.ChangeTrackingID
+		item := azgit.GitItem{Path: &path}
+		entry := azgit.GitPullRequestChange{
+			Item:             item,
+			ChangeTrackingId: &changeTrackingID,
+		}
+		if originalPath != "" {
+			entry.OriginalPath = &originalPath
+		}
+		entries = append(entries, entry)
+	}
+	return &azgit.GitPullRequestIterationChanges{ChangeEntries: &entries}, nil
+}
+
+func intPtr(v int) *int {
+	return &v
+}
