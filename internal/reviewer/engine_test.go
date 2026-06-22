@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/diff"
@@ -659,6 +660,33 @@ func TestRunWithRuntimeRetriesTransientRuntimeFailures(t *testing.T) {
 	}
 }
 
+func TestRunWithRuntimeUsesConfiguredReviewTimeout(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"before\")\n}\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {\n\tprintln(\"after\")\n}\n")
+
+	runtime := &deadlineRuntime{}
+	timeout := 7 * time.Second
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir:    repo,
+		Repo:          "repo-timeout",
+		ReviewID:      "review-timeout",
+		BlockOn:       "high",
+		ReviewTimeout: timeout,
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if runtime.deadlineDelta <= 0 {
+		t.Fatalf("runtime deadline delta = %s, want positive timeout", runtime.deadlineDelta)
+	}
+	if runtime.deadlineDelta > timeout || runtime.deadlineDelta < timeout-time.Second {
+		t.Fatalf("runtime deadline delta = %s, want close to %s", runtime.deadlineDelta, timeout)
+	}
+}
+
 func TestStructuredOutputErrorsAreTransient(t *testing.T) {
 	err := errors.New("structured output schema validation error: extract output JSON: no JSON object found at byte start")
 	if !isTransientProviderError(err) {
@@ -721,6 +749,19 @@ type fakeRuntime struct {
 	errs    []error
 	inputs  []ReviewInput
 	calls   int
+}
+
+type deadlineRuntime struct {
+	deadlineDelta time.Duration
+}
+
+func (r *deadlineRuntime) Review(ctx context.Context, _ RuntimeConfig, _ ReviewInput) (ReviewOutput, RuntimeUsage, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return ReviewOutput{}, RuntimeUsage{}, errors.New("review context has no deadline")
+	}
+	r.deadlineDelta = time.Until(deadline)
+	return ReviewOutput{}, RuntimeUsage{}, nil
 }
 
 func (f *fakeRuntime) Review(_ context.Context, _ RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {

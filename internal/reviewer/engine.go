@@ -20,14 +20,15 @@ import (
 )
 
 type Options struct {
-	WorkingDir   string
-	Repo         string
-	ReviewID     string
-	BaseSHA      string
-	HeadSHA      string
-	BlockOn      string
-	Language     string
-	Instructions string
+	WorkingDir    string
+	Repo          string
+	ReviewID      string
+	BaseSHA       string
+	HeadSHA       string
+	BlockOn       string
+	Language      string
+	ReviewTimeout time.Duration
+	Instructions  string
 }
 
 type Result struct {
@@ -192,10 +193,14 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, blockOn, language, instructions, commitMessages)
 	var output ReviewOutput
 	var usage RuntimeUsage
+	reviewTimeout := opts.ReviewTimeout
+	if reviewTimeout <= 0 {
+		reviewTimeout = dpconfig.DefaultReviewTimeout
+	}
 	err = reliability.RetryWithPolicy(ctx, reliability.Policy{
 		Attempts:  3,
 		BaseDelay: 750 * time.Millisecond,
-		Timeout:   90 * time.Second,
+		Timeout:   reviewTimeout,
 		IsTransient: func(err error) bool {
 			var reviewErr *Error
 			if errors.As(err, &reviewErr) {

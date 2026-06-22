@@ -9,3 +9,4 @@ diffpal:
     block_on: high
   review:
     language: en
+    timeout: 5m

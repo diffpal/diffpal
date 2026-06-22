@@ -251,6 +251,8 @@ matrix is in the [config reference](docs/config-reference.md#severity-matrix).
 
 Use `diffpal.review.instructions`, the `instructions` action input, or
 `--instructions-file` for repository-specific review guidance.
+For large pull requests or slower providers, set `diffpal.review.timeout`
+in the selected profile, for example `profiles.ci.diffpal.review.timeout: 10m`.
 
 ## Provider Recipes and Runtime Types
 
