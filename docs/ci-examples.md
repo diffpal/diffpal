@@ -210,8 +210,8 @@ Use `feedback` for normal setup:
 | Feedback | Behavior |
 | --- | --- |
 | `summary` | PR/MR summary plus non-file artifacts such as status, SARIF, or Code Quality. No file-level findings are published. |
-| `balanced` | Summary plus file-level comments, threads, or discussions for the platform. Non-blocking findings remain visible without becoming merge blockers. |
-| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. |
+| `balanced` | Summary plus file-level comments, threads, or discussions for the platform. Non-blocking findings remain visible without becoming merge blockers. The summary does not duplicate file-level finding details. |
+| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. The summary does not duplicate file-level finding details. |
 
 Raw `mode` remains available for advanced publish-surface control and overrides
 `feedback` when set.

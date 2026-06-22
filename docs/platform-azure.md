@@ -73,6 +73,9 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
   `--instructions-file`, and `--feedback`.
 - `feedback: balanced` is the default and publishes status, a PR summary
   thread, and Azure threads for all findings.
+- In `balanced` and `inline`, the PR summary thread reports the overview/result
+  only; detailed finding text is published in the file-bound or fallback Azure
+  threads.
 - `feedback: summary` keeps the PR summary thread and status but does not
   publish file-bound Azure threads.
 - Config auth values:
