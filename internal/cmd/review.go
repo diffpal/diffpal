@@ -93,14 +93,13 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 }
 
 func addReviewPublishFlags(cmd *cobra.Command) {
-	cmd.Flags().String("mode", "", "Comma-separated publish modes for the selected host")
-	cmd.Flags().String("feedback", string(FeedbackBalanced), "Review feedback shape: summary, balanced, or inline")
+	cmd.Flags().String("feedback", string(FeedbackReview), "Review feedback shape: summary or review")
 	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
 	cmd.Flags().Bool("dry-run", false, "Print the host review markdown without publishing")
 }
 
 func addGitHubReviewPublishFlags(cmd *cobra.Command) {
-	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for check runs and pull request reviews")
+	cmd.Flags().String("review-channel", github.DefaultReviewChannel, "GitHub publishing channel used for pull request reviews")
 }
 
 func addReviewPolicyFlags(cmd *cobra.Command) {
@@ -127,18 +126,14 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 }
 
 func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run reviewRunner) error {
-	modeSpec, _ := cmd.Flags().GetString("mode")
-	modes := parseModeList(modeSpec)
 	feedback, _ := cmd.Flags().GetString("feedback")
 	summaryOverview, _ := cmd.Flags().GetBool("summary-overview")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if dryRun && platform != "github" {
 		return withExitCode(2, fmt.Errorf("--dry-run is only supported for github review"))
 	}
-	if len(modes) == 0 {
-		if _, err := normalizeFeedback(feedback); err != nil {
-			return withExitCode(2, err)
-		}
+	if _, err := normalizeFeedback(feedback); err != nil {
+		return withExitCode(2, err)
 	}
 	if cmd.Flags().Lookup("review-channel") != nil {
 		reviewChannel, _ := cmd.Flags().GetString("review-channel")
@@ -171,7 +166,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	blocking := countBlockingFindings(bundle)
 
 	if dryRun {
-		resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
+		resolvedModes, profile, err := resolvePublishModes(platform, feedback)
 		if err != nil {
 			return withExitCode(2, err)
 		}
@@ -210,7 +205,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	outputs, _, err := publishBundleToFiles(platform, bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, "", execution.ReviewChannel)
+	outputs, _, err := publishBundleToFiles(platform, bundle, execution.Repo, execution.BlockOn, execution.Gate, feedback, summaryOverview, "", execution.ReviewChannel)
 	if err != nil {
 		return withExitCode(4, err)
 	}
@@ -218,11 +213,11 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, bundle, execution.Repo, execution.BlockOn, execution.Gate, modes, feedback, summaryOverview, execution.ReviewChannel); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, bundle, execution.Repo, execution.BlockOn, execution.Gate, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "mode=%s path=%s\n", item.Mode, item.Path)
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "surface=%s path=%s\n", item.Surface, item.Path)
 		if err != nil {
 			return withExitCode(5, err)
 		}
@@ -425,7 +420,7 @@ func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
 	return ctx.IsFork, nil
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, reviewChannel string) error {
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, feedback string, summaryOverview bool, reviewChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -434,11 +429,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 	if err != nil {
 		return err
 	}
-	resolvedModes, profile, err := resolvePublishModes(platform, modes, feedback)
+	modes, profile, err := resolvePublishModes(platform, feedback)
 	if err != nil {
 		return err
 	}
-	modes = resolvedModes
 	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
 	if err != nil {
 		return err
@@ -475,7 +469,6 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					}
 					existing := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
 					plan = github.PlanInlineCommentsWithOptions(existing, inlineFindings, github.CommentOptions{
-						Profile:     string(profile),
 						AllFindings: true,
 					})
 				}
@@ -523,7 +516,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		plan := azure.PlanThreadsWithProfile(existing, bundle.Findings, reviewCtx, string(profile))
+		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {

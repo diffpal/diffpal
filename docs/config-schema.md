@@ -87,7 +87,7 @@ The default public onboarding recipe selects `codex-acp`. Install it with
 and authenticate Codex with `OPENAI_API_KEY` in CI.
 
 For GitHub, DiffPal always publishes a pull request review. Findings are
-published as inline review comments.
+published as file-level review comments.
 
 Validation requires `version: v1`, a `diffpal.provider` key present in
 `runtime.providers`, and a valid `diffpal.gate.block_on` severity. Changing

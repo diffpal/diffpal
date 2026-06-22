@@ -259,7 +259,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 			{Path: "internal/app/service.go"},
 		},
 	}, SummaryOptions{
-		FeedbackProfile: "balanced",
+		FeedbackProfile: "review",
 		PublishSurfaces: []string{
 			"comments",
 			"sarif",
@@ -271,7 +271,7 @@ func TestRenderSummaryWithOptionsShowsMetadata(t *testing.T) {
 	assertContains(t, got, "## Review Metadata")
 	assertContains(t, got, "- Review ID: review-feedback")
 	assertContains(t, got, "- Reviewed files: 1")
-	assertContains(t, got, "- Feedback profile: balanced")
+	assertContains(t, got, "- Feedback profile: review")
 	assertContains(t, got, "- Publish surfaces: comments, sarif, summary")
 }
 

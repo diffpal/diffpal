@@ -187,11 +187,11 @@ func TestLoadExistingStateReadsPriorPlan(t *testing.T) {
 	}
 }
 
-func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) {
+func TestPlanInlineCommentsUsesStandardConfidenceThreshold(t *testing.T) {
 	t.Parallel()
 
 	items := []findings.Finding{{
-		ID:         "fp-inline",
+		ID:         "fp-low-confidence",
 		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.7,
@@ -199,11 +199,13 @@ func TestPlanInlineCommentsWithProfileUsesExpandedInlineThreshold(t *testing.T) 
 		StartLine:  12,
 		Message:    "edge case",
 	}}
-	if got := PlanInlineCommentsWithProfile(nil, items, "balanced"); len(got.Actions) != 0 {
-		t.Fatalf("balanced actions = %d, want 0", len(got.Actions))
+	if got := PlanInlineComments(nil, items); len(got.Actions) != 0 {
+		t.Fatalf("low confidence actions = %d, want 0", len(got.Actions))
 	}
-	if got := PlanInlineCommentsWithProfile(nil, items, "inline"); len(got.Actions) != 1 {
-		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	items[0].ID = "fp-high-confidence"
+	items[0].Confidence = 0.9
+	if got := PlanInlineComments(nil, items); len(got.Actions) != 1 {
+		t.Fatalf("high confidence actions = %d, want 1", len(got.Actions))
 	}
 }
 
@@ -261,7 +263,6 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 		Evidence:   findings.NewEvidence("Line 17 builds SQL by concatenating user input."),
 		Suggestion: "Use a parameterized statement.",
 	}}, CommentOptions{
-		Profile: "balanced",
 		Links: markdown.FindingLinkFunc(func(findings.Finding) (string, bool) {
 			return "https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17", true
 		}),

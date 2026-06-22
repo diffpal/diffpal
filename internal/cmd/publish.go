@@ -19,20 +19,19 @@ import (
 )
 
 type publishOutput struct {
-	Mode   string `json:"mode"`
-	Path   string `json:"path,omitempty"`
-	Status string `json:"status,omitempty"`
+	Surface string `json:"surface"`
+	Path    string `json:"path,omitempty"`
+	Status  string `json:"status,omitempty"`
 }
 
 type FeedbackProfile string
 
 const (
-	FeedbackBalanced FeedbackProfile = "balanced"
-	FeedbackSummary  FeedbackProfile = "summary"
-	FeedbackInline   FeedbackProfile = "inline"
+	FeedbackReview  FeedbackProfile = "review"
+	FeedbackSummary FeedbackProfile = "summary"
 )
 
-func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, modes []string, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
+func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, feedback string, summaryOverview bool, out string, reviewChannel string) ([]publishOutput, int, error) {
 	platform = strings.ToLower(platform)
 	blockOn, err := normalizeSeverity(blockOn)
 	if err != nil {
@@ -43,14 +42,14 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 		return nil, 0, err
 	}
 	blockThresholds := []string{blockOn}
-	outputs := make([]publishOutput, 0, len(modes))
 	blocking := 0
-	modes, profile, err := resolvePublishModes(platform, modes, feedback)
+	modes, profile, err := resolvePublishModes(platform, feedback)
 	if err != nil {
 		return nil, 0, err
 	}
+	outputs := make([]publishOutput, 0, len(modes))
 	if strings.TrimSpace(out) != "" && len(modes) > 1 {
-		return nil, 0, fmt.Errorf("--out cannot be used with multiple publish modes")
+		return nil, 0, fmt.Errorf("--out cannot be used when feedback publishes multiple surfaces")
 	}
 	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
 	if err != nil {
@@ -69,7 +68,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, summary); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: "published"})
 		case "github_comments":
 			blocking = max(blocking, decision.BlockCount)
 			existing, err := github.LoadExistingState(targetOut)
@@ -77,7 +76,6 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				return nil, 0, err
 			}
 			plan := github.PlanInlineCommentsWithOptions(existing, publishableInlineFindings(bundle.Findings), github.CommentOptions{
-				Profile:     string(profile),
 				Links:       githubLinkProvider(platform, bundle, repo),
 				AllFindings: true,
 			})
@@ -88,7 +86,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: "published"})
 		case "discussions":
 			existing, err := gitlabpub.LoadExistingState(targetOut)
 			if err != nil {
@@ -109,7 +107,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: string(decision.Decision)})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: string(decision.Decision)})
 		case "code_quality", "code-quality":
 			report, err := codequality.ToJSON(bundle, repo)
 			if err != nil {
@@ -118,7 +116,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(report)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: "code-quality", Path: targetOut, Status: "published"})
+			outputs = append(outputs, publishOutput{Surface: "code-quality", Path: targetOut, Status: "published"})
 		case "sarif":
 			converted := sarif.ToReport(bundle)
 			raw, err := sarif.ToJSON(converted)
@@ -128,7 +126,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: "published"})
 		case "threads":
 			existing, err := azure.LoadExistingState(targetOut)
 			if err != nil {
@@ -141,7 +139,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 					HeadSHA: bundle.HeadSHA,
 				}
 			}
-			threads := azure.PlanThreadsWithProfile(existing, bundle.Findings, ctx, string(profile))
+			threads := azure.PlanThreads(existing, bundle.Findings, ctx)
 			payload := map[string]interface{}{
 				"threads": threads,
 			}
@@ -152,7 +150,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: "published"})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: "published"})
 		case "status":
 			blocking = max(blocking, decision.BlockCount)
 			payload := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, decision.BlockCount, decision.AdvisoryCount, false)
@@ -169,7 +167,7 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
 				return nil, 0, err
 			}
-			outputs = append(outputs, publishOutput{Mode: normalized, Path: targetOut, Status: string(payload.State)})
+			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: string(payload.State)})
 		default:
 			return nil, 0, fmt.Errorf("unsupported mode %q for platform %s", mode, platform)
 		}
@@ -178,36 +176,12 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	return outputs, blocking, nil
 }
 
-func resolvePublishModes(platform string, modes []string, feedback string) ([]string, FeedbackProfile, error) {
+func resolvePublishModes(platform string, feedback string) ([]string, FeedbackProfile, error) {
 	profile, err := normalizeFeedback(feedback)
 	if err != nil {
 		return nil, "", err
 	}
-	if len(modes) > 0 {
-		return resolveExplicitPublishModes(platform, modes, profile)
-	}
 	return modesForFeedback(platform, profile), profile, nil
-}
-
-func resolveExplicitPublishModes(platform string, modes []string, profile FeedbackProfile) ([]string, FeedbackProfile, error) {
-	if strings.ToLower(strings.TrimSpace(platform)) != "github" {
-		return modes, profile, nil
-	}
-	normalized := make([]string, 0, len(modes))
-	seen := map[string]struct{}{}
-	for _, mode := range modes {
-		clean := normalizePublishMode(platform, mode)
-		if clean == "check_run" {
-			return nil, "", fmt.Errorf("unsupported mode %q for platform github", mode)
-		}
-		if _, ok := seen[clean]; ok {
-			continue
-		}
-		seen[clean] = struct{}{}
-		normalized = append(normalized, clean)
-	}
-	sort.Strings(normalized)
-	return normalized, profile, nil
 }
 
 func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string, repo string) (string, error) {
@@ -292,12 +266,10 @@ func publishSurfaceLabel(mode string) string {
 
 func normalizeFeedback(value string) (FeedbackProfile, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", string(FeedbackBalanced):
-		return FeedbackBalanced, nil
+	case "", string(FeedbackReview):
+		return FeedbackReview, nil
 	case string(FeedbackSummary):
 		return FeedbackSummary, nil
-	case string(FeedbackInline):
-		return FeedbackInline, nil
 	default:
 		return "", fmt.Errorf("invalid feedback %q", value)
 	}
@@ -329,31 +301,10 @@ func modesForFeedback(platform string, feedback FeedbackProfile) []string {
 	}
 }
 
-func parseModeList(raw string) []string {
-	parts := strings.Split(raw, ",")
-	seen := map[string]struct{}{}
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		clean := strings.TrimSpace(part)
-		if clean == "" {
-			continue
-		}
-		if _, ok := seen[clean]; ok {
-			continue
-		}
-		seen[clean] = struct{}{}
-		out = append(out, clean)
-	}
-	sort.Strings(out)
-	return out
-}
-
 func normalizePublishMode(platform string, mode string) string {
 	mode = strings.ToLower(strings.TrimSpace(mode))
 	switch mode {
-	case "check", "checkrun", "check-run", "check_run":
-		return "check_run"
-	case "comments", "inline", "inline-comments", "inline_comments":
+	case "comments", "review-comments":
 		return "github_comments"
 	case "discussion", "discussions", "threads":
 		if platform == "gitlab" {
@@ -389,7 +340,7 @@ func normalizePublishMode(platform string, mode string) string {
 }
 
 func defaultModes(platform string) []string {
-	return modesForFeedback(platform, FeedbackBalanced)
+	return modesForFeedback(platform, FeedbackReview)
 }
 
 func publishesFileLevelFindings(platform string, modes []string) bool {

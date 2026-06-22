@@ -91,7 +91,7 @@ install/authentication step plus `.config/diffpal/config.yaml`.
 After a PR run, expect:
 
 - a `DiffPal Review Summary` PR review
-- inline review comments when actionable findings exist
+- file-level review comments when actionable findings exist
 - `.artifacts/diffpal/findings.json` in the workflow workspace
 - a failed job only when `gate: true` and blocking findings exist, or when
   setup/publish fails

@@ -281,11 +281,11 @@ func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	}
 }
 
-func TestPlanThreadsWithProfilePublishesAllFindingsInBothProfiles(t *testing.T) {
+func TestPlanThreadsPublishesAllFindings(t *testing.T) {
 	t.Parallel()
 
 	items := []findings.Finding{{
-		ID:         "fp-inline",
+		ID:         "fp-thread",
 		Category:   "correctness",
 		Severity:   "medium",
 		Confidence: 0.1,
@@ -293,11 +293,8 @@ func TestPlanThreadsWithProfilePublishesAllFindingsInBothProfiles(t *testing.T) 
 		StartLine:  12,
 		Message:    "edge case",
 	}}
-	if got := PlanThreadsWithProfile(nil, items, Context{}, "balanced"); len(got.Actions) != 1 {
-		t.Fatalf("balanced actions = %d, want 1", len(got.Actions))
-	}
-	if got := PlanThreadsWithProfile(nil, items, Context{}, "inline"); len(got.Actions) != 1 {
-		t.Fatalf("inline actions = %d, want 1", len(got.Actions))
+	if got := PlanThreads(nil, items, Context{}); len(got.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1", len(got.Actions))
 	}
 }
 
@@ -314,7 +311,7 @@ func TestPlanThreadsClosesAdvisoryFinding(t *testing.T) {
 		Message:    "advisory issue",
 	}}
 
-	plan := PlanThreadsWithProfile(nil, items, Context{}, "balanced")
+	plan := PlanThreads(nil, items, Context{})
 	if len(plan.Actions) != 1 {
 		t.Fatalf("actions = %d, want 1", len(plan.Actions))
 	}

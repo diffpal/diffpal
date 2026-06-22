@@ -45,15 +45,15 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", false, []string{"code-quality", "sarif"}, "", true, "", "")
+	outputs, blocking, err := publishBundleToFiles("gitlab", bundle, "repo-a", "high", false, "summary", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
 	if blocking != 0 {
 		t.Fatalf("blocking = %d, want 0 for artifact-only modes", blocking)
 	}
-	if len(outputs) != 2 {
-		t.Fatalf("len(outputs) = %d, want 2", len(outputs))
+	if len(outputs) != 3 {
+		t.Fatalf("len(outputs) = %d, want 3", len(outputs))
 	}
 	for _, item := range outputs {
 		raw, err := os.ReadFile(item.Path)
@@ -114,15 +114,15 @@ func TestPublishBundleToFilesGitHubEmbedsPermanentLinks(t *testing.T) {
 		},
 	}
 
-	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, []string{"comments"}, "balanced", true, "", "")
+	outputs, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, "review", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
 	if blocking != 1 {
 		t.Fatalf("blocking = %d, want 1", blocking)
 	}
-	if len(outputs) != 1 {
-		t.Fatalf("outputs = %d, want 1", len(outputs))
+	if len(outputs) != 3 {
+		t.Fatalf("outputs = %d, want 3", len(outputs))
 	}
 	path := filepath.Join(".artifacts", "diffpal", "github-comments.json")
 	raw, err := os.ReadFile(path)
@@ -176,7 +176,7 @@ func TestPublishBundleToFilesGitHubCommentsReportsBlocking(t *testing.T) {
 		},
 	}
 
-	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, []string{"comments"}, "inline", true, "", "")
+	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, "review", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -225,7 +225,7 @@ func TestPublishBundleToFilesGitHubCommentsIncludeAdvisoryFindings(t *testing.T)
 		}},
 	}
 
-	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, []string{"comments"}, "balanced", true, "", "")
+	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, "review", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -286,7 +286,7 @@ func TestPublishBundleToFilesNormalizesBlockingFromBlockOn(t *testing.T) {
 		}},
 	}
 
-	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, []string{"comments"}, "balanced", true, "", "")
+	_, blocking, err := publishBundleToFiles("github", bundle, "repo-a", "high", false, "review", true, "", "")
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
@@ -306,11 +306,11 @@ func TestPublishBundleToFilesNormalizesBlockingFromBlockOn(t *testing.T) {
 }
 
 func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
-	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", false, []string{"comments", "summary"}, "", true, "review.out", "")
+	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", false, "review", true, "review.out", "")
 	if err == nil {
-		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-mode error")
+		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-surface error")
 	}
-	if !strings.Contains(err.Error(), "--out cannot be used with multiple publish modes") {
+	if !strings.Contains(err.Error(), "--out cannot be used when feedback publishes multiple surfaces") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

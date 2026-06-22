@@ -59,10 +59,6 @@ type ThreadPlan struct {
 }
 
 func PlanThreads(existing map[string]string, findingsList []findings.Finding, ctx Context) ThreadPlan {
-	return PlanThreadsWithProfile(existing, findingsList, ctx, "")
-}
-
-func PlanThreadsWithProfile(existing map[string]string, findingsList []findings.Finding, ctx Context, _ string) ThreadPlan {
 	return planThreads(existing, findingsList, ctx)
 }
 

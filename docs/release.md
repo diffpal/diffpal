@@ -129,7 +129,7 @@ npm install "@diffpal/diffpal@${VERSION}"
 ```
 
 Open a same-repository pull request and confirm the `diffpal` workflow
-submits a PR review even when no findings are present, and includes inline
+submits a PR review even when no findings are present, and includes file-level
 review comments when findings are present. The GitHub Action smoke path should use `diffpal/action@v1` with
 default `install: true`; provider setup such as `@openai/codex` and
 `@normahq/codex-acp-bridge` remains a separate explicit step.

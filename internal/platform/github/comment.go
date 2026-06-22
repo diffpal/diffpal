@@ -11,7 +11,6 @@ import (
 )
 
 const MinInlineConfidence = 0.8
-const MinExpandedInlineConfidence = 0.65
 
 type CommentActionType string
 
@@ -41,21 +40,16 @@ type CommentPlan struct {
 }
 
 func PlanInlineComments(existing map[string]string, findings []findings.Finding) CommentPlan {
-	return PlanInlineCommentsWithProfile(existing, findings, "")
-}
-
-func PlanInlineCommentsWithProfile(existing map[string]string, findings []findings.Finding, profile string) CommentPlan {
-	return PlanInlineCommentsWithOptions(existing, findings, CommentOptions{Profile: profile})
+	return PlanInlineCommentsWithOptions(existing, findings, CommentOptions{})
 }
 
 type CommentOptions struct {
-	Profile     string
 	Links       markdown.FindingLinkProvider
 	AllFindings bool
 }
 
 func PlanInlineCommentsWithOptions(existing map[string]string, findings []findings.Finding, opts CommentOptions) CommentPlan {
-	minConfidence := inlineConfidenceThreshold(opts.Profile)
+	minConfidence := MinInlineConfidence
 	if opts.AllFindings {
 		minConfidence = -1
 	}
@@ -101,13 +95,6 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		Actions: out,
 		State:   state,
 	}
-}
-
-func inlineConfidenceThreshold(profile string) float64 {
-	if profile == "inline" {
-		return MinExpandedInlineConfidence
-	}
-	return MinInlineConfidence
 }
 
 func ValidateInlineFindings(items []findings.Finding) error {

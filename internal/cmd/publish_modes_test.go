@@ -26,7 +26,7 @@ func TestDefaultModesMatchProductContract(t *testing.T) {
 	}
 }
 
-func TestResolvePublishModesUsesFeedbackWhenModeIsEmpty(t *testing.T) {
+func TestResolvePublishModesUsesFeedback(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -36,16 +36,17 @@ func TestResolvePublishModesUsesFeedbackWhenModeIsEmpty(t *testing.T) {
 		want     []string
 	}{
 		{name: "github summary", platform: "github", feedback: "summary", want: []string{"sarif", "summary"}},
-		{name: "github balanced", platform: "github", feedback: "balanced", want: []string{"comments", "sarif", "summary"}},
+		{name: "github review", platform: "github", feedback: "review", want: []string{"comments", "sarif", "summary"}},
 		{name: "azure summary", platform: "azure", feedback: "summary", want: []string{"status", "summary"}},
-		{name: "azure balanced", platform: "azure", feedback: "balanced", want: []string{"threads", "status", "summary"}},
+		{name: "azure review", platform: "azure", feedback: "review", want: []string{"threads", "status", "summary"}},
 		{name: "gitlab summary", platform: "gitlab", feedback: "summary", want: []string{"code-quality", "sarif", "summary"}},
+		{name: "gitlab review", platform: "gitlab", feedback: "review", want: []string{"code-quality", "discussions", "sarif", "summary"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, profile, err := resolvePublishModes(tc.platform, nil, tc.feedback)
+			got, profile, err := resolvePublishModes(tc.platform, tc.feedback)
 			if err != nil {
 				t.Fatalf("resolvePublishModes() error = %v", err)
 			}
@@ -59,65 +60,13 @@ func TestResolvePublishModesUsesFeedbackWhenModeIsEmpty(t *testing.T) {
 	}
 }
 
-func TestResolvePublishModesExplicitModesOverrideFeedback(t *testing.T) {
-	t.Parallel()
-
-	want := []string{"status"}
-	got, profile, err := resolvePublishModes("azure", want, "summary")
-	if err != nil {
-		t.Fatalf("resolvePublishModes() error = %v", err)
-	}
-	if profile != FeedbackProfile("summary") {
-		t.Fatalf("profile = %q, want summary", profile)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("modes = %v, want %v", got, want)
-	}
-}
-
-func TestResolvePublishModesRejectsGitHubCheckRun(t *testing.T) {
-	t.Parallel()
-
-	_, _, err := resolvePublishModes("github", []string{"check-run"}, "balanced")
-	if err == nil {
-		t.Fatal("resolvePublishModes() error = nil, want unsupported check-run mode")
-	}
-	if !strings.Contains(err.Error(), "unsupported mode") {
-		t.Fatalf("error = %v, want unsupported mode", err)
-	}
-}
-
-func TestResolvePublishModesKeepsExplicitGitHubModes(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		mode string
-		want []string
-	}{
-		{name: "summary only", mode: "summary", want: []string{"summary"}},
-		{name: "sarif only", mode: "sarif", want: []string{"sarif"}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			got, _, err := resolvePublishModes("github", []string{tc.mode}, "summary")
-			if err != nil {
-				t.Fatalf("resolvePublishModes() error = %v", err)
-			}
-			if !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("modes = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
 	t.Parallel()
 
-	if _, _, err := resolvePublishModes("github", nil, "verbose"); err == nil {
-		t.Fatal("resolvePublishModes() error = nil, want invalid feedback error")
+	for _, value := range []string{"verbose", "balanced", "inline"} {
+		if _, _, err := resolvePublishModes("github", value); err == nil {
+			t.Fatalf("resolvePublishModes(%q) error = nil, want invalid feedback error", value)
+		}
 	}
 }
 
@@ -132,13 +81,13 @@ func TestRenderPublishSummaryHidesMetadataByDefault(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"comments", "sarif", "summary"}, true, "", "")
+	}, FeedbackReview, []string{"comments", "sarif", "summary"}, true, "", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
 
 	for _, unwanted := range []string{
-		"- Feedback profile: balanced",
+		"- Feedback profile: review",
 		"- Publish surfaces: comments, sarif, summary",
 	} {
 		if strings.Contains(got, unwanted) {
@@ -161,7 +110,7 @@ func TestRenderPublishSummaryCanHideOverview(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"comments", "sarif", "summary"}, false, "", "")
+	}, FeedbackReview, []string{"comments", "sarif", "summary"}, false, "", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -193,12 +142,11 @@ func TestRenderPublishSummarySummaryOnlyOmitsFindingsResult(t *testing.T) {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
 
-	assertions := []string{
+	for _, unwanted := range []string{
 		"## Review Result",
 		"## Detailed Comments",
 		"DiffPal found 1 actionable finding(s)",
-	}
-	for _, unwanted := range assertions {
+	} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("summary-only output contains %q:\n%s", unwanted, got)
 		}
@@ -226,7 +174,7 @@ func TestRenderPublishSummaryOmitsDetailedCommentsWhenFileThreadsArePublished(t 
 			Impact:     findings.NewImpact("Some trade sessions can remain unprocessed."),
 			Suggestion: "Use s3.NewListObjectsV2Paginator.",
 		}},
-	}, FeedbackBalanced, []string{"threads", "status", "summary"}, true, "", "")
+	}, FeedbackReview, []string{"threads", "status", "summary"}, true, "", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -260,7 +208,7 @@ func TestRenderPublishSummaryUsesReviewChannelTitle(t *testing.T) {
 		Files: []findings.ReviewedFile{
 			{Path: "README.md"},
 		},
-	}, FeedbackBalanced, []string{"comments", "summary"}, true, "diffpal-dev", "")
+	}, FeedbackReview, []string{"comments", "summary"}, true, "diffpal-dev", "")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
@@ -275,7 +223,7 @@ func TestRenderPublishSummaryRejectsInvalidReviewChannel(t *testing.T) {
 
 	_, err := renderPublishSummary("github", findings.FindingsBundle{
 		ReviewID: "github-pr-2",
-	}, FeedbackBalanced, []string{"summary"}, true, "bad/channel", "")
+	}, FeedbackReview, []string{"summary"}, true, "bad/channel", "")
 	if err == nil {
 		t.Fatal("renderPublishSummary() error = nil, want invalid review channel error")
 	}
@@ -302,7 +250,7 @@ func TestRenderPublishSummaryUsesRepoFallbackForGitHubLinks(t *testing.T) {
 				Message:   "message",
 			},
 		},
-	}, FeedbackBalanced, []string{"summary"}, true, "", "acme/diffpal")
+	}, FeedbackReview, []string{"summary"}, true, "", "acme/diffpal")
 	if err != nil {
 		t.Fatalf("renderPublishSummary() error = %v", err)
 	}
