@@ -51,7 +51,7 @@ jobs:
           head: ${{ github.event.pull_request.head.sha }}
           repo: ${{ github.repository }}
           review-id: github-pr-${{ github.event.pull_request.number }}
-          feedback: balanced
+          feedback: review
           gate: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

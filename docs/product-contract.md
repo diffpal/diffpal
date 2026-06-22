@@ -69,7 +69,7 @@
 ## Runtime contract
 
 - Go toolchain minimum: `1.26`
-- Language of CLI defaults to `review` mode flows and findings JSON outputs.
-- Primary review modes are `local`, `github`, `gitlab`, and `ado`.
+- Language of CLI defaults to `review` flows and findings JSON outputs.
+- Primary review subcommands are `local`, `github`, `gitlab`, and `ado`.
 - User-facing host output behavior is configurable by review `--feedback`.
 - Merge gating is based on workflow exit status or platform status surfaces, not bot approval semantics.

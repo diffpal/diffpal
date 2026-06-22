@@ -32,7 +32,7 @@ steps:
     inputs:
       diffpalVersion: latest
       profile: ci
-      feedback: balanced
+      feedback: review
       gate: true
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)

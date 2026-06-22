@@ -28,7 +28,7 @@ steps:
     inputs:
       diffpalVersion: latest
       profile: ci
-      feedback: balanced
+      feedback: review
       gate: true
     env:
       OPENAI_API_KEY: $(OPENAI_API_KEY)
