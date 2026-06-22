@@ -45,11 +45,14 @@ func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Cont
 }
 
 func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, args gitClientArgs, plan ThreadPlan) error {
-	iterationID, changes, err := listPullRequestIterationChanges(ctx, gitClient, args)
-	if err != nil {
-		return err
+	var targets map[string]resolvedThreadTarget
+	if needsAzureThreadTargets(plan.Actions) {
+		iterationID, changes, err := listPullRequestIterationChanges(ctx, gitClient, args)
+		if err != nil {
+			return err
+		}
+		targets = resolveThreadTargets(plan.Actions, iterationID, changes)
 	}
-	targets := resolveThreadTargets(plan.Actions, iterationID, changes)
 	for _, action := range plan.Actions {
 		if action.Type == ActionSkip {
 			continue
@@ -72,6 +75,18 @@ func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, ar
 		}
 	}
 	return nil
+}
+
+func needsAzureThreadTargets(actions []ThreadAction) bool {
+	for _, action := range actions {
+		if action.Type == ActionSkip {
+			continue
+		}
+		if hasCanonicalAzureThreadLocation(action.Path, action.Line) {
+			return true
+		}
+	}
+	return false
 }
 
 const summaryThreadMarker = "<!-- diffpal:summary -->"

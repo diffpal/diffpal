@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -262,9 +263,60 @@ func TestPublishThreadsFailsUnmatchedInlineThread(t *testing.T) {
 	}
 }
 
+func TestPublishThreadsDoesNotFetchChangesForFallbackOnlyPlan(t *testing.T) {
+	t.Parallel()
+
+	repoID := "repo-1"
+	project := "proj"
+	prID := 19
+	client := &fakeThreadGitClient{
+		iterationErr: errors.New("iteration lookup should not run"),
+	}
+
+	err := publishThreadsWithClient(context.Background(), client, gitClientArgs{
+		RepositoryID:  &repoID,
+		PullRequestID: &prID,
+		Project:       &project,
+	}, ThreadPlan{
+		Actions: []ThreadAction{
+			{
+				Type:     ActionSkip,
+				ThreadID: "internal/app/service.go:7:correctness:fp-a",
+				Status:   ThreadStatusActive,
+				Path:     "internal/app/service.go",
+				Line:     7,
+				EndLine:  7,
+				Body:     "body",
+			},
+			{
+				Type:     ActionCreate,
+				ThreadID: fallbackAdvisoryThreadID,
+				Status:   ThreadStatusClosed,
+				Body:     "fallback body",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publishThreadsWithClient() error = %v", err)
+	}
+	if client.iterationCalls != 0 {
+		t.Fatalf("GetPullRequestIterations calls = %d, want 0", client.iterationCalls)
+	}
+	if client.changeCalls != 0 {
+		t.Fatalf("GetPullRequestIterationChanges calls = %d, want 0", client.changeCalls)
+	}
+	if client.createThreadCalls != 1 {
+		t.Fatalf("CreateThread calls = %d, want 1", client.createThreadCalls)
+	}
+}
+
 type fakeThreadGitClient struct {
 	iterations        []azgit.GitPullRequestIteration
 	changes           []pullRequestChangeRef
+	iterationErr      error
+	changeErr         error
+	iterationCalls    int
+	changeCalls       int
 	createThreadCalls int
 	lastThread        *azgit.GitPullRequestCommentThread
 }
@@ -276,11 +328,19 @@ func (f *fakeThreadGitClient) CreateThread(_ context.Context, args azgit.CreateT
 }
 
 func (f *fakeThreadGitClient) GetPullRequestIterations(_ context.Context, _ azgit.GetPullRequestIterationsArgs) (*[]azgit.GitPullRequestIteration, error) {
+	f.iterationCalls++
+	if f.iterationErr != nil {
+		return nil, f.iterationErr
+	}
 	items := append([]azgit.GitPullRequestIteration(nil), f.iterations...)
 	return &items, nil
 }
 
 func (f *fakeThreadGitClient) GetPullRequestIterationChanges(_ context.Context, _ azgit.GetPullRequestIterationChangesArgs) (*azgit.GitPullRequestIterationChanges, error) {
+	f.changeCalls++
+	if f.changeErr != nil {
+		return nil, f.changeErr
+	}
 	entries := make([]azgit.GitPullRequestChange, 0, len(f.changes))
 	for _, change := range f.changes {
 		path := change.Path
