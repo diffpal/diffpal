@@ -341,11 +341,11 @@ diffpal:
 Keep MCP credentials in CI secrets. Use envsubst placeholders only for values
 that are guaranteed to exist in that job.
 
-## Feedback Modes
+## Feedback
 
 Use `feedback` for the normal user-facing shape:
 
-| Mode | Behavior |
+| Feedback | Behavior |
 | --- | --- |
 | `summary` | Summary plus non-file artifacts such as SARIF, Code Quality, or status. No file-level findings are published. |
 | `review` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. The summary does not duplicate file-level finding details. |
