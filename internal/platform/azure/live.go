@@ -3,7 +3,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"strconv"
@@ -59,8 +58,7 @@ func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, ar
 		if hasCanonicalAzureThreadLocation(action.Path, action.Line) {
 			target, ok := targets[action.ThreadID]
 			if !ok {
-				log.Printf("diffpal: skipped Azure inline thread for %s:%d: no current PR change mapping found", action.Path, action.Line)
-				continue
+				return fmt.Errorf("azure inline thread target not found for %s:%d", action.Path, action.Line)
 			}
 			payload = threadPayloadForTarget(action, target)
 		}

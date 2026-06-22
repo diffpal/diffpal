@@ -225,7 +225,7 @@ func TestPublishThreadsUsesResolvedAzureFileContext(t *testing.T) {
 	}
 }
 
-func TestPublishThreadsSkipsUnmatchedInlineThread(t *testing.T) {
+func TestPublishThreadsFailsUnmatchedInlineThread(t *testing.T) {
 	t.Parallel()
 
 	repoID := "repo-1"
@@ -251,8 +251,11 @@ func TestPublishThreadsSkipsUnmatchedInlineThread(t *testing.T) {
 			Body:     "body",
 		}},
 	})
-	if err != nil {
-		t.Fatalf("publishThreadsWithClient() error = %v", err)
+	if err == nil {
+		t.Fatal("publishThreadsWithClient() error = nil, want unmatched inline target error")
+	}
+	if !strings.Contains(err.Error(), "azure inline thread target not found for missing.go:7") {
+		t.Fatalf("publishThreadsWithClient() error = %v, want unmatched inline target", err)
 	}
 	if client.createThreadCalls != 0 {
 		t.Fatalf("CreateThread calls = %d, want 0", client.createThreadCalls)
