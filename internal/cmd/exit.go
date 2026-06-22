@@ -2,13 +2,33 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/diffpal/diffpal/internal/reviewer"
 )
 
+const exitCodeReviewBlocked = 10
+
+var ErrReviewBlocked = errors.New("review blocked")
+
 type exitError struct {
 	code int
 	err  error
+}
+
+type reviewBlockedError struct {
+	blocking int
+}
+
+func (e *reviewBlockedError) Error() string {
+	if e == nil {
+		return ErrReviewBlocked.Error()
+	}
+	return fmt.Sprintf("%s: blocking findings detected: %d", ErrReviewBlocked, e.blocking)
+}
+
+func (e *reviewBlockedError) Unwrap() error {
+	return ErrReviewBlocked
 }
 
 func (e *exitError) Error() string {
@@ -41,6 +61,10 @@ func withExitCode(code int, err error) error {
 		return err
 	}
 	return &exitError{code: code, err: err}
+}
+
+func newReviewBlockedError(blocking int) error {
+	return withExitCode(exitCodeReviewBlocked, &reviewBlockedError{blocking: blocking})
 }
 
 func reviewExitError(err error) error {
