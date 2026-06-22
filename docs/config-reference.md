@@ -192,7 +192,7 @@ diffpal review github \
   --head "$HEAD_SHA" \
   --language en \
   --instructions-file .config/diffpal/review-instructions.md \
-  --feedback balanced
+  --feedback review
 ```
 
 ## Gate

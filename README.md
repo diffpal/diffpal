@@ -8,14 +8,14 @@
 **Open-source, provider-agnostic AI review for pull requests.**
 
 DiffPal is an open-source PR review system that turns changed code into
-structured findings, clear summaries, inline feedback, artifacts, and merge
+structured findings, clear summaries, file-level feedback, artifacts, and merge
 gates. Teams bring their own AI provider or ACP-compatible CLI, so there is no
 mandatory hosted DiffPal review service and no required per-seat review
 platform.
 
 DiffPal exists to make AI code review something teams control, not another
 review platform they rent. It runs in your CI, uses the AI provider you choose,
-and turns every pull request into clear summaries, actionable inline feedback,
+and turns every pull request into clear summaries, actionable file-level feedback,
 review artifacts, and merge gates.
 
 Use the provider path that already works for your team and keep the review
@@ -24,7 +24,7 @@ affordable, and enforceable across GitHub, GitLab, and Azure DevOps.
 
 | Works with | Publishes | Gates on |
 | --- | --- | --- |
-| GitHub Actions, GitLab CI, Azure Pipelines | summaries, inline comments, checks/statuses, SARIF, Code Quality | policy thresholds through native CI checks and PR statuses |
+| GitHub Actions, GitLab CI, Azure Pipelines | summaries, file-level comments, checks/statuses, SARIF, Code Quality | policy thresholds through native CI checks and PR statuses |
 
 [Quickstart](docs/quickstart.md) · [CI examples](docs/ci-examples.md) · [Config reference](docs/config-reference.md) · [Provider recipes](examples/README.md)
 
@@ -99,7 +99,7 @@ cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 Expected result:
 
 - a `DiffPal Review Summary` PR review with an overview of the change
-- inline review comments for actionable findings
+- file-level review comments for actionable findings
 - `.artifacts/diffpal/findings.json` in the job workspace
 - a failed job only when `gate: true` and blocking findings exist, or when setup
   or publishing fails
@@ -117,7 +117,7 @@ DiffPal.
 
 | CI system | Examples | Output surfaces |
 | --- | --- | --- |
-| GitHub Actions | [`examples/ci/github-actions`](examples/ci/github-actions) | PR review summary, inline review comments, SARIF |
+| GitHub Actions | [`examples/ci/github-actions`](examples/ci/github-actions) | PR review summary, file-level review comments, SARIF |
 | GitLab CI | [`examples/ci/gitlab`](examples/ci/gitlab) | MR summary, discussions, Code Quality, SARIF |
 | Azure Pipelines | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) | PR summary thread, PR threads, PR status |
 
@@ -190,7 +190,7 @@ jobs:
           head: ${{ github.event.pull_request.head.sha }}
           profile: ci
           gate: true
-          feedback: balanced
+          feedback: review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -348,8 +348,7 @@ Use `feedback` for the normal user-facing shape:
 | Mode | Behavior |
 | --- | --- |
 | `summary` | Summary plus non-file artifacts such as SARIF, Code Quality, or status. No file-level findings are published. |
-| `balanced` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. The summary does not duplicate file-level finding details. |
-| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. The summary does not duplicate file-level finding details. |
+| `review` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. The summary does not duplicate file-level finding details. |
 
 Use `summary-overview: false` or `--summary-overview=false` if you do not want
 the semantic change overview in the summary.
@@ -362,7 +361,7 @@ with:
   review-id: github-pr-${{ github.event.pull_request.number }}-diffpal-dev
 ```
 
-That produces a separate `diffpal-dev` PR review with its own summary and inline
+That produces a separate `diffpal-dev` PR review with its own summary and file-level
 comments.
 
 ## Local Debugging

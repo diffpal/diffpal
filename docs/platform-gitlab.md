@@ -27,11 +27,7 @@ Required context:
 Normal CI setup should use `--feedback`:
 
 - `summary`: posts Code Quality/SARIF artifacts and one MR summary discussion, without file-level findings.
-- `balanced`: publishes blocking discussions and keeps non-blocking findings visible in the advisory summary stream.
-- `inline`: uses the same publication contract as `balanced` on GitLab today.
-
-Advanced `--mode` values still exist for direct surface selection and override
-`--feedback` when set.
+- `review`: publishes blocking discussions and keeps non-blocking findings visible in the advisory summary stream.
 
 Severity to discussion policy:
 

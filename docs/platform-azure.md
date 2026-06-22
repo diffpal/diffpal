@@ -74,9 +74,9 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - For large PRs or slower ACP providers, set `diffpal.review.timeout` in the
   selected config profile, for example `profiles.ci.diffpal.review.timeout:
   10m`.
-- `feedback: balanced` is the default and publishes status, a PR summary
+- `feedback: review` is the default and publishes status, a PR summary
   thread, and Azure threads for all findings.
-- In `balanced` and `inline`, the PR summary thread reports the overview/result
+- In `review`, the PR summary thread reports the overview/result
   only; detailed finding text is published in the file-bound or fallback Azure
   threads.
 - `feedback: summary` keeps the PR summary thread and status but does not

@@ -60,8 +60,7 @@ jobs:
           --repo ${{ github.repository }}
           --review-id github-pr-${{ github.event.pull_request.number }}-diffpal-dev
           --review-channel diffpal-dev
-          --feedback balanced
-          --mode comments,summary
+          --feedback summary
           --gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

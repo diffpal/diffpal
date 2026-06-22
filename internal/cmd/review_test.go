@@ -219,7 +219,6 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "comments,summary",
 		"--review-channel", "diffpal-dev",
 	})
 
@@ -256,8 +255,8 @@ func TestReviewGitHubPublishesSelectedHostArtifacts(t *testing.T) {
 	for _, needle := range []string{
 		"findings=1",
 		"bundle=",
-		"mode=github_comments path=.artifacts/diffpal/github-comments.json",
-		"mode=summary path=.artifacts/diffpal/summary.md",
+		"surface=github_comments path=.artifacts/diffpal/github-comments.json",
+		"surface=summary path=.artifacts/diffpal/summary.md",
 	} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("output missing %q:\n%s", needle, text)
@@ -319,7 +318,7 @@ func TestReviewGitHubGateFailsWithCommentReview(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "summary",
+		"--feedback", "summary",
 		"--gate",
 	})
 
@@ -408,7 +407,6 @@ func TestReviewGitHubPublishesAdvisoryInlineComment(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "comments,summary",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -486,7 +484,7 @@ func TestReviewGitHubGateCommentsOnPassingReview(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "summary",
+		"--feedback", "summary",
 		"--gate",
 	})
 
@@ -574,7 +572,7 @@ func TestReviewGitHubPublishesNoInlineCommentsForNonBlockingFindings(t *testing.
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "summary",
+		"--feedback", "summary",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -831,7 +829,7 @@ func TestReviewGitHubForkSafetyFailsClosedOnContextError(t *testing.T) {
 	if !strings.Contains(err.Error(), "resolve github context for fork safety") {
 		t.Fatalf("error missing fork safety context: %v", err)
 	}
-	if strings.Contains(out.String(), "mode=summary") {
+	if strings.Contains(out.String(), "surface=summary") {
 		t.Fatalf("output shows publish artifacts despite context error:\n%s", out.String())
 	}
 	if called.Load() {
@@ -876,7 +874,7 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	cmd.SetArgs([]string{
 		"github",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "summary",
+		"--feedback", "summary",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -885,7 +883,7 @@ func TestReviewGitHubAlwaysPublishesPullRequestReview(t *testing.T) {
 	if got := requests.Load(); got != 2 {
 		t.Fatalf("requests = %d, want 2", got)
 	}
-	if !strings.Contains(out.String(), "mode=summary path=.artifacts/diffpal/summary.md") {
+	if !strings.Contains(out.String(), "surface=summary path=.artifacts/diffpal/summary.md") {
 		t.Fatalf("output missing summary artifact:\n%s", out.String())
 	}
 	raw, err := os.ReadFile(filepath.Join(".artifacts", "diffpal", "summary.md"))
@@ -919,7 +917,7 @@ func TestReviewGitHubRequiresConfiguredAuthEnv(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json"), "--mode", "summary"})
+	cmd.SetArgs([]string{"github", "--out", filepath.Join(dir, "findings.json"), "--feedback", "summary"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -1011,13 +1009,13 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	cmd.SetArgs([]string{"gitlab", "--out", filepath.Join(dir, "findings.json"), "--mode", "discussions"})
+	cmd.SetArgs([]string{"gitlab", "--out", filepath.Join(dir, "findings.json")})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 1 {
-		t.Fatalf("requests = %d, want 1", got)
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("requests = %d, want 2", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -1052,7 +1050,7 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 		switch {
 		case r.Method == http.MethodOptions && r.URL.Path == "/_apis":
 			_, _ = w.Write([]byte(`{
-  "count": 2,
+  "count": 3,
   "value": [
     {
       "id": "e81700f7-3be2-46de-8624-2eb35882fcaa",
@@ -1069,6 +1067,16 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
       "area": "git",
       "resourceName": "pullRequestStatuses",
       "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
+    },
+    {
+      "id": "ab6e2e5d-a0b7-4153-b64a-a4efe0d49449",
+      "area": "git",
+      "resourceName": "pullRequestThreads",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads",
       "minVersion": "1.0",
       "maxVersion": "7.1",
       "releasedVersion": "7.1",
@@ -1090,6 +1098,11 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/statuses":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":1}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			_, _ = w.Write([]byte(`{"count":0,"value":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1,"comments":[]}`))
 		default:
 			handlerErrs <- fmt.Errorf("request = %s %s", r.Method, r.URL.String())
 			http.Error(w, "unexpected request", http.StatusBadRequest)
@@ -1106,13 +1119,13 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	cmd.SetArgs([]string{"ado", "--out", filepath.Join(dir, "findings.json"), "--mode", "status"})
+	cmd.SetArgs([]string{"ado", "--out", filepath.Join(dir, "findings.json"), "--feedback", "summary"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 3 {
-		t.Fatalf("requests = %d, want 3 SDK discovery/status requests", got)
+	if got := requests.Load(); got != 6 {
+		t.Fatalf("requests = %d, want 6 SDK discovery/status/summary requests", got)
 	}
 	select {
 	case err := <-handlerErrs:
@@ -1148,7 +1161,7 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 		switch {
 		case r.Method == http.MethodOptions && r.URL.Path == "/_apis":
 			_, _ = w.Write([]byte(`{
-  "count": 4,
+  "count": 5,
   "value": [
     {
       "id": "e81700f7-3be2-46de-8624-2eb35882fcaa",
@@ -1189,6 +1202,16 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
       "maxVersion": "7.1",
       "releasedVersion": "7.1",
       "resourceVersion": 1
+    },
+    {
+      "id": "ab6e2e5d-a0b7-4153-b64a-a4efe0d49449",
+      "area": "git",
+      "resourceName": "pullRequestThreads",
+      "routeTemplate": "{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads",
+      "minVersion": "1.0",
+      "maxVersion": "7.1",
+      "releasedVersion": "7.1",
+      "resourceVersion": 1
     }
   ]
 }`))
@@ -1212,6 +1235,11 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 			sawStatus.Store(true)
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":1}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			_, _ = w.Write([]byte(`{"count":0,"value":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/threads":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":1,"comments":[]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/reviewers/"+reviewerID:
 			var payload struct {
 				Id   string `json:"id"`
@@ -1254,7 +1282,7 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 	cmd.SetArgs([]string{
 		"ado",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--mode", "status",
+		"--feedback", "summary",
 		"--gate",
 	})
 
@@ -1551,7 +1579,7 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
 	cmd.SetArgs([]string{
 		"ado",
 		"--out", filepath.Join(dir, "findings.json"),
-		"--feedback", "balanced",
+		"--feedback", "review",
 		"--gate",
 	})
 
@@ -1572,9 +1600,9 @@ func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing
 	}
 	for _, needle := range []string{
 		"findings=1",
-		"mode=threads path=.artifacts/diffpal/azure-threads.json",
-		"mode=status path=.artifacts/diffpal/azure-status.json",
-		"mode=summary path=.artifacts/diffpal/summary.md",
+		"surface=threads path=.artifacts/diffpal/azure-threads.json",
+		"surface=status path=.artifacts/diffpal/azure-status.json",
+		"surface=summary path=.artifacts/diffpal/summary.md",
 	} {
 		if !strings.Contains(out.String(), needle) {
 			t.Fatalf("output missing %q:\n%s", needle, out.String())

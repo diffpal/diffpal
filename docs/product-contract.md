@@ -21,7 +21,7 @@
 - Affordability story: teams keep cost control with their existing provider
   choices instead of adopting a required per-seat review platform.
 - DiffPal product surface: diff collection, structured findings, summaries,
-  inline feedback, artifacts, and merge gates.
+  file-level feedback, artifacts, and merge gates.
 
 ## Project Goals
 
@@ -36,7 +36,7 @@
 
 | Host | Phase | Primary surfaces |
 |---|---|---|
-| GitHub | MVP | PR reviews, inline review comments, markdown summary, SARIF |
+| GitHub | MVP | PR reviews, file-level review comments, markdown summary, SARIF |
 | GitLab | v1 | discussions, Code Quality, SARIF |
 | Azure DevOps | v1 | PR threads, PR status |
 
@@ -54,7 +54,7 @@
 - Markdown summary: `.artifacts/diffpal/summary.md`
 - SARIF export: `.artifacts/diffpal/diffpal.sarif`
 - Code Quality export: `.artifacts/diffpal/codequality.json`
-- GitHub inline comment plan: `.artifacts/diffpal/github-comments.json`
+- GitHub review comment plan: `.artifacts/diffpal/github-comments.json`
 - GitLab discussions plan: `.artifacts/diffpal/gitlab-discussions.json`
 - Azure threads plan: `.artifacts/diffpal/azure-threads.json`
 - Azure status payload: `.artifacts/diffpal/azure-status.json`
@@ -71,6 +71,5 @@
 - Go toolchain minimum: `1.26`
 - Language of CLI defaults to `review` mode flows and findings JSON outputs.
 - Primary review modes are `local`, `github`, `gitlab`, and `ado`.
-- User-facing host output behavior is configurable by review `--feedback`;
-  advanced publish surfaces remain configurable by `--mode`.
+- User-facing host output behavior is configurable by review `--feedback`.
 - Merge gating is based on workflow exit status or platform status surfaces, not bot approval semantics.
