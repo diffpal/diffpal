@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/diffpal/diffpal/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -10,6 +11,7 @@ var (
 )
 
 func NewRootCommand() *cobra.Command {
+	var debug bool
 	root := &cobra.Command{
 		Use:           "diffpal",
 		Short:         "DiffPal CLI for local and CI code review",
@@ -18,7 +20,11 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().StringVar(&rootConfigDir, "config-dir", "", "extra config root directory (highest priority)")
+	root.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	root.PersistentFlags().StringVar(&rootProfile, "profile", "", "config profile name")
+	root.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
+		cmd.SetContext(logging.Init(cmd.Context(), debug))
+	}
 
 	root.AddCommand(
 		newInitCommand(),

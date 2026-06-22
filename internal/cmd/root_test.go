@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/rs/zerolog"
 )
 
 func TestRootHelpShowsCanonicalCommands(t *testing.T) {
@@ -36,6 +38,42 @@ func TestRootSilencesUsageAndErrorsForRunErrors(t *testing.T) {
 	}
 	if !cmd.SilenceErrors {
 		t.Fatal("root command should let main print runtime errors")
+	}
+}
+
+func TestRootDebugFlagEnablesZerologDebugLevel(t *testing.T) {
+	prevLevel := zerolog.GlobalLevel()
+	defer zerolog.SetGlobalLevel(prevLevel)
+
+	cmd := NewRootCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--debug", "version"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := zerolog.GlobalLevel(); got != zerolog.DebugLevel {
+		t.Fatalf("zerolog global level = %s, want %s", got, zerolog.DebugLevel)
+	}
+}
+
+func TestRootDefaultLogLevelIsInfo(t *testing.T) {
+	prevLevel := zerolog.GlobalLevel()
+	defer zerolog.SetGlobalLevel(prevLevel)
+
+	cmd := NewRootCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"version"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := zerolog.GlobalLevel(); got != zerolog.InfoLevel {
+		t.Fatalf("zerolog global level = %s, want %s", got, zerolog.InfoLevel)
 	}
 }
 
