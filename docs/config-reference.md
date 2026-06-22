@@ -114,6 +114,7 @@ config file.
 | --- | --- | --- |
 | `diffpal.review.language` | `en` | Language for finding text and summaries. |
 | `diffpal.review.instructions` | empty | Optional repository-local prompt tuning and scope extensions appended to the review instruction. |
+| `diffpal.review.timeout` | `5m` | Per-attempt provider review timeout. Uses Go duration syntax such as `180s`, `5m`, or `10m`. |
 
 ## Prompt Pack
 

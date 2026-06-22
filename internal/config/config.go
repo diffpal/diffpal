@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
 	"github.com/normahq/norma/pkg/runtime/appconfig"
@@ -51,6 +52,7 @@ type GateConfig struct {
 type ReviewConfig struct {
 	Language     string `json:"language"     yaml:"language"     mapstructure:"language"`
 	Instructions string `json:"instructions" yaml:"instructions" mapstructure:"instructions"`
+	Timeout      string `json:"timeout"      yaml:"timeout"      mapstructure:"timeout"`
 }
 
 type PlatformConfigs struct {
@@ -100,7 +102,10 @@ var validSeverityThresholds = map[string]struct{}{
 	"critical": {},
 }
 
-const defaultBlockOn = "high"
+const (
+	DefaultReviewTimeout = 5 * time.Minute
+	defaultBlockOn       = "high"
+)
 
 func LoadConfig(workingDir, configDir, profile string) (Config, error) {
 	loaded, err := LoadConfigWithMetadata(workingDir, configDir, profile)
@@ -198,6 +203,9 @@ func (cfg Config) Validate() error {
 	if _, err := NormalizeReviewLanguage(cfg.Review.Language); err != nil {
 		return err
 	}
+	if _, err := NormalizeReviewTimeout(cfg.Review.Timeout); err != nil {
+		return err
+	}
 	if err := cfg.Platforms.Validate(); err != nil {
 		return err
 	}
@@ -211,6 +219,10 @@ func (cfg *Config) Normalize() error {
 	}
 	cfg.Review.Language = language
 	cfg.Review.Instructions = strings.TrimSpace(cfg.Review.Instructions)
+	cfg.Review.Timeout, err = NormalizeReviewTimeoutString(cfg.Review.Timeout)
+	if err != nil {
+		return err
+	}
 	cfg.Provider = strings.TrimSpace(cfg.Provider)
 	cfg.Gate.BlockOn = strings.ToLower(strings.TrimSpace(cfg.Gate.BlockOn))
 	if cfg.Gate.BlockOn == "" {
@@ -243,6 +255,14 @@ func (cfg Config) ReviewInstructions() string {
 	return strings.TrimSpace(cfg.Review.Instructions)
 }
 
+func (cfg Config) ReviewTimeout() time.Duration {
+	timeout, err := NormalizeReviewTimeout(cfg.Review.Timeout)
+	if err != nil {
+		return DefaultReviewTimeout
+	}
+	return timeout
+}
+
 func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_PROVIDER")); value != "" {
 		cfg.Provider = value
@@ -259,6 +279,9 @@ func (cfg *Config) ApplyEnvOverrides() error {
 	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_INSTRUCTIONS")); value != "" {
 		cfg.Review.Instructions = value
 	}
+	if value := strings.TrimSpace(os.Getenv("DIFFPAL_REVIEW_TIMEOUT")); value != "" {
+		cfg.Review.Timeout = value
+	}
 	return nil
 }
 
@@ -271,6 +294,29 @@ func NormalizeReviewLanguage(value string) (string, error) {
 		return "", fmt.Errorf("review.language must be a single line")
 	}
 	return language, nil
+}
+
+func NormalizeReviewTimeout(value string) (time.Duration, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return DefaultReviewTimeout, nil
+	}
+	timeout, err := time.ParseDuration(normalized)
+	if err != nil {
+		return 0, fmt.Errorf("invalid review.timeout %q: %w", value, err)
+	}
+	if timeout <= 0 {
+		return 0, fmt.Errorf("invalid review.timeout %q: must be greater than 0", value)
+	}
+	return timeout, nil
+}
+
+func NormalizeReviewTimeoutString(value string) (string, error) {
+	timeout, err := NormalizeReviewTimeout(value)
+	if err != nil {
+		return "", err
+	}
+	return timeout.String(), nil
 }
 
 func (cfg *Config) setOpenAIModel(value string) {

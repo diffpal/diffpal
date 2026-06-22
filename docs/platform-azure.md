@@ -71,6 +71,9 @@ Status payload name should be stable and branch-policy-compatible, e.g.:
 - Optional task inputs `language`, `instructions`, `instructionsFile`, and
   `feedback` map to the CLI flags `--language`, `--instructions`,
   `--instructions-file`, and `--feedback`.
+- For large PRs or slower ACP providers, set `diffpal.review.timeout` in the
+  selected config profile, for example `profiles.ci.diffpal.review.timeout:
+  10m`.
 - `feedback: balanced` is the default and publishes status, a PR summary
   thread, and Azure threads for all findings.
 - In `balanced` and `inline`, the PR summary thread reports the overview/result

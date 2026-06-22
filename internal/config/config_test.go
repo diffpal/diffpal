@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadConfigAppliesProfileOverlay(t *testing.T) {
@@ -25,6 +26,7 @@ diffpal:
     block_on: high
   review:
     language: en
+    timeout: 2m
     instructions: Focus on OWASP best practices.
 profiles:
   ci:
@@ -33,6 +35,7 @@ profiles:
         block_on: critical
       review:
         language: Spanish
+        timeout: 10m
         instructions: Focus on API authorization boundaries.
 `)
 
@@ -51,6 +54,9 @@ profiles:
 	}
 	if cfg.ReviewInstructions() != "Focus on API authorization boundaries." {
 		t.Fatalf("ReviewInstructions() = %q, want profile instructions", cfg.ReviewInstructions())
+	}
+	if cfg.ReviewTimeout() != 10*time.Minute {
+		t.Fatalf("ReviewTimeout() = %s, want 10m", cfg.ReviewTimeout())
 	}
 }
 
@@ -94,6 +100,7 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 
 	t.Setenv("DIFFPAL_REVIEW_LANGUAGE", "Portuguese")
 	t.Setenv("DIFFPAL_REVIEW_INSTRUCTIONS", "Focus on auth-sensitive paths.")
+	t.Setenv("DIFFPAL_REVIEW_TIMEOUT", "7m")
 	t.Setenv("DIFFPAL_BLOCK_ON", "critical")
 	t.Setenv("DIFFPAL_OPENAI_MODEL", "gpt-env")
 	cfg, err := LoadConfig(dir, "", "")
@@ -105,6 +112,9 @@ func TestLoadConfigEnvLeafOverridesApply(t *testing.T) {
 	}
 	if cfg.ReviewInstructions() != "Focus on auth-sensitive paths." {
 		t.Fatalf("ReviewInstructions() = %q, want env override", cfg.ReviewInstructions())
+	}
+	if cfg.ReviewTimeout() != 7*time.Minute {
+		t.Fatalf("ReviewTimeout() = %s, want 7m", cfg.ReviewTimeout())
 	}
 	if cfg.BlockOn() != "critical" {
 		t.Fatalf("BlockOn() = %q, want critical", cfg.BlockOn())
@@ -219,6 +229,27 @@ diffpal:
 	}
 }
 
+func TestLoadConfigRejectsInvalidReviewTimeout(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"soon", "0s", "-1m"} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), minimalConfig("openai-fast")+`
+  review:
+    timeout: `+value+`
+`)
+
+			_, err := LoadConfig(dir, "", "")
+			if err == nil || !strings.Contains(err.Error(), "invalid review.timeout") {
+				t.Fatalf("LoadConfig() error = %v, want invalid review.timeout error", err)
+			}
+		})
+	}
+}
+
 func TestNormalizeReviewDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -228,6 +259,12 @@ func TestNormalizeReviewDefaults(t *testing.T) {
 	}
 	if cfg.Review.Language != "en" {
 		t.Fatalf("Review.Language = %q, want en", cfg.Review.Language)
+	}
+	if cfg.ReviewTimeout() != DefaultReviewTimeout {
+		t.Fatalf("ReviewTimeout() = %s, want %s", cfg.ReviewTimeout(), DefaultReviewTimeout)
+	}
+	if cfg.Review.Timeout != DefaultReviewTimeout.String() {
+		t.Fatalf("Review.Timeout = %q, want %q", cfg.Review.Timeout, DefaultReviewTimeout.String())
 	}
 }
 

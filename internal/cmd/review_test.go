@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/diff"
@@ -81,6 +82,29 @@ func TestReviewLocalSubcommandPassesLanguageAndInstructionsFlags(t *testing.T) {
 		"--instructions-file", instructionsPath,
 		"--out", filepath.Join(dir, "findings.json"),
 	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+}
+
+func TestReviewLocalSubcommandPassesConfiguredReviewTimeout(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("DIFFPAL_REVIEW_TIMEOUT", "8m")
+	writeTestConfig(t, dir)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+		if opts.ReviewTimeout != 8*time.Minute {
+			t.Fatalf("ReviewTimeout = %s, want 8m", opts.ReviewTimeout)
+		}
+		return testReviewResult("local"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--out", filepath.Join(dir, "findings.json")})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)

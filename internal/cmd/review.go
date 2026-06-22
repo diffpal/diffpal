@@ -293,13 +293,14 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		runCtx = context.Background()
 	}
 	result, err := run(runCtx, cfg, reviewer.Options{
-		Repo:         repo,
-		ReviewID:     reviewID,
-		BaseSHA:      base,
-		HeadSHA:      head,
-		BlockOn:      blockOn,
-		Language:     language,
-		Instructions: instructions,
+		Repo:          repo,
+		ReviewID:      reviewID,
+		BaseSHA:       base,
+		HeadSHA:       head,
+		BlockOn:       blockOn,
+		Language:      language,
+		ReviewTimeout: cfg.ReviewTimeout(),
+		Instructions:  instructions,
 	})
 	if err != nil {
 		return reviewExecution{}, reviewExitError(err)
