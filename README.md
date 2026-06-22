@@ -346,8 +346,8 @@ Use `feedback` for the normal user-facing shape:
 | Mode | Behavior |
 | --- | --- |
 | `summary` | Summary plus non-file artifacts such as SARIF, Code Quality, or status. No file-level findings are published. |
-| `balanced` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. |
-| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. |
+| `balanced` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. The summary does not duplicate file-level finding details. |
+| `inline` | Same publication set as `balanced`, with more permissive file-level placement where the platform supports it. The summary does not duplicate file-level finding details. |
 
 Use `summary-overview: false` or `--summary-overview=false` if you do not want
 the semantic change overview in the summary.

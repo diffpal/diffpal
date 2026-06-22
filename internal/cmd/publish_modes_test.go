@@ -208,6 +208,50 @@ func TestRenderPublishSummarySummaryOnlyOmitsFindingsResult(t *testing.T) {
 	}
 }
 
+func TestRenderPublishSummaryOmitsDetailedCommentsWhenFileThreadsArePublished(t *testing.T) {
+	t.Parallel()
+
+	got, err := renderPublishSummary("azure", findings.FindingsBundle{
+		ReviewID: "azure-pr-1921",
+		ChangeSummary: []string{
+			"Added trade session synchronization workflow.",
+		},
+		Findings: []findings.Finding{{
+			Severity:   "medium",
+			Category:   "reliability",
+			Path:       "internal/tradesessionssyncservice/temporal/activities/load_from_s3.go",
+			StartLine:  29,
+			EndLine:    32,
+			Message:    "S3 ListObjectsV2 is called only once without pagination.",
+			Impact:     findings.NewImpact("Some trade sessions can remain unprocessed."),
+			Suggestion: "Use s3.NewListObjectsV2Paginator.",
+		}},
+	}, FeedbackBalanced, []string{"threads", "status", "summary"}, true, "", "")
+	if err != nil {
+		t.Fatalf("renderPublishSummary() error = %v", err)
+	}
+
+	for _, unwanted := range []string{
+		"## Detailed Comments",
+		"internal/tradesessionssyncservice/temporal/activities/load_from_s3.go",
+		"S3 ListObjectsV2 is called only once without pagination.",
+		"Use s3.NewListObjectsV2Paginator.",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("summary duplicates file-thread detail %q:\n%s", unwanted, got)
+		}
+	}
+	for _, want := range []string{
+		"## Summary of Changes",
+		"## Review Result",
+		"DiffPal found 1 actionable finding(s).",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("summary missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderPublishSummaryUsesReviewChannelTitle(t *testing.T) {
 	t.Parallel()
 

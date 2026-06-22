@@ -225,7 +225,7 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 		PublishSurfaces: publishSurfaceLabels(modes),
 		HideOverview:    !summaryOverview,
 		HideResult:      !publishesFileLevelFindings(platform, modes),
-		HideDetails:     strings.ToLower(strings.TrimSpace(platform)) == "github" || !publishesFileLevelFindings(platform, modes),
+		HideDetails:     true,
 		Links:           githubLinkProvider(platform, bundle, repo),
 	}
 	return markdown.RenderSummaryWithOptions(bundle, opts), nil
