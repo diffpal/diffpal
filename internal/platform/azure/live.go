@@ -270,15 +270,18 @@ func threadPayloadForTarget(action ThreadAction, target resolvedThreadTarget) *a
 	if endLine <= 0 || endLine < startLine {
 		endLine = startLine
 	}
+	offset := 1
 	firstIteration := target.IterationID
 	secondIteration := target.IterationID
 	payload.ThreadContext = &azgit.CommentThreadContext{
 		FilePath: &target.FilePath,
 		RightFileStart: &azgit.CommentPosition{
-			Line: &startLine,
+			Line:   &startLine,
+			Offset: &offset,
 		},
 		RightFileEnd: &azgit.CommentPosition{
-			Line: &endLine,
+			Line:   &endLine,
+			Offset: &offset,
 		},
 	}
 	payload.PullRequestThreadContext = &azgit.GitPullRequestCommentThreadContext{

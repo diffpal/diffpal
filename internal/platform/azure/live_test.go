@@ -2,6 +2,8 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	azgit "github.com/microsoft/azure-devops-go-api/azuredevops/v7/git"
@@ -128,8 +130,14 @@ func TestThreadPayloadForTargetIncludesAzureFileContext(t *testing.T) {
 	if payload.ThreadContext.RightFileStart == nil || payload.ThreadContext.RightFileStart.Line == nil || *payload.ThreadContext.RightFileStart.Line != 15 {
 		t.Fatalf("RightFileStart.Line = %#v, want 15", payload.ThreadContext.RightFileStart)
 	}
+	if payload.ThreadContext.RightFileStart.Offset == nil || *payload.ThreadContext.RightFileStart.Offset != 1 {
+		t.Fatalf("RightFileStart.Offset = %#v, want 1", payload.ThreadContext.RightFileStart)
+	}
 	if payload.ThreadContext.RightFileEnd == nil || payload.ThreadContext.RightFileEnd.Line == nil || *payload.ThreadContext.RightFileEnd.Line != 18 {
 		t.Fatalf("RightFileEnd.Line = %#v, want 18", payload.ThreadContext.RightFileEnd)
+	}
+	if payload.ThreadContext.RightFileEnd.Offset == nil || *payload.ThreadContext.RightFileEnd.Offset != 1 {
+		t.Fatalf("RightFileEnd.Offset = %#v, want 1", payload.ThreadContext.RightFileEnd)
 	}
 	if payload.PullRequestThreadContext == nil || payload.PullRequestThreadContext.ChangeTrackingId == nil || *payload.PullRequestThreadContext.ChangeTrackingId != 55 {
 		t.Fatalf("ChangeTrackingId = %#v, want 55", payload.PullRequestThreadContext)
@@ -186,8 +194,34 @@ func TestPublishThreadsUsesResolvedAzureFileContext(t *testing.T) {
 	if got := *client.lastThread.ThreadContext.FilePath; got != "/internal/app/service.go" {
 		t.Fatalf("ThreadContext.FilePath = %q, want /internal/app/service.go", got)
 	}
+	if got := client.lastThread.ThreadContext.RightFileStart; got == nil || got.Line == nil || *got.Line != 7 || got.Offset == nil || *got.Offset != 1 {
+		t.Fatalf("RightFileStart = %#v, want line 7 offset 1", got)
+	}
+	if got := client.lastThread.ThreadContext.RightFileEnd; got == nil || got.Line == nil || *got.Line != 9 || got.Offset == nil || *got.Offset != 1 {
+		t.Fatalf("RightFileEnd = %#v, want line 9 offset 1", got)
+	}
 	if client.lastThread.PullRequestThreadContext == nil || client.lastThread.PullRequestThreadContext.ChangeTrackingId == nil || *client.lastThread.PullRequestThreadContext.ChangeTrackingId != 91 {
 		t.Fatalf("ChangeTrackingId = %#v, want 91", client.lastThread.PullRequestThreadContext)
+	}
+	if client.lastThread.PullRequestThreadContext.IterationContext == nil {
+		t.Fatal("IterationContext is nil")
+	}
+	if got := client.lastThread.PullRequestThreadContext.IterationContext.FirstComparingIteration; got == nil || *got != 3 {
+		t.Fatalf("FirstComparingIteration = %#v, want 3", got)
+	}
+	if got := client.lastThread.PullRequestThreadContext.IterationContext.SecondComparingIteration; got == nil || *got != 3 {
+		t.Fatalf("SecondComparingIteration = %#v, want 3", got)
+	}
+	raw, err := json.Marshal(client.lastThread)
+	if err != nil {
+		t.Fatalf("json.Marshal(lastThread) error = %v", err)
+	}
+	payloadJSON := string(raw)
+	if !strings.Contains(payloadJSON, `"offset":1`) {
+		t.Fatalf("serialized thread payload does not include offset 1: %s", payloadJSON)
+	}
+	if strings.Contains(payloadJSON, `"offset":0`) {
+		t.Fatalf("serialized thread payload includes invalid offset 0: %s", payloadJSON)
 	}
 }
 
