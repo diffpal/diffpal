@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 
@@ -17,17 +18,55 @@ type gateVoteClient interface {
 	CreatePullRequestReviewer(context.Context, azgit.CreatePullRequestReviewerArgs) (*azgit.IdentityRefWithVote, error)
 }
 
+type threadGitClient interface {
+	CreateThread(context.Context, azgit.CreateThreadArgs) (*azgit.GitPullRequestCommentThread, error)
+	GetPullRequestIterations(context.Context, azgit.GetPullRequestIterationsArgs) (*[]azgit.GitPullRequestIteration, error)
+	GetPullRequestIterationChanges(context.Context, azgit.GetPullRequestIterationChangesArgs) (*azgit.GitPullRequestIterationChanges, error)
+}
+
+type pullRequestChangeRef struct {
+	Path             string
+	OriginalPath     string
+	ChangeTrackingID int
+}
+
+type resolvedThreadTarget struct {
+	FilePath         string
+	ChangeTrackingID int
+	IterationID      int
+}
+
 func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Context, plan ThreadPlan, client *http.Client) error {
 	gitClient, args, err := newGitClient(ctx, tokenMode, token, reviewCtx, client)
 	if err != nil {
 		return err
 	}
+	return publishThreadsWithClient(ctx, gitClient, args, plan)
+}
+
+func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, args gitClientArgs, plan ThreadPlan) error {
+	var targets map[string]resolvedThreadTarget
+	if needsAzureThreadTargets(plan.Actions) {
+		iterationID, changes, err := listPullRequestIterationChanges(ctx, gitClient, args)
+		if err != nil {
+			return err
+		}
+		targets = resolveThreadTargets(plan.Actions, iterationID, changes)
+	}
 	for _, action := range plan.Actions {
 		if action.Type == ActionSkip {
 			continue
 		}
+		payload := threadPayload(action.Body, action.Status, action.Path, action.Line, action.EndLine)
+		if hasCanonicalAzureThreadLocation(action.Path, action.Line) {
+			target, ok := targets[action.ThreadID]
+			if !ok {
+				return fmt.Errorf("azure inline thread target not found for %s:%d", action.Path, action.Line)
+			}
+			payload = threadPayloadForTarget(action, target)
+		}
 		if _, err := gitClient.CreateThread(ctx, azgit.CreateThreadArgs{
-			CommentThread: threadPayload(action.Body, action.Status, action.Path, action.Line, action.EndLine),
+			CommentThread: payload,
 			RepositoryId:  args.RepositoryID,
 			PullRequestId: args.PullRequestID,
 			Project:       args.Project,
@@ -36,6 +75,18 @@ func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Cont
 		}
 	}
 	return nil
+}
+
+func needsAzureThreadTargets(actions []ThreadAction) bool {
+	for _, action := range actions {
+		if action.Type == ActionSkip {
+			continue
+		}
+		if hasCanonicalAzureThreadLocation(action.Path, action.Line) {
+			return true
+		}
+	}
+	return false
 }
 
 const summaryThreadMarker = "<!-- diffpal:summary -->"
@@ -225,6 +276,41 @@ func threadPayload(content string, status ThreadStatus, path string, line int, e
 	return payload
 }
 
+func threadPayloadForTarget(action ThreadAction, target resolvedThreadTarget) *azgit.GitPullRequestCommentThread {
+	payload := threadPayload(action.Body, action.Status, "", 0, 0)
+	startLine := action.Line
+	endLine := action.EndLine
+	if endLine <= 0 || endLine < startLine {
+		endLine = startLine
+	}
+	offset := 1
+	firstIteration := target.IterationID
+	secondIteration := target.IterationID
+	payload.ThreadContext = &azgit.CommentThreadContext{
+		FilePath: &target.FilePath,
+		RightFileStart: &azgit.CommentPosition{
+			Line:   &startLine,
+			Offset: &offset,
+		},
+		RightFileEnd: &azgit.CommentPosition{
+			Line:   &endLine,
+			Offset: &offset,
+		},
+	}
+	payload.PullRequestThreadContext = &azgit.GitPullRequestCommentThreadContext{
+		ChangeTrackingId: &target.ChangeTrackingID,
+		IterationContext: &azgit.CommentIterationContext{
+			FirstComparingIteration:  &firstIteration,
+			SecondComparingIteration: &secondIteration,
+		},
+	}
+	return payload
+}
+
+func hasCanonicalAzureThreadLocation(pathValue string, line int) bool {
+	return strings.TrimSpace(pathValue) != "" && line > 0
+}
+
 func threadStatusPayload(status ThreadStatus) *azgit.GitPullRequestCommentThread {
 	azureStatus := azgit.CommentThreadStatusValues.Active
 	if status == ThreadStatusClosed {
@@ -259,6 +345,176 @@ func identityID(data *location.ConnectionData, authorized bool) string {
 		return ""
 	}
 	return item.Id.String()
+}
+
+func listPullRequestIterationChanges(ctx context.Context, gitClient threadGitClient, args gitClientArgs) (int, []pullRequestChangeRef, error) {
+	iterations, err := gitClient.GetPullRequestIterations(ctx, azgit.GetPullRequestIterationsArgs{
+		RepositoryId:  args.RepositoryID,
+		PullRequestId: args.PullRequestID,
+		Project:       args.Project,
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+	iterationID := latestIterationID(iterations)
+	if iterationID <= 0 {
+		return 0, nil, fmt.Errorf("no Azure pull request iterations found")
+	}
+
+	top := 2000
+	skip := 0
+	changes := make([]pullRequestChangeRef, 0)
+	for {
+		page, err := gitClient.GetPullRequestIterationChanges(ctx, azgit.GetPullRequestIterationChangesArgs{
+			RepositoryId:  args.RepositoryID,
+			PullRequestId: args.PullRequestID,
+			IterationId:   &iterationID,
+			Project:       args.Project,
+			Top:           &top,
+			Skip:          &skip,
+		})
+		if err != nil {
+			return 0, nil, err
+		}
+		if page != nil && page.ChangeEntries != nil {
+			for _, change := range *page.ChangeEntries {
+				ref := pullRequestChangeRef{
+					Path:             normalizeAzureRepoPath(changePath(change)),
+					OriginalPath:     normalizeAzureRepoPath(derefString(change.OriginalPath)),
+					ChangeTrackingID: derefInt(change.ChangeTrackingId),
+				}
+				if ref.Path == "" || ref.ChangeTrackingID <= 0 {
+					continue
+				}
+				changes = append(changes, ref)
+			}
+		}
+		if page == nil || page.NextTop == nil || page.NextSkip == nil || *page.NextTop <= 0 {
+			break
+		}
+		top = *page.NextTop
+		skip = *page.NextSkip
+	}
+	return iterationID, changes, nil
+}
+
+func latestIterationID(items *[]azgit.GitPullRequestIteration) int {
+	if items == nil {
+		return 0
+	}
+	latest := 0
+	for _, item := range *items {
+		if item.Id != nil && *item.Id > latest {
+			latest = *item.Id
+		}
+	}
+	return latest
+}
+
+func resolveThreadTargets(actions []ThreadAction, iterationID int, changes []pullRequestChangeRef) map[string]resolvedThreadTarget {
+	current := map[string]pullRequestChangeRef{}
+	original := map[string]pullRequestChangeRef{}
+	ambiguousCurrent := map[string]struct{}{}
+	ambiguousOriginal := map[string]struct{}{}
+	for _, change := range changes {
+		addThreadChangeIndex(current, ambiguousCurrent, trimAzureRepoPath(change.Path), change)
+		addThreadChangeIndex(original, ambiguousOriginal, trimAzureRepoPath(change.OriginalPath), change)
+	}
+
+	targets := make(map[string]resolvedThreadTarget, len(actions))
+	for _, action := range actions {
+		if !hasCanonicalAzureThreadLocation(action.Path, action.Line) {
+			continue
+		}
+		normalized := trimAzureRepoPath(normalizeAzureRepoPath(action.Path))
+		if normalized == "" {
+			continue
+		}
+		change, ok := lookupThreadChange(current, ambiguousCurrent, normalized)
+		if !ok {
+			change, ok = lookupThreadChange(original, ambiguousOriginal, normalized)
+		}
+		if !ok {
+			continue
+		}
+		targets[action.ThreadID] = resolvedThreadTarget{
+			FilePath:         change.Path,
+			ChangeTrackingID: change.ChangeTrackingID,
+			IterationID:      iterationID,
+		}
+	}
+	return targets
+}
+
+func addThreadChangeIndex(index map[string]pullRequestChangeRef, ambiguous map[string]struct{}, key string, value pullRequestChangeRef) {
+	if key == "" {
+		return
+	}
+	if _, exists := ambiguous[key]; exists {
+		return
+	}
+	if _, exists := index[key]; exists {
+		delete(index, key)
+		ambiguous[key] = struct{}{}
+		return
+	}
+	index[key] = value
+}
+
+func lookupThreadChange(index map[string]pullRequestChangeRef, ambiguous map[string]struct{}, key string) (pullRequestChangeRef, bool) {
+	if _, exists := ambiguous[key]; exists {
+		return pullRequestChangeRef{}, false
+	}
+	value, ok := index[key]
+	return value, ok
+}
+
+func normalizeAzureRepoPath(raw string) string {
+	raw = strings.TrimSpace(strings.ReplaceAll(raw, "\\", "/"))
+	if raw == "" || raw == "/dev/null" {
+		return ""
+	}
+	cleaned := path.Clean("/" + strings.TrimPrefix(raw, "/"))
+	if cleaned == "/." {
+		return ""
+	}
+	return cleaned
+}
+
+func trimAzureRepoPath(raw string) string {
+	return strings.TrimPrefix(normalizeAzureRepoPath(raw), "/")
+}
+
+func changePath(change azgit.GitPullRequestChange) string {
+	if item := change.Item; item != nil {
+		switch typed := item.(type) {
+		case azgit.GitItem:
+			return derefString(typed.Path)
+		case *azgit.GitItem:
+			if typed != nil {
+				return derefString(typed.Path)
+			}
+		case map[string]any:
+			if value, ok := typed["path"].(string); ok {
+				return value
+			}
+		}
+	}
+	return derefString(change.SourceServerItem)
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func derefInt(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func findSummaryThread(ctx context.Context, gitClient azgit.Client, args gitClientArgs) (int, int, error) {
