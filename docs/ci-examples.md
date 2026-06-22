@@ -240,7 +240,7 @@ Common artifacts:
 | --- | --- |
 | `.artifacts/diffpal/findings.json` | Canonical structured findings bundle. |
 | `.artifacts/diffpal/summary.md` | Human-readable review summary. |
-| `.artifacts/diffpal/diffpal.sarif` | SARIF report when enabled by the platform mode. |
+| `.artifacts/diffpal/diffpal.sarif` | SARIF report when enabled by the platform output. |
 | `.artifacts/diffpal/codequality.json` | GitLab Code Quality report. |
 
 ## Production Hardening

@@ -1313,7 +1313,7 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 	}
 }
 
-func TestReviewADOBalancedPublishesClosedAdvisoryThreadAndApproveVote(t *testing.T) {
+func TestReviewADOReviewFeedbackPublishesClosedAdvisoryThreadAndApproveVote(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("AZURE_DEVOPS_EXT_PAT", "ado-token")

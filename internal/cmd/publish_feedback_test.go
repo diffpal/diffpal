@@ -8,25 +8,7 @@ import (
 	"github.com/diffpal/diffpal/internal/findings"
 )
 
-func TestDefaultModesMatchProductContract(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		platform string
-		want     []string
-	}{
-		{platform: "github", want: []string{"comments", "sarif", "summary"}},
-		{platform: "gitlab", want: []string{"code-quality", "discussions", "sarif", "summary"}},
-		{platform: "azure", want: []string{"threads", "status", "summary"}},
-	}
-	for _, tc := range cases {
-		if got := defaultModes(tc.platform); !reflect.DeepEqual(got, tc.want) {
-			t.Fatalf("defaultModes(%q) = %v, want %v", tc.platform, got, tc.want)
-		}
-	}
-}
-
-func TestResolvePublishModesUsesFeedback(t *testing.T) {
+func TestResolvePublishSurfacesUsesFeedback(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -46,26 +28,26 @@ func TestResolvePublishModesUsesFeedback(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, profile, err := resolvePublishModes(tc.platform, tc.feedback)
+			got, profile, err := resolvePublishSurfaces(tc.platform, tc.feedback)
 			if err != nil {
-				t.Fatalf("resolvePublishModes() error = %v", err)
+				t.Fatalf("resolvePublishSurfaces() error = %v", err)
 			}
 			if profile != FeedbackProfile(tc.feedback) {
 				t.Fatalf("profile = %q, want %q", profile, tc.feedback)
 			}
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("modes = %v, want %v", got, tc.want)
+				t.Fatalf("surfaces = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestResolvePublishModesRejectsInvalidFeedback(t *testing.T) {
+func TestResolvePublishSurfacesRejectsInvalidFeedback(t *testing.T) {
 	t.Parallel()
 
 	for _, value := range []string{"verbose", "balanced", "inline"} {
-		if _, _, err := resolvePublishModes("github", value); err == nil {
-			t.Fatalf("resolvePublishModes(%q) error = nil, want invalid feedback error", value)
+		if _, _, err := resolvePublishSurfaces("github", value); err == nil {
+			t.Fatalf("resolvePublishSurfaces(%q) error = nil, want invalid feedback error", value)
 		}
 	}
 }

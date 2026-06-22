@@ -22,7 +22,7 @@ steps:
     inputs:
       diffpalVersion: latest
       profile: ci
-      feedback: balanced
+      feedback: review
       gate: true
     env:
       COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)

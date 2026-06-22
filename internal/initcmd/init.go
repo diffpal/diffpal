@@ -425,7 +425,7 @@ func configTemplates() []configTemplate {
 		{
 			name: "platform-auth.yaml",
 			content: strings.Join([]string{
-				"# Copy a platform block into config.yaml when enabling host publish modes.",
+				"# Copy a platform block into config.yaml when enabling host publishing.",
 				"# These fields use envsubst values. Keep the placeholders quoted.",
 				"diffpal:",
 				"  platforms:",

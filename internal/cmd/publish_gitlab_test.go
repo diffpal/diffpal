@@ -50,7 +50,7 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
 	if blocking != 0 {
-		t.Fatalf("blocking = %d, want 0 for artifact-only modes", blocking)
+		t.Fatalf("blocking = %d, want 0 for artifact-only surfaces", blocking)
 	}
 	if len(outputs) != 3 {
 		t.Fatalf("len(outputs) = %d, want 3", len(outputs))
@@ -305,7 +305,7 @@ func TestPublishBundleToFilesNormalizesBlockingFromBlockOn(t *testing.T) {
 	}
 }
 
-func TestPublishBundleToFilesRejectsSingleOutputForMultipleModes(t *testing.T) {
+func TestPublishBundleToFilesRejectsSingleOutputForMultipleSurfaces(t *testing.T) {
 	_, _, err := publishBundleToFiles("github", findings.FindingsBundle{ReviewID: "github-pr-1"}, "repo-a", "high", false, "review", true, "review.out", "")
 	if err == nil {
 		t.Fatal("publishBundleToFiles() error = nil, want single-output multi-surface error")

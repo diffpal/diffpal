@@ -55,7 +55,6 @@ jobs:
           repo: ${{ github.repository }}
           review-id: github-pr-${{ github.event.pull_request.number }}
           feedback: review
-          mode: comments,summary
           gate: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -43,25 +43,25 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 	}
 	blockThresholds := []string{blockOn}
 	blocking := 0
-	modes, profile, err := resolvePublishModes(platform, feedback)
+	surfaces, profile, err := resolvePublishSurfaces(platform, feedback)
 	if err != nil {
 		return nil, 0, err
 	}
-	outputs := make([]publishOutput, 0, len(modes))
-	if strings.TrimSpace(out) != "" && len(modes) > 1 {
+	outputs := make([]publishOutput, 0, len(surfaces))
+	if strings.TrimSpace(out) != "" && len(surfaces) > 1 {
 		return nil, 0, fmt.Errorf("--out cannot be used when feedback publishes multiple surfaces")
 	}
-	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
+	summary, err := renderPublishSummary(platform, bundle, profile, surfaces, summaryOverview, reviewChannel, repo)
 	if err != nil {
 		return nil, 0, err
 	}
 	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
 
-	for _, mode := range modes {
-		normalized := normalizePublishMode(platform, mode)
+	for _, surface := range surfaces {
+		normalized := normalizePublishSurface(platform, surface)
 		targetOut := out
 		if targetOut == "" {
-			targetOut = defaultModeOutput(platform, normalized)
+			targetOut = defaultSurfaceOutput(platform, normalized)
 		}
 		switch normalized {
 		case "summary":
@@ -169,22 +169,22 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 			}
 			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: string(payload.State)})
 		default:
-			return nil, 0, fmt.Errorf("unsupported mode %q for platform %s", mode, platform)
+			return nil, 0, fmt.Errorf("unsupported surface %q for platform %s", surface, platform)
 		}
 	}
 
 	return outputs, blocking, nil
 }
 
-func resolvePublishModes(platform string, feedback string) ([]string, FeedbackProfile, error) {
+func resolvePublishSurfaces(platform string, feedback string) ([]string, FeedbackProfile, error) {
 	profile, err := normalizeFeedback(feedback)
 	if err != nil {
 		return nil, "", err
 	}
-	return modesForFeedback(platform, profile), profile, nil
+	return surfacesForFeedback(platform, profile), profile, nil
 }
 
-func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, modes []string, summaryOverview bool, reviewChannel string, repo string) (string, error) {
+func renderPublishSummary(platform string, bundle findings.FindingsBundle, profile FeedbackProfile, surfaces []string, summaryOverview bool, reviewChannel string, repo string) (string, error) {
 	title := ""
 	if strings.ToLower(strings.TrimSpace(platform)) == "github" {
 		identity, err := github.NewReviewIdentity(reviewChannel)
@@ -196,9 +196,9 @@ func renderPublishSummary(platform string, bundle findings.FindingsBundle, profi
 	opts := markdown.SummaryOptions{
 		Title:           title,
 		FeedbackProfile: string(profile),
-		PublishSurfaces: publishSurfaceLabels(modes),
+		PublishSurfaces: publishSurfaceLabels(surfaces),
 		HideOverview:    !summaryOverview,
-		HideResult:      !publishesFileLevelFindings(platform, modes),
+		HideResult:      !publishesFileLevelFindings(platform, surfaces),
 		HideDetails:     true,
 		Links:           githubLinkProvider(platform, bundle, repo),
 	}
@@ -225,11 +225,11 @@ func githubLinkProvider(platform string, bundle findings.FindingsBundle, repo st
 	return github.NewPermanentLinkProvider(ctx)
 }
 
-func publishSurfaceLabels(modes []string) []string {
-	labels := make([]string, 0, len(modes))
+func publishSurfaceLabels(surfaces []string) []string {
+	labels := make([]string, 0, len(surfaces))
 	seen := map[string]struct{}{}
-	for _, mode := range modes {
-		label := publishSurfaceLabel(mode)
+	for _, surface := range surfaces {
+		label := publishSurfaceLabel(surface)
 		if label == "" {
 			continue
 		}
@@ -243,8 +243,8 @@ func publishSurfaceLabels(modes []string) []string {
 	return labels
 }
 
-func publishSurfaceLabel(mode string) string {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
+func publishSurfaceLabel(surface string) string {
+	switch strings.ToLower(strings.TrimSpace(surface)) {
 	case "github_comments", "comments", "review-comments":
 		return "comments"
 	case "code_quality", "code-quality":
@@ -260,7 +260,7 @@ func publishSurfaceLabel(mode string) string {
 	case "summary":
 		return "summary"
 	default:
-		return strings.TrimSpace(mode)
+		return strings.TrimSpace(surface)
 	}
 }
 
@@ -275,7 +275,7 @@ func normalizeFeedback(value string) (FeedbackProfile, error) {
 	}
 }
 
-func modesForFeedback(platform string, feedback FeedbackProfile) []string {
+func surfacesForFeedback(platform string, feedback FeedbackProfile) []string {
 	switch strings.ToLower(platform) {
 	case "gitlab":
 		switch feedback {
@@ -301,9 +301,9 @@ func modesForFeedback(platform string, feedback FeedbackProfile) []string {
 	}
 }
 
-func normalizePublishMode(platform string, mode string) string {
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	switch mode {
+func normalizePublishSurface(platform string, surface string) string {
+	surface = strings.ToLower(strings.TrimSpace(surface))
+	switch surface {
 	case "comments", "review-comments":
 		return "github_comments"
 	case "discussion", "discussions", "threads":
@@ -314,38 +314,34 @@ func normalizePublishMode(platform string, mode string) string {
 			return "threads"
 		}
 	}
-	switch mode {
+	switch surface {
 	case "summary":
 		return "summary"
 	case "codequality", "code_quality", "code-quality":
 		if platform == "gitlab" {
 			return "code-quality"
 		}
-		return mode
+		return surface
 	case "sarif":
 		return "sarif"
 	case "status":
 		return "status"
 	}
-	if platform == "github" && mode == "comments" {
+	if platform == "github" && surface == "comments" {
 		return "github_comments"
 	}
-	if platform == "azure" && mode == "status" {
+	if platform == "azure" && surface == "status" {
 		return "status"
 	}
-	if platform == "gitlab" && mode == "discussions" {
+	if platform == "gitlab" && surface == "discussions" {
 		return "discussions"
 	}
-	return mode
+	return surface
 }
 
-func defaultModes(platform string) []string {
-	return modesForFeedback(platform, FeedbackReview)
-}
-
-func publishesFileLevelFindings(platform string, modes []string) bool {
-	for _, mode := range modes {
-		switch normalizePublishMode(platform, mode) {
+func publishesFileLevelFindings(platform string, surfaces []string) bool {
+	for _, surface := range surfaces {
+		switch normalizePublishSurface(platform, surface) {
 		case "github_comments", "threads", "discussions":
 			return true
 		}
@@ -353,8 +349,8 @@ func publishesFileLevelFindings(platform string, modes []string) bool {
 	return false
 }
 
-func defaultModeOutput(platform string, mode string) string {
-	switch mode {
+func defaultSurfaceOutput(platform string, surface string) string {
+	switch surface {
 	case "summary":
 		return ".artifacts/diffpal/summary.md"
 	case "sarif":
@@ -370,7 +366,7 @@ func defaultModeOutput(platform string, mode string) string {
 	case "status":
 		return ".artifacts/diffpal/azure-status.json"
 	default:
-		base := strings.ReplaceAll(mode, " ", "-")
+		base := strings.ReplaceAll(surface, " ", "-")
 		if base == "" {
 			base = "publish"
 		}

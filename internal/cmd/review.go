@@ -166,11 +166,11 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	blocking := countBlockingFindings(bundle)
 
 	if dryRun {
-		resolvedModes, profile, err := resolvePublishModes(platform, feedback)
+		resolvedSurfaces, profile, err := resolvePublishSurfaces(platform, feedback)
 		if err != nil {
 			return withExitCode(2, err)
 		}
-		summary, err := renderPublishSummary(platform, bundle, profile, resolvedModes, summaryOverview, execution.ReviewChannel, execution.Repo)
+		summary, err := renderPublishSummary(platform, bundle, profile, resolvedSurfaces, summaryOverview, execution.ReviewChannel, execution.Repo)
 		if err != nil {
 			return withExitCode(2, err)
 		}
@@ -429,11 +429,11 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 	if err != nil {
 		return err
 	}
-	modes, profile, err := resolvePublishModes(platform, feedback)
+	surfaces, profile, err := resolvePublishSurfaces(platform, feedback)
 	if err != nil {
 		return err
 	}
-	summary, err := renderPublishSummary(platform, bundle, profile, modes, summaryOverview, reviewChannel, repo)
+	summary, err := renderPublishSummary(platform, bundle, profile, surfaces, summaryOverview, reviewChannel, repo)
 	if err != nil {
 		return err
 	}
@@ -451,8 +451,8 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		return auth.WithToken(func(token string) error {
 			publishReview := false
 			includeInline := false
-			for _, mode := range modes {
-				switch normalizePublishMode(platform, mode) {
+			for _, surface := range surfaces {
+				switch normalizePublishSurface(platform, surface) {
 				case "github_comments":
 					publishReview = true
 					includeInline = true
@@ -486,15 +486,15 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		existing, err := gitlabpub.LoadExistingState(defaultModeOutput(platform, "discussions"))
+		existing, err := gitlabpub.LoadExistingState(defaultSurfaceOutput(platform, "discussions"))
 		if err != nil {
 			return err
 		}
 		blockThresholds := []string{blockOn}
 		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
 		return auth.WithToken(func(token string) error {
-			for _, mode := range modes {
-				switch normalizePublishMode(platform, mode) {
+			for _, surface := range surfaces {
+				switch normalizePublishSurface(platform, surface) {
 				case "discussions":
 					if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
 						return err
@@ -512,7 +512,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		existing, err := azure.LoadExistingState(defaultModeOutput(platform, "threads"))
+		existing, err := azure.LoadExistingState(defaultSurfaceOutput(platform, "threads"))
 		if err != nil {
 			return err
 		}
@@ -520,8 +520,8 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {
-			for _, mode := range modes {
-				switch normalizePublishMode(platform, mode) {
+			for _, surface := range surfaces {
+				switch normalizePublishSurface(platform, surface) {
 				case "threads":
 					if err := azure.PublishThreads(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
 						return err
