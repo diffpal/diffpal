@@ -49,11 +49,11 @@ func TestPublishBundleToFilesGitLabEmitsCodeQualityAndSARIF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publishBundleToFiles() error = %v", err)
 	}
-	if blocking != 0 {
-		t.Fatalf("blocking = %d, want 0 for artifact-only surfaces", blocking)
+	if blocking != 1 {
+		t.Fatalf("blocking = %d, want 1 with GitLab status surface", blocking)
 	}
-	if len(outputs) != 3 {
-		t.Fatalf("len(outputs) = %d, want 3", len(outputs))
+	if len(outputs) != 4 {
+		t.Fatalf("len(outputs) = %d, want 4", len(outputs))
 	}
 	for _, item := range outputs {
 		raw, err := os.ReadFile(item.Path)

@@ -486,17 +486,19 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		existing, err := gitlabpub.LoadExistingState(defaultSurfaceOutput(platform, "discussions"))
-		if err != nil {
-			return err
-		}
 		blockThresholds := []string{blockOn}
-		plan := gitlabpub.PlanDiscussions(existing, bundle.Findings, blockThresholds)
+		plan := gitlabpub.PlanDiscussions(nil, bundle.Findings, blockThresholds)
+		decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
+		status := gitlabpub.PolicyStatus(decision.BlockCount, decision.AdvisoryCount, gateEnabled, os.Getenv("CI_JOB_URL"))
 		return auth.WithToken(func(token string) error {
 			for _, surface := range surfaces {
 				switch normalizePublishSurface(platform, surface) {
 				case "discussions":
 					if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
+						return err
+					}
+				case "gitlab_status":
+					if err := gitlabpub.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
 						return err
 					}
 				case "summary":

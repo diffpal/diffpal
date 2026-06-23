@@ -153,6 +153,7 @@ with `$CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH`.
 What you should see:
 
 - GitLab discussions for actionable findings.
+- GitLab commit status named `DiffPal Review`.
 - Code Quality and SARIF artifacts.
 - `.artifacts/diffpal/summary.md` in job artifacts.
 - Failed job when `--gate` is set and blocking findings exist.
@@ -231,7 +232,7 @@ Default review publish surfaces:
 | Platform | Default surfaces |
 | --- | --- |
 | GitHub | `comments,sarif,summary` |
-| GitLab | `code-quality,discussions,sarif,summary` |
+| GitLab | `code-quality,discussions,status,sarif,summary` |
 | Azure | `threads,status,summary` |
 
 Common artifacts:

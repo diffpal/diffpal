@@ -983,21 +983,94 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	t.Setenv("CI_COMMIT_SHA", "head-a")
 
 	var requests atomic.Int32
-	handlerErrs := make(chan error, 2)
+	var discussionCreated atomic.Bool
+	var statusCreated atomic.Bool
+	var summaryCreated atomic.Bool
+	handlerErrs := make(chan error, 8)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		if r.URL.EscapedPath() != "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/discussions" {
-			handlerErrs <- fmt.Errorf("path = %q, want GitLab discussions endpoint", r.URL.Path)
-			http.Error(w, "unexpected path", http.StatusBadRequest)
-			return
-		}
 		if got := r.Header.Get("PRIVATE-TOKEN"); got != "gitlab-token" {
 			handlerErrs <- fmt.Errorf("PRIVATE-TOKEN = %q, want gitlab-token", got)
 			http.Error(w, "unexpected token", http.StatusUnauthorized)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"discussion-1","notes":[]}`))
+		switch {
+		case r.Method == http.MethodGet && r.URL.EscapedPath() == "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/versions":
+			_, _ = w.Write([]byte(`[{"id":1,"base_commit_sha":"base-a","start_commit_sha":"base-a","head_commit_sha":"head-a"}]`))
+		case r.Method == http.MethodGet && r.URL.EscapedPath() == "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/versions/1":
+			_, _ = w.Write([]byte(`{
+				"id":1,
+				"base_commit_sha":"base-a",
+				"start_commit_sha":"base-a",
+				"head_commit_sha":"head-a",
+				"diffs":[{"old_path":"main.go","new_path":"main.go","diff":"@@ -1,4 +1,5 @@\n package main\n \n+func main() {}\n var x = 1\n"}]
+			}`))
+		case r.Method == http.MethodGet && r.URL.EscapedPath() == "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/discussions":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.EscapedPath() == "/api/v4/projects/acme%2Fdiffpal/merge_requests/42/discussions":
+			var payload struct {
+				Body     string `json:"body"`
+				Position *struct {
+					PositionType string `json:"position_type"`
+					NewPath      string `json:"new_path"`
+					NewLine      int    `json:"new_line"`
+					BaseSHA      string `json:"base_sha"`
+					StartSHA     string `json:"start_sha"`
+					HeadSHA      string `json:"head_sha"`
+				} `json:"position"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode discussion payload: %w", err)
+				http.Error(w, "bad payload", http.StatusBadRequest)
+				return
+			}
+			if strings.Contains(payload.Body, "<!-- diffpal:summary -->") {
+				summaryCreated.Store(true)
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"id":"summary-discussion","notes":[{"id":2}]}`))
+				return
+			}
+			discussionCreated.Store(true)
+			if payload.Position == nil || payload.Position.PositionType != "text" || payload.Position.NewPath != "main.go" || payload.Position.NewLine != 4 {
+				handlerErrs <- fmt.Errorf("position = %+v, want text main.go:4", payload.Position)
+				http.Error(w, "bad position", http.StatusBadRequest)
+				return
+			}
+			if strings.Contains(payload.Body, "Confidence") || !strings.Contains(payload.Body, "<!-- diffpal:finding id:") {
+				handlerErrs <- fmt.Errorf("unexpected discussion body: %s", payload.Body)
+				http.Error(w, "bad body", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":"discussion-1","notes":[{"id":1}]}`))
+		case r.Method == http.MethodPut && strings.Contains(r.URL.EscapedPath(), "/discussions/discussion-1"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"discussion-1","notes":[{"id":1,"resolved":false}]}`))
+		case r.Method == http.MethodPost && r.URL.EscapedPath() == "/api/v4/projects/acme%2Fdiffpal/statuses/head-a":
+			statusCreated.Store(true)
+			var payload struct {
+				State       string `json:"state"`
+				Name        string `json:"name"`
+				Context     string `json:"context"`
+				Description string `json:"description"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				handlerErrs <- fmt.Errorf("decode status payload: %w", err)
+				http.Error(w, "bad status", http.StatusBadRequest)
+				return
+			}
+			if payload.State != "success" || payload.Context != "diffpal/review" {
+				handlerErrs <- fmt.Errorf("status payload = %+v, want success diffpal/review", payload)
+				http.Error(w, "bad status", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+		default:
+			handlerErrs <- fmt.Errorf("%s %s: unexpected request", r.Method, r.URL.EscapedPath())
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
+		}
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITLAB_API_URL", server.URL)
@@ -1014,13 +1087,19 @@ func TestReviewGitLabPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("requests = %d, want 2", got)
-	}
 	select {
 	case err := <-handlerErrs:
 		t.Fatal(err)
 	default:
+	}
+	if !discussionCreated.Load() {
+		t.Fatal("positioned GitLab discussion was not created")
+	}
+	if !statusCreated.Load() {
+		t.Fatal("GitLab status was not created")
+	}
+	if !summaryCreated.Load() {
+		t.Fatal("GitLab summary was not created")
 	}
 }
 

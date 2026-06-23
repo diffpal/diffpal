@@ -21,8 +21,8 @@ func TestResolvePublishSurfacesUsesFeedback(t *testing.T) {
 		{name: "github review", platform: "github", feedback: "review", want: []string{"comments", "sarif", "summary"}},
 		{name: "azure summary", platform: "azure", feedback: "summary", want: []string{"status", "summary"}},
 		{name: "azure review", platform: "azure", feedback: "review", want: []string{"threads", "status", "summary"}},
-		{name: "gitlab summary", platform: "gitlab", feedback: "summary", want: []string{"code-quality", "sarif", "summary"}},
-		{name: "gitlab review", platform: "gitlab", feedback: "review", want: []string{"code-quality", "discussions", "sarif", "summary"}},
+		{name: "gitlab summary", platform: "gitlab", feedback: "summary", want: []string{"code-quality", "sarif", "status", "summary"}},
+		{name: "gitlab review", platform: "gitlab", feedback: "review", want: []string{"code-quality", "discussions", "status", "sarif", "summary"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

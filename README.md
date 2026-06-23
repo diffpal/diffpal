@@ -5,20 +5,20 @@
 [![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**AI PR review with the provider you already use.**
+**AI code review with the agent you already use.**
 
-DiffPal runs in your CI and turns your existing AI subscription, hosted API key,
-or ACP-compatible CLI into structured pull request reviews. There is no
+DiffPal runs in your CI and turns the AI agent your team already uses into
+structured code review for pull requests. There is no
 mandatory hosted DiffPal review service, no required per-seat review platform,
-and no provider lock-in.
+and no agent lock-in.
 
 Bring Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an
-ordered provider pool, or your own ACP-compatible agent. DiffPal keeps the review
-workflow consistent: summaries, file-level findings, artifacts, and merge gates
-across GitHub, GitLab, and Azure DevOps.
+ordered provider pool, or your own ACP-compatible agent. DiffPal keeps the code
+review workflow consistent: summaries, file-level findings, artifacts, and merge
+gates across GitHub, GitLab, and Azure DevOps.
 
 DiffPal exists to make AI code review something teams control, not another
-platform they rent. Use the provider path that already works for your team and
+platform they rent. Use the agent path that already works for your team and
 keep the review workflow in your repository.
 
 | Works with | Publishes | Gates on |
@@ -49,8 +49,8 @@ and [findings schema](docs/findings-schema.md) for the current metadata.
 
 ## Use the AI You Already Have
 
-DiffPal decouples AI review from any one vendor or hosted service. Your team can
-use the account, subscription, model, and CLI you already trust without
+DiffPal decouples AI code review from any one vendor or hosted service. Your
+team can use the account, subscription, model, and CLI you already trust without
 rebuilding the PR review workflow around a new review platform.
 
 | Bring | Use when |
@@ -70,7 +70,7 @@ feedback, write artifacts, or enforce merge gates.
 
 ## Quick Start: GitHub Actions
 
-Start by choosing the provider recipe that matches the account or agent your
+Start by choosing the setup recipe that matches the account or agent your
 team already uses:
 
 | Setup | Use when |
@@ -83,7 +83,7 @@ team already uses:
 
 The example below uses the Codex API-key recipe because it is a concrete
 copy-paste setup. You can swap the setup name, config recipe, secret, and
-provider install/auth step while keeping the same DiffPal review workflow.
+agent install/auth step while keeping the same DiffPal review workflow.
 
 1. Generate the config:
 

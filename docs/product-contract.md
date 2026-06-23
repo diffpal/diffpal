@@ -37,7 +37,7 @@
 | Host | Phase | Primary surfaces |
 |---|---|---|
 | GitHub | MVP | PR reviews, file-level review comments, markdown summary, SARIF |
-| GitLab | v1 | discussions, Code Quality, SARIF |
+| GitLab | v1 | discussions, commit status, Code Quality, SARIF |
 | Azure DevOps | v1 | PR threads, PR status |
 
 ## Binary and package surface

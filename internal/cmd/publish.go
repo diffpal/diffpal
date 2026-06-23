@@ -108,6 +108,22 @@ func publishBundleToFiles(platform string, bundle findings.FindingsBundle, repo 
 				return nil, 0, err
 			}
 			outputs = append(outputs, publishOutput{Surface: normalized, Path: targetOut, Status: string(decision.Decision)})
+		case "gitlab_status":
+			blocking = max(blocking, decision.BlockCount)
+			payload := gitlabpub.PolicyStatus(decision.BlockCount, decision.AdvisoryCount, gateEnabled, os.Getenv("CI_JOB_URL"))
+			raw, err := json.MarshalIndent(map[string]interface{}{
+				"decision": decision.Decision,
+				"status":   payload,
+				"blocking": decision.BlockCount,
+				"advisory": decision.AdvisoryCount,
+			}, "", "  ")
+			if err != nil {
+				return nil, 0, err
+			}
+			if err := findings.WriteStringBundle(targetOut, string(raw)); err != nil {
+				return nil, 0, err
+			}
+			outputs = append(outputs, publishOutput{Surface: "status", Path: targetOut, Status: payload.State})
 		case "code_quality", "code-quality":
 			report, err := codequality.ToJSON(bundle, repo)
 			if err != nil {
@@ -255,6 +271,8 @@ func publishSurfaceLabel(surface string) string {
 		return "threads"
 	case "status":
 		return "status"
+	case "gitlab_status":
+		return "status"
 	case "sarif":
 		return "sarif"
 	case "summary":
@@ -280,9 +298,9 @@ func surfacesForFeedback(platform string, feedback FeedbackProfile) []string {
 	case "gitlab":
 		switch feedback {
 		case FeedbackSummary:
-			return []string{"code-quality", "sarif", "summary"}
+			return []string{"code-quality", "sarif", "status", "summary"}
 		default:
-			return []string{"code-quality", "discussions", "sarif", "summary"}
+			return []string{"code-quality", "discussions", "status", "sarif", "summary"}
 		}
 	case "azure":
 		switch feedback {
@@ -325,6 +343,9 @@ func normalizePublishSurface(platform string, surface string) string {
 	case "sarif":
 		return "sarif"
 	case "status":
+		if platform == "gitlab" {
+			return "gitlab_status"
+		}
 		return "status"
 	}
 	if platform == "github" && surface == "comments" {
@@ -361,6 +382,8 @@ func defaultSurfaceOutput(platform string, surface string) string {
 		return ".artifacts/diffpal/github-comments.json"
 	case "discussions":
 		return ".artifacts/diffpal/gitlab-discussions.json"
+	case "gitlab_status":
+		return ".artifacts/diffpal/gitlab-status.json"
 	case "threads":
 		return ".artifacts/diffpal/azure-threads.json"
 	case "status":
