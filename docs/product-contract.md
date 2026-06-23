@@ -12,9 +12,10 @@
 
 ## Product Positioning
 
-- Public promise: open-source, provider-agnostic AI review for pull requests.
-- Product category: PR review, with GitHub, GitLab, and Azure DevOps as
-  supported publishing targets.
+- Public promise: open-source AI PR review you control.
+- Hero message: bring your own agent; keep one PR review workflow.
+- Product category: AI pull request review control plane, with GitHub, GitLab,
+  and Azure DevOps as supported publishing targets.
 - Provider model: users bring their preferred AI provider or ACP-compatible CLI
   through `runtime.providers`; DiffPal does not require a hosted DiffPal review
   service.
@@ -22,10 +23,12 @@
   choices instead of adopting a required per-seat review platform.
 - DiffPal product surface: diff collection, structured findings, summaries,
   file-level feedback, artifacts, and merge gates.
+- Differentiation: provider choice, repository-owned policy, machine-readable
+  artifacts, and cross-host publishing consistency.
 
 ## Project Goals
 
-- Make AI PR review open, portable, and CI-native.
+- Make AI PR review open, portable, controllable, and CI-native.
 - Let teams choose the provider path and cost model that fits them.
 - Provide consistent review outputs and merge gates across GitHub, GitLab, and
   Azure DevOps.

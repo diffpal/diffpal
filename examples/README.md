@@ -1,7 +1,7 @@
 # DiffPal Examples
 
-Use these examples as copy-paste starting points. Pick a provider recipe and one
-CI system, or adapt the generic ACP template for your own CLI.
+Use these examples as copy-paste starting points. Pick one provider recipe and
+one CI system, or adapt the generic ACP template for your own CLI.
 
 The examples pin npm package versions so credentialed CI jobs do not execute
 newly published package versions automatically. Update `@diffpal/diffpal`,
@@ -9,21 +9,39 @@ newly published package versions automatically. Update `@diffpal/diffpal`,
 `@github/copilot` intentionally after testing. If you use OpenCode, pin the
 OpenCode package or install source in your own CI setup the same way.
 
-## Provider Recipes
+## Get Started Fast
+
+| Scenario | Start here |
+| --- | --- |
+| GitHub Actions with Codex API key | [`configs/codex-api-key/config.yaml`](configs/codex-api-key/config.yaml) + [`ci/github-actions/codex-api-key.yml`](ci/github-actions/codex-api-key.yml) |
+| GitHub Actions with Codex subscription auth | [`configs/codex-subscription/config.yaml`](configs/codex-subscription/config.yaml) + [`ci/github-actions/codex-subscription.yml`](ci/github-actions/codex-subscription.yml) |
+| GitHub Actions with Copilot token | [`configs/copilot-github-token/config.yaml`](configs/copilot-github-token/config.yaml) + [`ci/github-actions/copilot-github-token.yml`](ci/github-actions/copilot-github-token.yml) |
+
+For the full first-run path, use the [quickstart](../docs/quickstart.md).
+
+## Bring Your Own Agent
 
 | Setup | Config | CI secret |
 | --- | --- | --- |
 | Generic ACP CLI | [`configs/generic-acp/config.yaml`](configs/generic-acp/config.yaml) | provider-specific |
-| Codex API key | [`configs/codex-api-key/config.yaml`](configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
-| Codex subscription auth | [`configs/codex-subscription/config.yaml`](configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
-| Copilot fine-grained PAT | [`configs/copilot-github-token/config.yaml`](configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 | OpenCode ACP | [`configs/opencode-acp/config.yaml`](configs/opencode-acp/config.yaml) | OpenCode-specific |
 
 Copy the selected config to `.config/diffpal/config.yaml`. To use another ACP
 CLI, start from the generic ACP config and replace `generic_acp.cmd` with the
 command that starts your provider's ACP stdio server.
 
-## CI Examples
+## Govern Review Quality
+
+Use these references when you want stricter policy, auditing, or rollout
+control:
+
+- [Config reference](../docs/config-reference.md) for `runtime.providers`,
+  review instructions, MCP servers, profiles, and `gate.block_on`
+- [Findings schema](../docs/findings-schema.md) for the structured bundle
+- [What success looks like](../docs/what-success-looks-like.md) for expected
+  summary, comments, artifacts, and gate behavior
+
+## Compare Publish Surfaces
 
 | CI system | Codex API key | Codex subscription | Copilot token |
 | --- | --- | --- | --- |
@@ -50,17 +68,14 @@ command that starts your provider's ACP stdio server.
   The Azure examples skip credentialed review steps when
   `System.PullRequest.IsFork` is `True`.
 
-To use another ACP CLI, copy the closest CI example for your host and replace
-only the provider install/auth step plus `.config/diffpal/config.yaml`.
-
 ## Generate CODEX_AUTH_JSON_B64
 
 Use this only when you intentionally want Codex subscription auth in trusted CI.
 API-key auth is simpler to rotate and should remain the default automation path.
 
-This command creates a fresh file-backed Codex login in a temporary `CODEX_HOME`,
-then base64-encodes the generated `auth.json` for the `CODEX_AUTH_JSON_B64`
-secret:
+This command creates a fresh file-backed Codex login in a temporary
+`CODEX_HOME`, then base64-encodes the generated `auth.json` for the
+`CODEX_AUTH_JSON_B64` secret:
 
 ```bash
 npm install --global @openai/codex@0.139.0

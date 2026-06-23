@@ -1,13 +1,23 @@
 # DiffPal Quickstart
 
-DiffPal is provider-agnostic AI review for pull requests. This guide uses the
-default Codex API-key recipe because it is the fastest ready-made GitHub
-Actions setup, not because Codex is the product boundary. If you already have
-another ACP-compatible CLI, use the generic ACP config instead:
-[`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml).
+This guide is the fastest GitHub path for your first successful DiffPal review.
+It uses the Codex API-key recipe because it is a ready-made GitHub Actions
+setup, not because Codex is the product boundary.
 
-For other provider recipes or CI systems, use the examples matrix:
-[`examples/README.md`](../examples/README.md).
+If you already have another ACP-compatible CLI, start with
+[Using Another ACP CLI](ci-examples.md#using-another-acp-cli) instead.
+
+## What You Should See
+
+After the first successful run, expect:
+
+- a `DiffPal Review Summary` PR review
+- inline review comments when actionable findings exist
+- `.artifacts/diffpal/findings.json` in the workflow workspace
+- a failed job only when `gate: true` and blocking findings exist, or when
+  setup, authentication, diff collection, or publishing fails
+
+For a fuller outcome checklist, see [what success looks like](what-success-looks-like.md).
 
 ## 1. Generate Config
 
@@ -23,7 +33,6 @@ This creates `.config/diffpal/config.yaml` with:
 - `diffpal.gate.block_on: high`
 - the standard review checks
 - a visible `profiles.ci` profile
-- v2 prompt rollout flags enabled in the `ci` profile
 - a GitHub platform block
 
 The command keeps existing files unless you pass `--force`.
@@ -36,13 +45,9 @@ Other setup recipes:
 | `codex-subscription` | CI restores local Codex subscription auth. |
 | `copilot-github-token` | CI authenticates Copilot with a fine-grained GitHub token. |
 | `generic-acp` | You already have another ACP-compatible CLI. |
+| `opencode-acp` | You want CI to run OpenCode through ACP. |
 
-For `codex-subscription`, generate `CODEX_AUTH_JSON_B64` with the command
-recipe in [`examples/README.md`](../examples/README.md#generate-codex_auth_json_b64).
-
-If you prefer manual setup, copy
-[`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml)
-or another recipe from [`examples/configs`](../examples/configs).
+For manual setup, copy a config from [`examples/configs`](../examples/configs).
 
 ## 2. Add Secret
 
@@ -56,10 +61,9 @@ GitHub provides `GITHUB_TOKEN` automatically. The workflow grants it the
 permissions DiffPal needs to publish PR feedback.
 
 For public repositories, do not expose provider credentials to fork PR code.
-GitHub's fork workflow approval settings control whether outside contributors'
-fork workflows run automatically; they do not make it safe to release provider
-secrets to fork code. Keep secret-backed DiffPal review limited to
-same-repository pull requests, and let forks run no-secret CI only.
+Keep secret-backed DiffPal review limited to same-repository pull requests and
+let forks run no-secret CI only. See [troubleshooting](troubleshooting.md#fork-pull-requests-and-secrets)
+for the security rationale.
 
 ## 3. Add Workflow
 
@@ -78,35 +82,23 @@ The example:
 - uses the DiffPal action, which installs the DiffPal CLI
 - runs only on trusted same-repository PRs when secrets are required
 
-`pull_request_target` runs from the default branch of the base repository and is
-useful for trusted automation such as labeling or commenting. Do not combine it
-with checking out the PR head or running fork code such as package installs,
-tests, build scripts, hooks, or provider CLIs.
+## 4. Open A Same-Repository Pull Request
+
+Open a pull request from a branch in the same repository so the provider secret
+is available to the review job. DiffPal should publish the summary, inline
+findings, and artifacts described above.
+
+After the first successful run, pin `diffpal-version`, provider CLIs, and bridge
+packages when you need fully reproducible credentialed CI.
+
+## Bring Your Own Agent
 
 For another ACP CLI, keep the same workflow shape and replace the provider
-install/authentication step plus `.config/diffpal/config.yaml`.
+install/authentication step plus `.config/diffpal/config.yaml`. Start from the
+[generic ACP config](../examples/configs/generic-acp/config.yaml) and the
+[CI setup guide](ci-examples.md#using-another-acp-cli).
 
-## What Success Looks Like
-
-After a PR run, expect:
-
-- a `DiffPal Review Summary` PR review
-- file-level review comments when actionable findings exist
-- `.artifacts/diffpal/findings.json` in the workflow workspace
-- a failed job only when `gate: true` and blocking findings exist, or when
-  setup/publish fails
-
-The summary includes a semantic overview of the PR by default. Hide it with:
-
-```yaml
-summary-overview: false
-```
-
-If you run multiple DiffPal workflows on the same pull request, give each one a
-different `review-channel` and `review-id` so their checks and PR reviews stay
-separate.
-
-## Other Setups
+## Other Hosts And Recipes
 
 - GitHub Actions: [`examples/ci/github-actions`](../examples/ci/github-actions)
 - GitLab CI: [`examples/ci/gitlab`](../examples/ci/gitlab)
