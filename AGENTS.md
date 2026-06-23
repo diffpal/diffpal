@@ -20,6 +20,10 @@ For full workflow details: `bd prime`
 
 - Use Beads (`bd`) as the source of task truth.
 - Keep `dp-` issue IDs in planning comments and commit messages.
+- Always use the Gitflow workflow for branch selection, branch naming, and PR
+  targets.
+- Always use Conventional Commits for commit messages.
+- Always commit and push completed work before handing it back to the user.
 - Preserve the repository convention:
   - `cmd/` for executable entrypoints.
   - `internal/` for local implementation packages.
