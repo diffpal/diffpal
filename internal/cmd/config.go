@@ -66,7 +66,7 @@ func newInitCommand() *cobra.Command {
 	initCmd.Flags().String("state", "", "State directory for local cache (defaults to .config/diffpal/state)")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files")
 	initCmd.Flags().Bool("wizard", false, "Generate first-run onboarding config")
-	initCmd.Flags().String("setup", "codex-api-key", "Wizard setup: codex-api-key, codex-subscription, copilot-github-token, or generic-acp")
+	initCmd.Flags().String("setup", "codex-api-key", "Wizard setup: codex-api-key, codex-subscription, copilot-github-token, opencode-acp, or generic-acp")
 	initCmd.Flags().String("platform", "auto", "Wizard platform: auto, github, gitlab, azure, or none")
 	initCmd.Flags().String("profile", "ci", "Wizard review profile to generate")
 	initCmd.Flags().String("block-on", "high", "Wizard gate threshold: low, medium, high, or critical")

@@ -277,6 +277,12 @@ func providerConfigLinesForSetup(setup string) []string {
 			"      copilot_acp:",
 			"        model: auto",
 		}
+	case "opencode-acp":
+		return []string{
+			"      type: opencode_acp",
+			"      opencode_acp:",
+			"        model: opencode/big-pickle",
+		}
 	case "generic-acp":
 		return []string{
 			"      type: generic_acp",
@@ -302,6 +308,8 @@ func resolveWizardSetup(value string) (string, string, error) {
 		return setup, "codex-acp", nil
 	case "copilot-github-token":
 		return setup, "copilot-acp", nil
+	case "opencode-acp":
+		return setup, "opencode-acp", nil
 	case "generic-acp":
 		return setup, "generic-acp", nil
 	default:

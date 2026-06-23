@@ -109,7 +109,7 @@ func TestInitHelpShowsWizardFlags(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	text := out.String()
-	for _, needle := range []string{"--wizard", "--setup", "--platform", "--profile", "--block-on"} {
+	for _, needle := range []string{"--wizard", "--setup", "opencode-acp", "--platform", "--profile", "--block-on"} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("init help missing %q:\n%s", needle, text)
 		}

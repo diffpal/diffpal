@@ -29,6 +29,8 @@ steps are the install and authentication commands for that provider.
 | Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
 | OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
 
+These setup names are accepted by `diffpal init --wizard --setup ...`.
+
 ## Using Another ACP CLI
 
 DiffPal can use any CLI that starts an ACP stdio server. Copy the CI example

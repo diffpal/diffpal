@@ -142,26 +142,135 @@ func TestInitWizardWorkspacePreservesExistingConfigWithoutForce(t *testing.T) {
 func TestComposeWizardConfigUsesSetupRecipes(t *testing.T) {
 	t.Parallel()
 
-	rendered := composeWizardConfig(wizardConfigOptions{
-		Setup:      "copilot-github-token",
-		ProviderID: "copilot-acp",
-		Platform:   "gitlab",
-		Profile:    "ci",
-		BlockOn:    "critical",
+	cases := []struct {
+		name       string
+		setup      string
+		providerID string
+		want       []string
+	}{
+		{
+			name:       "copilot",
+			setup:      "copilot-github-token",
+			providerID: "copilot-acp",
+			want: []string{
+				"    copilot-acp:",
+				"      type: copilot_acp",
+				"        model: auto",
+			},
+		},
+		{
+			name:       "opencode",
+			setup:      "opencode-acp",
+			providerID: "opencode-acp",
+			want: []string{
+				"    opencode-acp:",
+				"      type: opencode_acp",
+				"        model: opencode/big-pickle",
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rendered := composeWizardConfig(wizardConfigOptions{
+				Setup:      tc.setup,
+				ProviderID: tc.providerID,
+				Platform:   "gitlab",
+				Profile:    "ci",
+				BlockOn:    "critical",
+			})
+			for _, needle := range append(tc.want, "    gitlab: {}", "        block_on: critical") {
+				if !strings.Contains(rendered, needle) {
+					t.Fatalf("composeWizardConfig() missing %q:\n%s", needle, rendered)
+				}
+			}
+			if strings.Contains(rendered, "openai-fast") || strings.Contains(rendered, "gpt-5-mini") {
+				t.Fatalf("composeWizardConfig() exposed obsolete provider details:\n%s", rendered)
+			}
+		})
+	}
+}
+
+func TestResolveWizardSetup(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		input        string
+		wantSetup    string
+		wantProvider string
+	}{
+		{input: "", wantSetup: "codex-api-key", wantProvider: "codex-acp"},
+		{input: "codex-api-key", wantSetup: "codex-api-key", wantProvider: "codex-acp"},
+		{input: "codex-subscription", wantSetup: "codex-subscription", wantProvider: "codex-acp"},
+		{input: "copilot-github-token", wantSetup: "copilot-github-token", wantProvider: "copilot-acp"},
+		{input: "generic-acp", wantSetup: "generic-acp", wantProvider: "generic-acp"},
+		{input: "opencode-acp", wantSetup: "opencode-acp", wantProvider: "opencode-acp"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.wantSetup, func(t *testing.T) {
+			t.Parallel()
+
+			gotSetup, gotProvider, err := resolveWizardSetup(tc.input)
+			if err != nil {
+				t.Fatalf("resolveWizardSetup(%q) error = %v", tc.input, err)
+			}
+			if gotSetup != tc.wantSetup || gotProvider != tc.wantProvider {
+				t.Fatalf("resolveWizardSetup(%q) = %q, %q; want %q, %q", tc.input, gotSetup, gotProvider, tc.wantSetup, tc.wantProvider)
+			}
+		})
+	}
+
+	if _, _, err := resolveWizardSetup("unknown"); err == nil {
+		t.Fatal("resolveWizardSetup(unknown) error = nil, want error")
+	}
+}
+
+func TestInitWizardWorkspaceWritesOpenCodeConfig(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	result, err := InitWizardWorkspace(WizardOptions{
+		InitOptions: InitOptions{
+			WorkingDir: dir,
+			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
+			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
+		},
+		Setup:    "opencode-acp",
+		Platform: "github",
+		Profile:  "ci",
+		BlockOn:  "high",
 	})
+	if err != nil {
+		t.Fatalf("InitWizardWorkspace() error = %v", err)
+	}
+	if result.Setup != "opencode-acp" || result.ProviderSet[0] != "opencode-acp" {
+		t.Fatalf("InitWizardWorkspace() result = %+v, want opencode setup/provider", result)
+	}
+	renderedBytes, err := os.ReadFile(result.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedBytes)
 	for _, needle := range []string{
-		"    copilot-acp:",
-		"      type: copilot_acp",
-		"        model: auto",
-		"    gitlab: {}",
-		"        block_on: critical",
+		"    opencode-acp:",
+		"      type: opencode_acp",
+		"        model: opencode/big-pickle",
+		"  provider: opencode-acp",
 	} {
 		if !strings.Contains(rendered, needle) {
-			t.Fatalf("composeWizardConfig() missing %q:\n%s", needle, rendered)
+			t.Fatalf("wizard config missing %q:\n%s", needle, rendered)
 		}
 	}
-	if strings.Contains(rendered, "openai-fast") || strings.Contains(rendered, "gpt-5-mini") {
-		t.Fatalf("composeWizardConfig() exposed obsolete provider details:\n%s", rendered)
+
+	cfg, err := dc.LoadConfig(dir, "", "ci")
+	if err != nil {
+		t.Fatalf("wizard config failed to load with ci profile: %v", err)
+	}
+	if cfg.ProviderID() != "opencode-acp" {
+		t.Fatalf("ProviderID() = %q, want opencode-acp", cfg.ProviderID())
 	}
 }
 
