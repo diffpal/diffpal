@@ -45,9 +45,10 @@ Other setup recipes:
 | `codex-subscription` | CI restores local Codex subscription auth. |
 | `copilot-github-token` | CI authenticates Copilot with a fine-grained GitHub token. |
 | `generic-acp` | You already have another ACP-compatible CLI. |
-| `opencode-acp` | You want CI to run OpenCode through ACP. |
-
 For manual setup, copy a config from [`examples/configs`](../examples/configs).
+OpenCode users can start from
+[`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml)
+and the [CI setup guide](ci-examples.md#using-another-acp-cli).
 
 ## 2. Add Secret
 
