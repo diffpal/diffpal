@@ -119,7 +119,7 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	execution, err := executeReview(cmd, defaultReviewID, run, false)
+	execution, err := executeReview(cmd, defaultReviewID, run, false, false)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	execution, err := executeReview(cmd, defaultReviewID, run, true)
+	execution, err := executeReview(cmd, defaultReviewID, run, true, true)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	return nil
 }
 
-func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner, emitStatus bool) (reviewExecution, error) {
+func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner, emitStatus bool, writeBundle bool) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	language, _ := cmd.Flags().GetString("language")
@@ -315,8 +315,10 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner,
 	if err != nil {
 		return reviewExecution{}, reviewExitError(err)
 	}
-	if err := findings.WriteBundle(outPath, result.Bundle, repo); err != nil {
-		return reviewExecution{}, withExitCode(5, err)
+	if writeBundle {
+		if err := findings.WriteBundle(outPath, result.Bundle, repo); err != nil {
+			return reviewExecution{}, withExitCode(5, err)
+		}
 	}
 	if emitStatus && !reviewDryRun(cmd) {
 		if err := emitReviewSummary(cmd, result, outPath); err != nil {
