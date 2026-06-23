@@ -127,6 +127,9 @@ func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if err != nil {
 		return withExitCode(2, err)
 	}
+	if err := findings.WriteBundle(execution.OutPath, bundle, execution.Repo); err != nil {
+		return withExitCode(5, err)
+	}
 	blocking := countBlockingFindings(bundle)
 	if err := renderLocalReviewMarkdown(cmd, bundle, profile); err != nil {
 		return err

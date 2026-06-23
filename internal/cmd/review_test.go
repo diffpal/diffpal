@@ -114,6 +114,39 @@ func TestReviewLocalFeedbackSummaryOmitsDetailedComments(t *testing.T) {
 	}
 }
 
+func TestReviewLocalWritesPolicyNormalizedBundle(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	outPath := filepath.Join(dir, "findings.json")
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewAdvisoryResult("local"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--block-on", "medium", "--out", outPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "including 1 blocking finding") {
+		t.Fatalf("local markdown did not use normalized blocking state:\n%s", out.String())
+	}
+	bundle, err := findings.ReadBundle(outPath)
+	if err != nil {
+		t.Fatalf("ReadBundle() error = %v", err)
+	}
+	if len(bundle.Findings) != 1 {
+		t.Fatalf("len(bundle.Findings) = %d, want 1", len(bundle.Findings))
+	}
+	if !bundle.Findings[0].Blocking {
+		t.Fatalf("persisted bundle finding Blocking = false, want true: %+v", bundle.Findings[0])
+	}
+}
+
 func TestReviewLocalRejectsInvalidFeedbackBeforeReview(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
