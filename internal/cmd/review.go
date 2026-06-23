@@ -8,6 +8,7 @@ import (
 
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/findings"
+	"github.com/diffpal/diffpal/internal/markdown"
 	"github.com/diffpal/diffpal/internal/platform/azure"
 	"github.com/diffpal/diffpal/internal/platform/github"
 	gitlabpub "github.com/diffpal/diffpal/internal/platform/gitlab"
@@ -53,13 +54,14 @@ func newReviewCommandWithRunner(run reviewRunner) *cobra.Command {
 func newLocalReviewSubcommand(run reviewRunner) *cobra.Command {
 	local := &cobra.Command{
 		Use:   "local",
-		Short: "Review a local diff and write findings.json",
+		Short: "Review a local diff and print Markdown",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReviewOnly(cmd, "local", run)
 		},
 	}
 	addReviewAnalysisFlags(local, "local")
 	addReviewPolicyFlags(local)
+	addReviewFeedbackFlag(local)
 	return local
 }
 
@@ -93,9 +95,13 @@ func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
 }
 
 func addReviewPublishFlags(cmd *cobra.Command) {
-	cmd.Flags().String("feedback", string(FeedbackReview), "Review feedback shape: summary or review")
+	addReviewFeedbackFlag(cmd)
 	cmd.Flags().Bool("summary-overview", true, "Include a semantic change overview in review summaries")
 	cmd.Flags().Bool("dry-run", false, "Print the host review markdown without publishing")
+}
+
+func addReviewFeedbackFlag(cmd *cobra.Command) {
+	cmd.Flags().String("feedback", string(FeedbackReview), "Review feedback shape: summary or review")
 }
 
 func addGitHubReviewPublishFlags(cmd *cobra.Command) {
@@ -108,19 +114,25 @@ func addReviewPolicyFlags(cmd *cobra.Command) {
 }
 
 func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner) error {
-	execution, err := executeReview(cmd, defaultReviewID, run)
+	feedback, _ := cmd.Flags().GetString("feedback")
+	profile, err := normalizeFeedback(feedback)
+	if err != nil {
+		return withExitCode(2, err)
+	}
+	execution, err := executeReview(cmd, defaultReviewID, run, false)
 	if err != nil {
 		return err
 	}
-	blocking := countBlockingFindings(execution.Result.Bundle)
+	bundle, err := normalizeBundleBlocking(execution.Result.Bundle, execution.BlockOn)
+	if err != nil {
+		return withExitCode(2, err)
+	}
+	blocking := countBlockingFindings(bundle)
+	if err := renderLocalReviewMarkdown(cmd, bundle, profile); err != nil {
+		return err
+	}
 	if execution.Gate && blocking > 0 {
 		return newReviewBlockedError(blocking)
-	}
-	if blocking > 0 {
-		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "status=blocked blocking=%d\n", blocking); err != nil {
-			return withExitCode(5, err)
-		}
-		return nil
 	}
 	return nil
 }
@@ -154,7 +166,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	execution, err := executeReview(cmd, defaultReviewID, run)
+	execution, err := executeReview(cmd, defaultReviewID, run, true)
 	if err != nil {
 		return err
 	}
@@ -234,7 +246,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	return nil
 }
 
-func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner) (reviewExecution, error) {
+func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner, emitStatus bool) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	language, _ := cmd.Flags().GetString("language")
@@ -303,7 +315,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 	if err := findings.WriteBundle(outPath, result.Bundle, repo); err != nil {
 		return reviewExecution{}, withExitCode(5, err)
 	}
-	if !reviewDryRun(cmd) {
+	if emitStatus && !reviewDryRun(cmd) {
 		if err := emitReviewSummary(cmd, result, outPath); err != nil {
 			return reviewExecution{}, err
 		}
@@ -318,6 +330,19 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner)
 		ReviewChannel: reviewChannel,
 		Result:        result,
 	}, nil
+}
+
+func renderLocalReviewMarkdown(cmd *cobra.Command, bundle findings.FindingsBundle, profile FeedbackProfile) error {
+	body := markdown.RenderSummaryWithOptions(bundle, markdown.SummaryOptions{
+		FeedbackProfile: string(profile),
+		ShowMetadata:    true,
+		HideDetails:     profile == FeedbackSummary,
+		Snippets:        markdown.NewWorktreeSnippetProvider("."),
+	})
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(body)); err != nil {
+		return withExitCode(5, err)
+	}
+	return nil
 }
 
 func reviewDryRun(cmd *cobra.Command) bool {

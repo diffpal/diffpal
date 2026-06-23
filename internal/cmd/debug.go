@@ -36,7 +36,7 @@ func newDebugPromptCommand() *cobra.Command {
 				}
 				return reviewer.Result{Bundle: debugResult.Bundle}, nil
 			}
-			if _, err := executeReview(cmd, "debug", runner); err != nil {
+			if _, err := executeReview(cmd, "debug", runner, false); err != nil {
 				return err
 			}
 			switch strings.ToLower(strings.TrimSpace(format)) {

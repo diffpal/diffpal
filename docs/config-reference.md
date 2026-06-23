@@ -195,6 +195,14 @@ diffpal review github \
   --feedback review
 ```
 
+For local review, `--feedback review` prints a Markdown report with summary and
+file-level comments to stdout while `--feedback summary` omits detailed
+comments:
+
+```bash
+diffpal review local --base origin/main --head HEAD --feedback review
+```
+
 ## Gate
 
 `diffpal.gate.block_on` controls which findings are blocking:
