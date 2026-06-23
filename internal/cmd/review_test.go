@@ -25,6 +25,9 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	writeTestConfig(t, dir)
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {\n\tpanic(\"boom\")\n}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main.go) error = %v", err)
+	}
 
 	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
 		if opts.ReviewID != "local" {
@@ -44,11 +47,138 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if !strings.Contains(out.String(), "findings=1") {
-		t.Fatalf("output missing findings count:\n%s", out.String())
+	text := out.String()
+	for _, needle := range []string{
+		"# DiffPal Review Summary",
+		"## Summary of Changes",
+		"## Review Result",
+		"## Review Metadata",
+		"- Review ID: local",
+		"- Feedback profile: review",
+		"## Detailed Comments",
+		"### main.go",
+		"#### High correctness - L4",
+		"example message",
+		"example evidence",
+		"```go",
+		"panic(\"boom\")",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("local markdown output missing %q:\n%s", needle, text)
+		}
 	}
-	if !strings.Contains(out.String(), "status=blocked blocking=1") {
-		t.Fatalf("output missing blocked status:\n%s", out.String())
+	for _, forbidden := range []string{"findings=", "bundle=", "status=blocked"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("local markdown output contains status line %q:\n%s", forbidden, text)
+		}
+	}
+	bundle, err := findings.ReadBundle(filepath.Join(dir, "findings.json"))
+	if err != nil {
+		t.Fatalf("ReadBundle() error = %v", err)
+	}
+	if len(bundle.Findings) != 1 {
+		t.Fatalf("len(bundle.Findings) = %d, want 1", len(bundle.Findings))
+	}
+}
+
+func TestReviewLocalFeedbackSummaryOmitsDetailedComments(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewResult("local"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--feedback", "summary", "--out", filepath.Join(dir, "findings.json")})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	text := out.String()
+	for _, needle := range []string{
+		"# DiffPal Review Summary",
+		"## Review Result",
+		"## Review Metadata",
+		"- Feedback profile: summary",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("local summary output missing %q:\n%s", needle, text)
+		}
+	}
+	if strings.Contains(text, "## Detailed Comments") {
+		t.Fatalf("local summary output includes detailed comments:\n%s", text)
+	}
+}
+
+func TestReviewLocalWritesPolicyNormalizedBundle(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	outPath := filepath.Join(dir, "findings.json")
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		return testReviewAdvisoryResult("local"), nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--block-on", "medium", "--out", outPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "including 1 blocking finding") {
+		t.Fatalf("local markdown did not use normalized blocking state:\n%s", out.String())
+	}
+	bundle, err := findings.ReadBundle(outPath)
+	if err != nil {
+		t.Fatalf("ReadBundle() error = %v", err)
+	}
+	if len(bundle.Findings) != 1 {
+		t.Fatalf("len(bundle.Findings) = %d, want 1", len(bundle.Findings))
+	}
+	if !bundle.Findings[0].Blocking {
+		t.Fatalf("persisted bundle finding Blocking = false, want true: %+v", bundle.Findings[0])
+	}
+}
+
+func TestReviewLocalRejectsInvalidFeedbackBeforeReview(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	called := false
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		called = true
+		return reviewer.Result{}, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--feedback", "verbose", "--out", filepath.Join(dir, "findings.json")})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want invalid feedback error")
+	}
+	if called {
+		t.Fatal("review runner was called for invalid feedback")
+	}
+	var coder interface{ ExitCode() int }
+	if !errors.As(err, &coder) {
+		t.Fatalf("error does not expose ExitCode(): %T", err)
+	}
+	if coder.ExitCode() != 2 {
+		t.Fatalf("ExitCode() = %d, want 2", coder.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "invalid feedback") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -147,6 +277,9 @@ func TestReviewLocalGateExitsBlocked(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "Error:") {
 		t.Fatalf("gate failure should not print cobra error prefix:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "# DiffPal Review Summary") {
+		t.Fatalf("gate failure should render local markdown before returning error:\n%s", out.String())
 	}
 }
 
@@ -585,6 +718,33 @@ func TestReviewGitHubPublishesNoInlineCommentsForNonBlockingFindings(t *testing.
 	}
 	if len(reviewComments) != 0 {
 		t.Fatalf("review comments = %d, want 0", len(reviewComments))
+	}
+}
+
+func TestReviewLocalHelpShowsFeedbackOnlyPublishFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		t.Fatal("review runner was called for help")
+		return reviewer.Result{}, nil
+	})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"local", "--help"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "--feedback") {
+		t.Fatalf("local help missing --feedback:\n%s", text)
+	}
+	for _, unwanted := range []string{"--summary-overview", "--dry-run"} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("local help contains %s:\n%s", unwanted, text)
+		}
 	}
 }
 

@@ -74,6 +74,15 @@ Run the host-specific doctor before enabling a blocking gate:
 diffpal doctor --mode github
 ```
 
+Render a local Markdown report while still writing the findings bundle:
+
+```bash
+diffpal review local --base origin/main --head HEAD --profile ci
+```
+
+Use `--feedback summary` when you want the summary without file-level detailed
+comments. Redirect stdout to save the Markdown report to a file.
+
 Inspect the prompt contract without spending provider quota:
 
 ```bash
