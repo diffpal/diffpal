@@ -5,294 +5,101 @@
 [![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**AI code review with the agent you already use.**
+**Open-source AI PR review you control.**  
+Bring your own agent. Keep one PR review workflow.
 
-DiffPal runs in your CI and turns the AI agent your team already uses into
-structured code review for pull requests. There is no
-mandatory hosted DiffPal review service, no required per-seat review platform,
-and no agent lock-in.
+DiffPal turns pull request diffs into structured findings, summaries, inline
+comments, and merge gates across GitHub, GitLab, and Azure DevOps without
+locking your team into a hosted review platform.
 
-Bring Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an
-ordered provider pool, or your own ACP-compatible agent. DiffPal keeps the code
-review workflow consistent: summaries, file-level findings, artifacts, and merge
-gates across GitHub, GitLab, and Azure DevOps.
+[Get started in 5 minutes](docs/quickstart.md) ·
+[Bring your own agent](docs/ci-examples.md#using-another-acp-cli) ·
+[See examples](examples/README.md) ·
+[Read the docs](docs/README.md)
 
-DiffPal exists to make AI code review something teams control, not another
-platform they rent. Use the agent path that already works for your team and
-keep the review workflow in your repository.
+## What DiffPal Publishes
 
-| Works with | Publishes | Gates on |
-| --- | --- | --- |
-| GitHub Actions, GitLab CI, Azure Pipelines | summaries, file-level comments, checks/statuses, SARIF, Code Quality | policy thresholds through native CI checks and PR statuses |
+DiffPal runs in CI and keeps the review output consistent even when teams use
+different AI agents, accounts, or hosts.
 
-[Quickstart](docs/quickstart.md) · [CI examples](docs/ci-examples.md) · [Config reference](docs/config-reference.md) · [Provider recipes](examples/README.md)
+| Output | Where it shows up |
+| --- | --- |
+| PR/MR summary | GitHub reviews, GitLab summaries, Azure PR threads |
+| Actionable findings | Inline comments, discussions, or PR threads on changed lines |
+| Review artifacts | `.artifacts/diffpal/findings.json`, summary Markdown, SARIF, Code Quality |
+| Merge gates | CI exit status, checks, commit statuses, or PR statuses |
+
+## Choose Your Path
+
+| Goal | Start here |
+| --- | --- |
+| Fastest GitHub setup | [Quickstart](docs/quickstart.md) with the default GitHub Actions recipe |
+| Keep an existing agent | [Generic ACP setup](docs/ci-examples.md#using-another-acp-cli) |
+| Use GitLab or Azure DevOps | [CI setup guide](docs/ci-examples.md) |
+| Tune policy and auditing | [Config reference](docs/config-reference.md), [findings schema](docs/findings-schema.md) |
+
+## Why DiffPal
+
+Most AI review products ask you to adopt their platform. DiffPal takes the
+opposite approach: keep the agent your team already trusts, keep the CI system
+you already operate, and standardize how review feedback is generated,
+published, and gated.
+
+- **Provider choice:** use Codex, Copilot, OpenCode, Gemini, Claude Code, a
+  hosted provider, an ordered provider pool, or any ACP-compatible CLI.
+- **Repository control:** review config, instructions, artifacts, and gates live
+  with the codebase instead of behind a required hosted DiffPal service.
+- **Structured outcomes:** DiffPal owns diff collection, findings validation,
+  publishing, artifacts, and merge policy while your provider owns model
+  reasoning and credentials.
 
 ## How DiffPal Works
 
-```text
-pull request diff
-  -> DiffPal config and policy
-  -> selected ACP or hosted provider
-  -> structured findings bundle
-  -> platform publisher and CI artifacts
+```mermaid
+flowchart LR
+    A[Pull request diff] --> B[DiffPal config and policy]
+    B --> C[Selected provider or ACP CLI]
+    C --> D[Structured findings bundle]
+    D --> E[PR summary and inline feedback]
+    D --> F[SARIF and Code Quality artifacts]
+    D --> G[Merge gates and statuses]
 ```
-
-DiffPal coordinates the review workflow around the model call. Your provider
-supplies the review intelligence; DiffPal keeps PR feedback, artifacts, and
-merge policy consistent across hosts.
 
 Review instructions are produced by DiffPal's versioned Prompt Pack. Findings
 artifacts include the prompt id, prompt version, purpose, and findings schema
-version, so a review can be traced back to the exact prompt contract that
-generated it. See the [config reference](docs/config-reference.md#prompt-pack)
-and [findings schema](docs/findings-schema.md) for the current metadata.
+version, so a review can be traced back to the prompt contract that generated
+it. See the [config reference](docs/config-reference.md#prompt-pack) and
+[findings schema](docs/findings-schema.md) for the current metadata.
 
-## Use the AI You Already Have
+## GitHub In 5 Minutes
 
-DiffPal decouples AI code review from any one vendor or hosted service. Your
-team can use the account, subscription, model, and CLI you already trust without
-rebuilding the PR review workflow around a new review platform.
-
-| Bring | Use when |
-| --- | --- |
-| Existing AI subscription | Your team already uses an agent CLI such as Codex, Copilot, OpenCode, Gemini, or Claude Code. |
-| Hosted provider API key | You want CI to call a hosted API provider directly. |
-| Any ACP-compatible CLI | You have your own review agent or a provider-specific ACP server. |
-
-DiffPal handles diff collection, the Prompt Pack review contract, findings
-validation, PR feedback, artifacts, and merge gates. Your selected provider or
-ACP agent owns model reasoning, account authentication, tools, and
-provider-specific credentials.
-
-That model keeps cost control with your team. DiffPal does not require a hosted
-review service or per-seat platform subscription to collect diffs, publish PR
-feedback, write artifacts, or enforce merge gates.
-
-## Quick Start: GitHub Actions
-
-Start by choosing the setup recipe that matches the account or agent your
-team already uses:
-
-| Setup | Use when |
-| --- | --- |
-| `generic-acp` | You have any ACP-compatible CLI and provider-specific auth. |
-| `codex-subscription` | You want CI to reuse existing Codex subscription auth. |
-| `codex-api-key` | You want CI to authenticate Codex with `OPENAI_API_KEY`. |
-| `copilot-github-token` | You want CI to authenticate Copilot with a fine-grained PAT. |
-| `opencode-acp` | You want CI to run OpenCode through ACP. |
-
-The example below uses the Codex API-key recipe because it is a concrete
-copy-paste setup. You can swap the setup name, config recipe, secret, and
-agent install/auth step while keeping the same DiffPal review workflow.
-
-1. Generate the config:
+The fastest path uses the Codex API-key recipe because it is a concrete
+copy-paste GitHub Actions setup. Codex is not the product boundary; you can swap
+the provider recipe and keep the same DiffPal workflow.
 
 ```bash
 npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
 ```
 
-This writes `.config/diffpal/config.yaml` with a visible `ci` profile. Existing
-files are kept unless you pass `--force`.
-
-2. Add a repository secret:
-
-| Secret | Purpose |
-| --- | --- |
-| `OPENAI_API_KEY` | Authenticates Codex for the review provider. |
-
-For public open-source repositories, keep provider credentials away from fork PR
-code. GitHub's fork workflow approval settings control whether outside
-contributors' fork workflows run automatically; they do not make it safe to
-release provider secrets to fork code. Keep DiffPal's secret-backed review job
-limited to same-repository pull requests. Fork PRs should run no-secret CI only.
-
-3. Add the workflow:
+Then add `OPENAI_API_KEY` as a repository secret, copy the GitHub Actions
+example, and open a trusted same-repository pull request:
 
 ```bash
 mkdir -p .github/workflows
 cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 ```
 
-4. Open a same-repository pull request.
+After the first successful run you should see a `DiffPal Review Summary`,
+inline findings when actionable issues exist, and
+`.artifacts/diffpal/findings.json` in the job workspace. Read the
+[quickstart](docs/quickstart.md) for the complete setup and fork-PR secret
+guidance.
 
-Expected result:
+## Bring Your Own Agent
 
-- a `DiffPal Review Summary` PR review with an overview of the change
-- file-level review comments for actionable findings
-- `.artifacts/diffpal/findings.json` in the job workspace
-- a failed job only when `gate: true` and blocking findings exist, or when setup
-  or publishing fails
-
-The GitHub Action installs the latest DiffPal CLI by default. After your first
-successful run, pin `diffpal-version`, provider CLIs, and bridge packages when
-you need fully reproducible credentialed CI.
-
-## Supported CI Systems
-
-Use the same `.config/diffpal/config.yaml` shape in every CI system. GitHub,
-GitLab, and Azure are publishing targets; the core workflow only changes how CI
-checks out code, installs the provider, passes the platform token, and runs
-DiffPal.
-
-| CI system | Examples | Output surfaces |
-| --- | --- | --- |
-| GitHub Actions | [`examples/ci/github-actions`](examples/ci/github-actions) | PR review summary, file-level review comments, SARIF |
-| GitLab CI | [`examples/ci/gitlab`](examples/ci/gitlab) | MR summary, discussions, Code Quality, SARIF |
-| Azure Pipelines | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) | PR summary thread, PR threads, PR status |
-
-## GitHub Action
-
-GitHub Actions users can install the
-[DiffPal Review action](https://github.com/marketplace/actions/diffpal-review)
-with `uses: diffpal/action@v1`. The action source and release automation live in
-the separate [diffpal/action](https://github.com/diffpal/action) repository.
-
-The action installs `@diffpal/diffpal` by default, then runs
-`diffpal review github`. You still own provider setup and authentication in the
-workflow, so switching provider recipes does not require switching PR review
-platforms.
-
-## Azure DevOps Marketplace Extension
-
-Azure Pipelines users can install the public
-[DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
-from the Azure DevOps Marketplace and add the `DiffPalReview@1` task to PR
-validation pipelines. Extension source and release automation live in the
-separate [diffpal/azure-devops](https://github.com/diffpal/azure-devops)
-repository.
-
-The task installs `@diffpal/diffpal` by default, then runs `diffpal review ado`.
-You still need a committed DiffPal config, a provider credential such as
-`OPENAI_API_KEY`, `SYSTEM_ACCESSTOKEN` for PR feedback publishing, and a full git
-checkout. See the [Azure Pipelines setup guide](docs/ci-examples.md#azure-pipelines)
-for copy-paste examples.
-
-Example GitHub Actions workflow:
-
-```yaml
-name: diffpal
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-
-jobs:
-  review:
-    name: review
-    # Provider credentials are only exposed to same-repository PRs.
-    # Fork PRs should run no-secret CI only.
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Install Codex provider
-        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-
-      - name: Authenticate Codex
-        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - uses: diffpal/action@v1
-        with:
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
-          profile: ci
-          gate: true
-          feedback: review
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-`pull_request_target` runs from the default branch of the base repository and is
-useful for trusted automation such as labeling or commenting. Do not combine it
-with checking out the PR head or running package installs, tests, build scripts,
-hooks, provider CLIs, or other fork code. That pattern can expose privileged
-tokens or secrets to untrusted code.
-
-If you prefer copying files manually, use
-[`examples/configs/codex-api-key/config.yaml`](examples/configs/codex-api-key/config.yaml).
-For full copy-paste files and host-specific notes, read
-[`docs/ci-examples.md`](docs/ci-examples.md).
-
-## Config You Commit
-
-DiffPal uses the current profile-based config shape. There is no legacy
-`defaults` block.
-
-```yaml
-version: v1
-
-runtime:
-  providers:
-    codex-acp:
-      type: codex_acp
-      codex_acp:
-        reasoning_effort: low
-
-diffpal:
-  provider: codex-acp
-  gate:
-    block_on: high
-  review:
-    language: en
-    instructions: |
-      Prefer actionable findings that are directly supported by the diff.
-  platforms:
-    github: {}
-    gitlab: {}
-    azure: {}
-
-profiles:
-  ci:
-    diffpal:
-      gate:
-        block_on: high
-```
-
-DiffPal uses a fixed finding taxonomy: security, correctness, reliability,
-performance, maintainability, testing, and style. Use review instructions to
-change or extend the review scope, for example `Review for OWASP best practices
-and authz/authn regressions.`
-
-Severity is impact-based across all categories. The full critical/high/medium/low
-matrix is in the [config reference](docs/config-reference.md#severity-matrix).
-
-Use `diffpal.review.instructions`, the `instructions` action input, or
-`--instructions-file` for repository-specific review guidance.
-For large pull requests or slower providers, set `diffpal.review.timeout`
-in the selected profile, for example `profiles.ci.diffpal.review.timeout: 10m`.
-
-## Provider Recipes and Runtime Types
-
-DiffPal delegates review to `diffpal.provider`, which points at a provider
-under `runtime.providers`.
-
-Ready-made config recipes. These are the same names accepted by
-`diffpal init --wizard --setup ...`:
-
-| Setup | Config | Secret |
-| --- | --- | --- |
-| Generic ACP CLI | [`examples/configs/generic-acp/config.yaml`](examples/configs/generic-acp/config.yaml) | provider-specific |
-| Codex API key | [`examples/configs/codex-api-key/config.yaml`](examples/configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
-| Codex subscription auth | [`examples/configs/codex-subscription/config.yaml`](examples/configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
-| Copilot fine-grained PAT | [`examples/configs/copilot-github-token/config.yaml`](examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
-| OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
-
-For Codex subscription auth, generate a fresh `CODEX_AUTH_JSON_B64` value with
-the command recipe in [`examples/README.md`](examples/README.md#generate-codex_auth_json_b64).
-
-Use `generic_acp` for any CLI that can start an ACP stdio server:
+DiffPal delegates review to `diffpal.provider`, which points at an entry under
+`runtime.providers`. Use `generic_acp` for any CLI that can start an ACP stdio
+server:
 
 ```yaml
 runtime:
@@ -306,112 +113,39 @@ diffpal:
   provider: my-review-agent
 ```
 
-Common provider aliases are available when the CLI is already installed and
-authenticated:
+Install and authenticate that CLI in CI before running DiffPal. The rest of the
+workflow stays the same: full git checkout, DiffPal config, provider secret,
+platform token, review command, and optional gate.
 
-| Type | Runtime command |
-| --- | --- |
-| `codex_acp` | Codex ACP via the configured Codex bridge |
-| `copilot_acp` | Copilot ACP |
-| `opencode_acp` | `opencode acp` |
-| `gemini_acp` | Gemini ACP |
-| `claude_code_acp` | Claude Code ACP |
-| `generic_acp` | Your explicit command |
-| `openai`, `aistudio` | Hosted API providers |
-| `pool` | Ordered provider failover |
+## Platform Support
 
-DiffPal passes the review task snapshot with base and head revisions. Providers
-inspect the repository diff and supporting code through their available Git and
-filesystem tools, then DiffPal validates the structured findings against the
-changed ranges it collected internally.
+Use the same `.config/diffpal/config.yaml` shape across hosts. The CI file only
+changes how the provider is installed, how credentials are passed, and which
+publisher DiffPal runs.
 
-## MCP Servers
+| Host | Native outputs | Examples |
+| --- | --- | --- |
+| GitHub Actions | PR review summary, file-level review comments, SARIF | [`examples/ci/github-actions`](examples/ci/github-actions) |
+| GitLab CI | MR summary, discussions, Code Quality, SARIF, status | [`examples/ci/gitlab`](examples/ci/gitlab) |
+| Azure Pipelines | PR summary thread, PR threads, PR status | [`examples/ci/azure-pipelines`](examples/ci/azure-pipelines) |
 
-DiffPal can pass MCP servers through the Norma runtime to providers that support
-them. Declare servers once, then attach them to the provider:
-
-```yaml
-runtime:
-  mcp_servers:
-    repo-docs:
-      type: stdio
-      cmd: ["your-docs-mcp-server"]
-      args: ["--root", "."]
-      env:
-        DOCS_TOKEN: "${DOCS_TOKEN}"
-    policy-api:
-      type: http
-      url: "https://policy.example.com/mcp"
-      headers:
-        Authorization: "Bearer ${POLICY_MCP_TOKEN}"
-  providers:
-    opencode-acp:
-      type: opencode_acp
-      mcp_servers:
-        - repo-docs
-        - policy-api
-      opencode_acp:
-        model: opencode/big-pickle
-
-diffpal:
-  provider: opencode-acp
-```
-
-Keep MCP credentials in CI secrets. Use envsubst placeholders only for values
-that are guaranteed to exist in that job.
-
-## Feedback
-
-Use `feedback` for the normal user-facing shape:
-
-| Feedback | Behavior |
-| --- | --- |
-| `summary` | Summary plus non-file artifacts such as SARIF, Code Quality, or status. No file-level findings are published. |
-| `review` | Summary plus file-level findings for the platform; non-blocking findings stay visible but do not become merge blockers. The summary does not duplicate file-level finding details. |
-
-Use `summary-overview: false` or `--summary-overview=false` if you do not want
-the semantic change overview in the summary.
-
-If two DiffPal workflows run on the same PR, give them separate channels:
-
-```yaml
-with:
-  review-channel: diffpal-dev
-  review-id: github-pr-${{ github.event.pull_request.number }}-diffpal-dev
-```
-
-That produces a separate `diffpal-dev` PR review with its own summary and file-level
-comments.
-
-## Local Debugging
-
-CI is the main path, but local checks help when wiring a provider:
-
-```bash
-npm install --global @diffpal/diffpal@latest @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-diffpal doctor --mode github
-diffpal review local --base origin/main --head HEAD --profile ci
-```
-
-To inspect the prompt contract without calling any provider:
-
-```bash
-diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
-```
-
-The debug command renders the system prompt, the review task snapshot, and a
-schema-valid mock findings bundle through the normal review validation path.
-It does not require API keys.
+GitHub users can also install the
+[DiffPal Review action](https://github.com/marketplace/actions/diffpal-review)
+with `uses: diffpal/action@v1`. Azure users can install the
+[DiffPal Review extension](https://marketplace.visualstudio.com/items?itemName=diffpal.diffpal)
+and use the `DiffPalReview@1` task.
 
 ## Documentation
 
+- [Start here](docs/README.md)
 - [Quickstart](docs/quickstart.md)
+- [What success looks like](docs/what-success-looks-like.md)
 - [CI setup guide](docs/ci-examples.md)
-- [Examples](examples/README.md)
+- [Examples gallery](examples/README.md)
+- [Comparison guide](docs/comparison.md)
+- [Troubleshooting](docs/troubleshooting.md)
 - [Config reference](docs/config-reference.md)
 - [Findings schema](docs/findings-schema.md)
 - [GitLab adapter reference](docs/platform-gitlab.md)
 - [Azure adapter reference](docs/platform-azure.md)
-- [Release process](docs/release.md)
 - [Contributing](CONTRIBUTING.md)
