@@ -19,13 +19,15 @@ const (
 )
 
 type DiscussionAction struct {
-	Type       DiscussionActionType
-	FindingID  string
-	Body       string
-	Path       string
-	Line       int
-	Blocking   bool
-	ThreadHash string
+	Type       DiscussionActionType `json:"type"`
+	FindingID  string               `json:"finding_id"`
+	Body       string               `json:"body"`
+	Path       string               `json:"path"`
+	Line       int                  `json:"line"`
+	EndLine    int                  `json:"end_line"`
+	Blocking   bool                 `json:"blocking"`
+	Resolved   bool                 `json:"resolved"`
+	ThreadHash string               `json:"thread_hash"`
 }
 
 type DiscussionState struct {
@@ -34,24 +36,18 @@ type DiscussionState struct {
 }
 
 type DiscussionPlan struct {
-	Actions         []DiscussionAction `json:"actions"`
-	State           []DiscussionState  `json:"state"`
-	AdvisorySummary string             `json:"advisory_summary,omitempty"`
+	Actions []DiscussionAction `json:"actions"`
+	State   []DiscussionState  `json:"state"`
 }
 
 func PlanDiscussions(existing map[string]string, findingsList []findings.Finding, blockOn []string) DiscussionPlan {
 	out := make([]DiscussionAction, 0, len(findingsList))
 	state := make([]DiscussionState, 0, len(findingsList))
-	advisory := make([]findings.Finding, 0, len(findingsList))
 	for _, finding := range findingsList {
 		if finding.Path == "" || finding.StartLine <= 0 || finding.Category == "" {
 			continue
 		}
 		blocking := finding.Blocking || isLevelOrAbove(finding.Severity, blockOn)
-		if !blocking {
-			advisory = append(advisory, finding)
-			continue
-		}
 		thread := discussionKey(finding.Path, finding.StartLine, finding.Category, finding.ID)
 		actionThread := thread
 		actionType := ActionCreate
@@ -77,18 +73,15 @@ func PlanDiscussions(existing map[string]string, findingsList []findings.Finding
 			Body:       discussionBody(finding),
 			Path:       finding.Path,
 			Line:       finding.StartLine,
+			EndLine:    max(finding.EndLine, finding.StartLine),
 			Blocking:   blocking,
+			Resolved:   !blocking,
 			ThreadHash: actionThread,
 		})
 	}
-	var advisorySummary string
-	if len(advisory) > 0 {
-		advisorySummary = markdown.RenderSummary(findings.FindingsBundle{Findings: advisory})
-	}
 	return DiscussionPlan{
-		Actions:         out,
-		State:           state,
-		AdvisorySummary: advisorySummary,
+		Actions: out,
+		State:   state,
 	}
 }
 
@@ -120,59 +113,9 @@ func singleExistingForLocation(existing map[string]string, locationKey string) (
 }
 
 func discussionBody(f findings.Finding) string {
-	lines := []string{
-		fmt.Sprintf("**%s %s**", strings.ToUpper(f.Severity), f.Category),
-		"",
-		findingText(f),
-		"",
-		"**Confidence**: " + formatConfidence(f.Confidence),
-		"**Provider**: " + f.Provider,
-	}
-	if evidence := f.EvidenceText(); evidence != "" {
-		fence := markdownFence(evidence)
-		lines = append(lines, "", "**Evidence:**", fence, evidence, fence)
-	}
-	if impact := f.ImpactText(); impact != "" {
-		lines = append(lines, "", "**Impact**: "+impact)
-	}
-	if f.Suggestion != "" {
-		fence := markdownFence(f.Suggestion)
-		lines = append(lines, "", "**Suggestion:**", fence, f.Suggestion, fence)
-	}
-	return strings.Join(lines, "\n")
-}
-
-func findingText(f findings.Finding) string {
-	if strings.TrimSpace(f.Message) != "" {
-		return f.Message
-	}
-	return f.Title
-}
-
-func markdownFence(content string) string {
-	maxRun := 0
-	current := 0
-	for _, r := range content {
-		if r == '`' {
-			current++
-			if current > maxRun {
-				maxRun = current
-			}
-			continue
-		}
-		current = 0
-	}
-	if maxRun < 3 {
-		return "```"
-	}
-	return strings.Repeat("`", maxRun+1)
-}
-
-func formatConfidence(v float64) string {
-	if v <= 0 {
-		return "unset"
-	}
-	return fmt.Sprintf("%.2f", v)
+	return markdown.RenderFindingDetail(f, markdown.FindingDetailOptions{
+		HideConfidence: true,
+	})
 }
 
 func isLevelOrAbove(level string, blockOn []string) bool {
@@ -212,6 +155,35 @@ type PublishResult struct {
 	AdvisoryCount int
 	Blocking      []findings.Finding
 	Advisory      []findings.Finding
+}
+
+type StatusPayload struct {
+	State       string `json:"state"`
+	Name        string `json:"name"`
+	Context     string `json:"context"`
+	Description string `json:"description"`
+	TargetURL   string `json:"target_url,omitempty"`
+}
+
+func PolicyStatus(blockingCount int, advisoryCount int, gateEnabled bool, targetURL string) StatusPayload {
+	payload := StatusPayload{
+		State:   "success",
+		Name:    "DiffPal Review",
+		Context: "diffpal/review",
+	}
+	switch {
+	case blockingCount > 0 && gateEnabled:
+		payload.State = "failed"
+		payload.Description = fmt.Sprintf("%d blocking findings", blockingCount)
+	case blockingCount > 0:
+		payload.Description = fmt.Sprintf("%d blocking findings; gate disabled", blockingCount)
+	case advisoryCount > 0:
+		payload.Description = "Advisory findings present without merge blockers"
+	default:
+		payload.Description = "DiffPal completed with no findings"
+	}
+	payload.TargetURL = strings.TrimSpace(targetURL)
+	return payload
 }
 
 func SummarizeDecision(bundle findings.FindingsBundle, blockOn []string) PublishResult {

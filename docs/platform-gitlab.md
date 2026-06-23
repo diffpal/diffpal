@@ -27,12 +27,12 @@ Required context:
 Normal CI setup should use `--feedback`:
 
 - `summary`: posts Code Quality/SARIF artifacts and one MR summary discussion, without file-level findings.
-- `review`: publishes blocking discussions and keeps non-blocking findings visible in the advisory summary stream.
+- `review`: publishes Code Quality/SARIF artifacts, one MR summary discussion, a commit status, and file-level discussions for every publishable finding.
 
 Severity to discussion policy:
 
 - `high/critical`: blocking discussion that remains unresolved until manual action
-- `medium/low`: advisory summary stream instead of merge-blocking discussion
+- `medium/low`: advisory file-level discussion that is resolved immediately
 
 Each finding maps to a stable thread key:
 
@@ -44,6 +44,7 @@ Re-publishing uses key + finding ID for idempotent update/skip.
 
 - GitLab Code Quality artifact: `.artifacts/diffpal/codequality.json`
 - SARIF artifact: `.artifacts/diffpal/diffpal.sarif`
+- GitLab commit status artifact: `.artifacts/diffpal/gitlab-status.json`
 
 Both artifacts are generated from one deterministic source so dedupe keys remain stable across re-runs.
 
@@ -52,7 +53,8 @@ Both artifacts are generated from one deterministic source so dedupe keys remain
 - Tool decision: `pass` (no findings), `warn` (advisory findings), `blocked` (blocking findings), `error` (tooling failure).
 - Merge blocking is represented in:
   - unresolved discussions for blockers, and
-  - optional blocked CI context when `--gate` is enabled.
+  - a GitLab commit status named `DiffPal Review` / `diffpal/review`.
+- `--gate` still controls the DiffPal process exit code: blocking findings return exit code `1` after publishing succeeds.
 
 ## Operational requirements
 

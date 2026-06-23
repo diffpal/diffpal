@@ -5,22 +5,21 @@
 [![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Open-source, provider-agnostic AI review for pull requests.**
+**AI code review with the agent you already use.**
 
-DiffPal is an open-source PR review system that turns changed code into
-structured findings, clear summaries, file-level feedback, artifacts, and merge
-gates. Teams bring their own AI provider or ACP-compatible CLI, so there is no
-mandatory hosted DiffPal review service and no required per-seat review
-platform.
+DiffPal runs in your CI and turns the AI agent your team already uses into
+structured code review for pull requests. There is no
+mandatory hosted DiffPal review service, no required per-seat review platform,
+and no agent lock-in.
+
+Bring Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an
+ordered provider pool, or your own ACP-compatible agent. DiffPal keeps the code
+review workflow consistent: summaries, file-level findings, artifacts, and merge
+gates across GitHub, GitLab, and Azure DevOps.
 
 DiffPal exists to make AI code review something teams control, not another
-review platform they rent. It runs in your CI, uses the AI provider you choose,
-and turns every pull request into clear summaries, actionable file-level feedback,
-review artifacts, and merge gates.
-
-Use the provider path that already works for your team and keep the review
-workflow in your repository. DiffPal's goal is to make AI PR review portable,
-affordable, and enforceable across GitHub, GitLab, and Azure DevOps.
+platform they rent. Use the agent path that already works for your team and
+keep the review workflow in your repository.
 
 | Works with | Publishes | Gates on |
 | --- | --- | --- |
@@ -48,12 +47,22 @@ version, so a review can be traced back to the exact prompt contract that
 generated it. See the [config reference](docs/config-reference.md#prompt-pack)
 and [findings schema](docs/findings-schema.md) for the current metadata.
 
-## Bring Your Own Provider
+## Use the AI You Already Have
 
-DiffPal decouples AI review from any one vendor or hosted service. Choose
-Codex, Copilot, OpenCode, Gemini, Claude Code, a hosted API provider, an ordered
-provider pool, or any ACP-compatible CLI without rebuilding your PR review
-workflow.
+DiffPal decouples AI code review from any one vendor or hosted service. Your
+team can use the account, subscription, model, and CLI you already trust without
+rebuilding the PR review workflow around a new review platform.
+
+| Bring | Use when |
+| --- | --- |
+| Existing AI subscription | Your team already uses an agent CLI such as Codex, Copilot, OpenCode, Gemini, or Claude Code. |
+| Hosted provider API key | You want CI to call a hosted API provider directly. |
+| Any ACP-compatible CLI | You have your own review agent or a provider-specific ACP server. |
+
+DiffPal handles diff collection, the Prompt Pack review contract, findings
+validation, PR feedback, artifacts, and merge gates. Your selected provider or
+ACP agent owns model reasoning, account authentication, tools, and
+provider-specific credentials.
 
 That model keeps cost control with your team. DiffPal does not require a hosted
 review service or per-seat platform subscription to collect diffs, publish PR
@@ -61,10 +70,20 @@ feedback, write artifacts, or enforce merge gates.
 
 ## Quick Start: GitHub Actions
 
-This is the fastest production-shaped setup using the default Codex API-key
-recipe: DiffPal installs itself through the GitHub Action, Codex is selected as
-the review provider, and `OPENAI_API_KEY` stays in GitHub Secrets. You can swap
-the provider recipe while keeping the same DiffPal review workflow.
+Start by choosing the setup recipe that matches the account or agent your
+team already uses:
+
+| Setup | Use when |
+| --- | --- |
+| `generic-acp` | You have any ACP-compatible CLI and provider-specific auth. |
+| `codex-subscription` | You want CI to reuse existing Codex subscription auth. |
+| `codex-api-key` | You want CI to authenticate Codex with `OPENAI_API_KEY`. |
+| `copilot-github-token` | You want CI to authenticate Copilot with a fine-grained PAT. |
+| `opencode-acp` | You want CI to run OpenCode through ACP. |
+
+The example below uses the Codex API-key recipe because it is a concrete
+copy-paste setup. You can swap the setup name, config recipe, secret, and
+agent install/auth step while keeping the same DiffPal review workflow.
 
 1. Generate the config:
 

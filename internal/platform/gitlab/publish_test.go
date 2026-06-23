@@ -9,7 +9,7 @@ import (
 	"github.com/diffpal/diffpal/internal/findings"
 )
 
-func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *testing.T) {
+func TestPlanDiscussionsCreatesAllFindingsAndResolvesAdvisories(t *testing.T) {
 	t.Parallel()
 
 	findingsList := []findings.Finding{
@@ -49,8 +49,8 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	}
 	plan := PlanDiscussions(existing, findingsList, []string{"high"})
 
-	if len(plan.Actions) != 2 {
-		t.Fatalf("len(Actions) = %d, want 2 blocking actions", len(plan.Actions))
+	if len(plan.Actions) != 3 {
+		t.Fatalf("len(Actions) = %d, want 3 actions", len(plan.Actions))
 	}
 	if plan.Actions[0].Type != ActionUpdate {
 		t.Fatalf("first action = %q, want update", plan.Actions[0].Type)
@@ -58,11 +58,11 @@ func TestPlanDiscussionsOnlyCreatesBlockingThreadsAndSummarizesAdvisories(t *tes
 	if plan.Actions[1].Type != ActionSkip {
 		t.Fatalf("second action = %q, want skip", plan.Actions[1].Type)
 	}
-	if len(plan.State) != 2 {
-		t.Fatalf("len(State) = %d, want 2 blocking states", len(plan.State))
+	if plan.Actions[2].Blocking || !plan.Actions[2].Resolved {
+		t.Fatalf("advisory action = %+v, want non-blocking resolved", plan.Actions[2])
 	}
-	if !strings.Contains(plan.AdvisorySummary, "Medium maintainability") {
-		t.Fatalf("advisory summary missing advisory finding:\n%s", plan.AdvisorySummary)
+	if len(plan.State) != 3 {
+		t.Fatalf("len(State) = %d, want 3 states", len(plan.State))
 	}
 }
 
@@ -82,11 +82,11 @@ func TestDiscussionBodyUsesSafeFenceForBackticks(t *testing.T) {
 	if !strings.Contains(body, "**Impact**: reviewers can see the concrete consequence") {
 		t.Fatalf("body missing impact:\n%s", body)
 	}
-	if !strings.Contains(body, "`````\n````suggestion\nx\n````\n`````") {
-		t.Fatalf("suggestion fence was not lengthened safely:\n%s", body)
+	if !strings.Contains(body, "- **Suggestion**: ````suggestion\nx\n````") {
+		t.Fatalf("body missing suggestion:\n%s", body)
 	}
-	if strings.Contains(body, "**Evidence:**\n```\n```go") {
-		t.Fatalf("evidence used unsafe triple fence:\n%s", body)
+	if strings.Contains(body, "Confidence") || strings.Contains(body, "Provider") {
+		t.Fatalf("body contains noisy fields:\n%s", body)
 	}
 }
 
@@ -219,5 +219,31 @@ func TestSummarizeDecisionIgnoresUnknownBlockOnSeverity(t *testing.T) {
 	}
 	if result.BlockCount != 0 || result.AdvisoryCount != 1 {
 		t.Fatalf("unexpected counts: %+v", result)
+	}
+}
+
+func TestPolicyStatus(t *testing.T) {
+	t.Parallel()
+
+	blocked := PolicyStatus(2, 1, true, "https://gitlab.example/job/1")
+	if blocked.State != "failed" || blocked.Context != "diffpal/review" || blocked.TargetURL == "" {
+		t.Fatalf("blocked status = %+v, want failed diffpal/review with target URL", blocked)
+	}
+
+	advisory := PolicyStatus(0, 1, true, "")
+	if advisory.State != "success" || !strings.Contains(advisory.Description, "Advisory findings") {
+		t.Fatalf("advisory status = %+v, want success advisory description", advisory)
+	}
+}
+
+func TestParseDiffLinesIgnoresNoNewlineMarker(t *testing.T) {
+	t.Parallel()
+
+	lines := parseDiffLines("@@ -1,2 +1,3 @@\n old\n+new\n\\ No newline at end of file\n")
+	if len(lines) != 2 {
+		t.Fatalf("len(lines) = %d, want 2: %+v", len(lines), lines)
+	}
+	if lines[1].NewLine != 2 || lines[1].OldLine != 0 {
+		t.Fatalf("added line = %+v, want new line 2 only", lines[1])
 	}
 }
