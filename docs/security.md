@@ -8,8 +8,8 @@ before enabling provider-backed review.
 
 - The CI runner receives the repository checkout, DiffPal configuration, and
   provider credentials made available to the job.
-- DiffPal reads the configured diff and sends review input to the selected
-  provider or ACP-compatible agent.
+- DiffPal resolves the configured base/head review scope and sends review input
+  to the selected provider or ACP-compatible agent.
 - The provider owns model execution, provider account security, and provider
   credentials.
 - GitHub, GitLab, and Azure DevOps publishers receive review output only when a

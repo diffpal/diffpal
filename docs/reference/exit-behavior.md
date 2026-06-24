@@ -33,7 +33,7 @@ Exit code `2` covers invalid config, missing config, invalid feedback mode,
 invalid review channel, invalid instructions file, missing platform token, and
 missing host context such as base/head/repository metadata.
 
-Diff collection failures are setup/context failures and also return `2`.
+Review scope resolution failures are setup/context failures and also return `2`.
 
 ## Provider Failure
 

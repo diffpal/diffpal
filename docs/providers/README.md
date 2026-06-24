@@ -17,7 +17,7 @@ For the conceptual difference between providers and agents, see
 | Code host | The system that owns pull requests or merge requests, such as GitHub, GitLab, or Azure DevOps. |
 | CI system | The runner that checks out the repository and executes DiffPal, such as GitHub Actions, GitLab CI, Azure Pipelines, or a custom runner. |
 | Provider | The configured runtime entry that DiffPal asks to perform review reasoning. |
-| Agent | The provider-backed CLI or ACP-compatible process that inspects the diff and returns structured review output. |
+| Agent | The provider-backed CLI or ACP-compatible process that inspects the requested change or repository context and returns structured review output. |
 
 The code host decides where feedback is published. The CI system decides how
 commands and secrets run. The provider or agent decides which model, account,
