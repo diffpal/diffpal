@@ -14,6 +14,7 @@ GitHub, GitLab, and Azure DevOps.
 
 [Quickstart](docs/getting-started/github-quickstart.md) ·
 [Documentation](docs/README.md) ·
+[Security](docs/security.md) ·
 [GitHub](https://github.com/diffpal/diffpal)
 
 ## What Users Get
@@ -44,6 +45,10 @@ npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform gi
 ```
 
 Add `OPENAI_API_KEY` as a repository secret, then copy the workflow:
+
+`OPENAI_API_KEY` is a provider credential. DiffPal runs in your CI and sends
+review input to the provider you configure, so keep this secret out of
+untrusted fork PR jobs.
 
 ```bash
 mkdir -p .github/workflows
@@ -81,6 +86,7 @@ Azure users can install the
 | Understand the concepts | [Concepts](docs/concepts/README.md) and [Glossary](docs/concepts/glossary.md) |
 | Choose a provider or ACP agent | [Providers](docs/providers/README.md) |
 | Set up GitLab, Azure, or custom CI | [Integrations](docs/integrations/README.md) |
+| Secure secrets and fork PRs | [Secrets and fork PRs](docs/guides/secrets-and-fork-prs.md) |
 | Tune review policy | [Configuration reference](docs/reference/configuration.md) |
 | Consume artifacts or schemas | [Artifacts](docs/reference/artifacts.md) and [findings schema](docs/reference/findings-schema.md) |
 | Debug setup problems | [Troubleshooting](docs/help/troubleshooting.md) |

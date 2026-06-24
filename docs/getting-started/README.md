@@ -14,6 +14,8 @@ Before you start, have:
 
 If the terms are new, read [How DiffPal works](../concepts/how-diffpal-works.md)
 and the [Glossary](../concepts/glossary.md) first.
+Before adding provider secrets, read
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Choose Code Host
 

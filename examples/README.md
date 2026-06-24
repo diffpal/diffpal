@@ -19,6 +19,8 @@ OpenCode package or install source in your own CI setup the same way.
 
 For the full first-run path, use the
 [quickstart](../docs/getting-started/github-quickstart.md).
+Before enabling any secret-backed example, read
+[Secrets and fork PRs](../docs/guides/secrets-and-fork-prs.md).
 
 ## Bring Your Own Agent
 

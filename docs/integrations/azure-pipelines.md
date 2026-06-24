@@ -43,12 +43,18 @@ env:
 
 Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access. Use
 `AZURE_DEVOPS_EXT_PAT` only when your organization requires a dedicated PAT.
+Keep host tokens separate from provider credentials such as `OPENAI_API_KEY`.
 
 ## Provider Installation And Authentication
 
 Install and authenticate the selected provider before the DiffPal step. Use
 [Providers](../providers/README.md) for Codex, Copilot, OpenCode, and custom
 ACP-compatible CLI setup.
+
+Provider credentials allow the selected third-party provider to process the
+review input. Store them as secret variables and keep credentialed review steps
+behind trusted-source conditions. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Minimal Pipeline
 
@@ -114,7 +120,7 @@ condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
 ```
 
 Use stricter organization-specific trusted-source conditions when needed. See
-[Untrusted Contributions](README.md#untrusted-contributions).
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Expected Results
 

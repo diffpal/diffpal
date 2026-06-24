@@ -43,6 +43,14 @@ custom ACP-compatible CLI:
 - [OpenCode](providers/opencode.md)
 - [Custom ACP-compatible CLI](providers/custom-acp.md)
 
+## Guides
+
+Use [Guides](guides/README.md) for operational guidance that spans setup and
+reference material:
+
+- [Secrets and fork PRs](guides/secrets-and-fork-prs.md)
+- [Security controls](security.md)
+
 ## Reference
 
 Use [Reference](reference/README.md) for stable contracts:
