@@ -1,8 +1,34 @@
-# GitLab Adapter Contract (v1)
+# GitLab CI
 
 For a copy-paste GitLab CI setup, start with the
-[CI setup guide](ci-examples.md#gitlab-ci). This page documents adapter
-behavior and publishing semantics.
+[integrations guide](README.md). This page documents setup requirements,
+adapter behavior, and publishing semantics.
+
+Examples:
+
+- [Codex API key](../../examples/ci/gitlab/codex-api-key.yml)
+- [Codex subscription auth](../../examples/ci/gitlab/codex-subscription.yml)
+- [Copilot token](../../examples/ci/gitlab/copilot-github-token.yml)
+
+Required variables:
+
+| Name | Purpose |
+| --- | --- |
+| `CI_JOB_TOKEN` | Built-in token, when your instance allows MR API publishing. |
+| `GITLAB_TOKEN` | Optional dedicated token when `CI_JOB_TOKEN` is not enough. |
+
+Use protected/masked variables for provider tokens. If your project accepts fork
+merge requests, keep provider tokens available only to trusted pipelines. The
+examples restrict secret-backed review jobs to same-project merge requests with
+`$CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH`.
+
+What you should see:
+
+- GitLab discussions for actionable findings.
+- GitLab commit status named `DiffPal Review`.
+- Code Quality and SARIF artifacts.
+- `.artifacts/diffpal/summary.md` in job artifacts.
+- Failed job when `--gate` is set and blocking findings exist.
 
 ## Context resolution
 

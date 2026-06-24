@@ -1,40 +1,47 @@
 # DiffPal Docs
 
-Choose the path that matches what you want to do first.
+Choose the section that matches what you want to do.
 
-## I Want The Fastest GitHub Setup
+## Getting Started
 
-Use the [quickstart](quickstart.md) to generate a config, add one provider
-secret, copy a GitHub Actions workflow, and get the first PR review running.
+Use [Getting Started](getting-started/README.md) for the first successful
+review path. Start with the
+[GitHub quickstart](getting-started/github-quickstart.md), then verify the
+expected summary, comments, artifacts, and gate behavior with
+[Verify First Review](getting-started/verify-first-review.md).
 
-This path uses the Codex API-key recipe because it is a ready-made example. You
-can switch providers later without changing the DiffPal review workflow.
+## Concepts
 
-## I Already Use Another Agent
+Use [Concepts](concepts/README.md) to understand how DiffPal turns pull request
+diffs into structured findings and host-native feedback. The section also
+includes the [comparison guide](concepts/comparison.md).
 
-Start with [Using Another ACP CLI](ci-examples.md#using-another-acp-cli). Keep
-your existing CLI, account, tools, and provider-specific authentication, then
-point `runtime.providers` at the command that starts its ACP stdio server.
+## Integrations
 
-## I Need GitLab Or Azure DevOps
+Use [Integrations](integrations/README.md) for CI setup, provider recipes, and
+host-specific requirements:
 
-Use the [CI setup guide](ci-examples.md) for host-specific checkout, token, and
-publishing requirements. The same committed DiffPal config shape works across
-GitHub, GitLab, and Azure DevOps.
+- [GitHub Actions](integrations/github-actions.md)
+- [GitLab CI](integrations/gitlab-ci.md)
+- [Azure Pipelines](integrations/azure-pipelines.md)
 
-## I Want Stricter Policy And Auditing
+## Reference
 
-Read the [config reference](config-reference.md), [findings schema](findings-schema.md),
-and [what success looks like](what-success-looks-like.md). DiffPal records prompt
-metadata, writes a structured findings bundle, and can fail CI when findings
-meet your `block_on` threshold.
+Use [Reference](reference/README.md) for stable contracts:
 
-## Common Next Steps
+- [Configuration](reference/configuration.md)
+- [Findings schema](reference/findings-schema.md)
+- [Artifacts](reference/artifacts.md)
+- [Versioning](reference/versioning.md)
+- [Support matrix](reference/support-matrix.md)
 
-- [Examples gallery](../examples/README.md) for copy-paste configs and CI files
-- [Comparison guide](comparison.md) for how DiffPal differs from hosted
-  reviewers and lint publishers
-- [Troubleshooting](troubleshooting.md) for missing comments, token failures,
-  fork PRs, and incomplete diffs
-- [Visual assets plan](visual-assets.md) for screenshots, diagrams, and demo
-  assets maintainers should produce
+## Help
+
+Use [Help](help/README.md) for operational fixes, including
+[troubleshooting](help/troubleshooting.md) for missing comments, token failures,
+fork PRs, and incomplete diffs.
+
+## Examples
+
+Use the [examples gallery](../examples/README.md) for copy-paste configs and CI
+files.

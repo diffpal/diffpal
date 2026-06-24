@@ -5,7 +5,8 @@ It uses the Codex API-key recipe because it is a ready-made GitHub Actions
 setup, not because Codex is the product boundary.
 
 If you already have another ACP-compatible CLI, start with
-[Using Another ACP CLI](ci-examples.md#using-another-acp-cli) instead.
+[Using Another ACP CLI](../integrations/README.md#using-another-acp-cli)
+instead.
 
 ## What You Should See
 
@@ -17,7 +18,8 @@ After the first successful run, expect:
 - a failed job only when `gate: true` and blocking findings exist, or when
   setup, authentication, diff collection, or publishing fails
 
-For a fuller outcome checklist, see [what success looks like](what-success-looks-like.md).
+For a fuller outcome checklist, see
+[Verify First Review](verify-first-review.md).
 
 ## 1. Generate Config
 
@@ -47,7 +49,8 @@ Other setup recipes:
 | `generic-acp` | You already have another ACP-compatible CLI. |
 | `opencode-acp` | You want CI to run OpenCode through ACP. |
 
-For manual setup, copy a config from [`examples/configs`](../examples/configs).
+For manual setup, copy a config from
+[`examples/configs`](../../examples/configs).
 
 ## 2. Add Secret
 
@@ -62,7 +65,8 @@ permissions DiffPal needs to publish PR feedback.
 
 For public repositories, do not expose provider credentials to fork PR code.
 Keep secret-backed DiffPal review limited to same-repository pull requests and
-let forks run no-secret CI only. See [troubleshooting](troubleshooting.md#fork-pull-requests-and-secrets)
+let forks run no-secret CI only. See
+[troubleshooting](../help/troubleshooting.md#fork-pull-requests-and-secrets)
 for the security rationale.
 
 ## 3. Add Workflow
@@ -95,24 +99,12 @@ packages when you need fully reproducible credentialed CI.
 
 For another ACP CLI, keep the same workflow shape and replace the provider
 install/authentication step plus `.config/diffpal/config.yaml`. Start from the
-[generic ACP config](../examples/configs/generic-acp/config.yaml) and the
-[CI setup guide](ci-examples.md#using-another-acp-cli).
+[generic ACP config](../../examples/configs/generic-acp/config.yaml) and the
+[integrations guide](../integrations/README.md#using-another-acp-cli).
 
 ## Other Hosts And Recipes
 
-- GitHub Actions: [`examples/ci/github-actions`](../examples/ci/github-actions)
-- GitLab CI: [`examples/ci/gitlab`](../examples/ci/gitlab)
-- Azure Pipelines: [`examples/ci/azure-pipelines`](../examples/ci/azure-pipelines)
-- Provider configs: [`examples/configs`](../examples/configs)
-
-## Planned Wizard Flow
-
-`diffpal init --wizard` is the supported entry point for one-command onboarding.
-The first implementation generates config safely. The intended full flow is:
-
-- detect GitHub Actions, GitLab CI, or Azure Pipelines config
-- choose a provider setup recipe
-- choose or name the review profile
-- choose gate behavior
-- generate `.config/diffpal/config.yaml`
-- optionally generate or patch CI configuration after confirmation
+- GitHub Actions: [`examples/ci/github-actions`](../../examples/ci/github-actions)
+- GitLab CI: [`examples/ci/gitlab`](../../examples/ci/gitlab)
+- Azure Pipelines: [`examples/ci/azure-pipelines`](../../examples/ci/azure-pipelines)
+- Provider configs: [`examples/configs`](../../examples/configs)

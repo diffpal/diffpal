@@ -52,7 +52,7 @@ manual runs, pass explicit `base` and `head` revisions.
 - For Codex API-key auth, set `OPENAI_API_KEY` and run
   `codex login --with-api-key`.
 - For Codex subscription auth, regenerate `CODEX_AUTH_JSON_B64` with the recipe
-  in [examples](../examples/README.md#generate-codex_auth_json_b64).
+  in [examples](../../examples/README.md#generate-codexauthjsonb64).
 - For Copilot, use a fine-grained GitHub PAT v2 with the Copilot Requests
   permission.
 

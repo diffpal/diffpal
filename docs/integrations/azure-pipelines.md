@@ -1,4 +1,4 @@
-# Azure DevOps Adapter Contract (v1)
+# Azure Pipelines
 
 Public CLI naming uses `ado`; config uses `azure`:
 
@@ -6,8 +6,34 @@ Public CLI naming uses `ado`; config uses `azure`:
 - config: `diffpal.platforms.azure`
 
 For a copy-paste Azure Pipelines setup, start with the
-[CI setup guide](ci-examples.md#azure-pipelines). This page documents adapter
-behavior and task requirements.
+[integrations guide](README.md). This page documents setup requirements,
+adapter behavior, and task requirements.
+
+Examples:
+
+- [Codex API key](../../examples/ci/azure-pipelines/codex-api-key.yml)
+- [Codex subscription auth](../../examples/ci/azure-pipelines/codex-subscription.yml)
+- [Copilot token](../../examples/ci/azure-pipelines/copilot-github-token.yml)
+
+Required setup:
+
+- Enable **Allow scripts to access the OAuth token**.
+- Pass `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` to the `DiffPalReview@1` task.
+- Keep `fetchDepth: 0` on checkout.
+- Run the task from PR validation or an Azure branch policy. When `base` and
+  `head` are omitted, the task fetches the target branch and computes the PR
+  merge-base automatically.
+- Set `explain: true` while debugging to print the resolved PR id, branches,
+  base/head, merge-base, and redacted CLI arguments.
+- Keep credentialed steps behind `ne(variables['System.PullRequest.IsFork'], 'True')`
+  or a stricter organization-specific trusted-source condition.
+
+What you should see:
+
+- Azure PR threads for actionable findings.
+- An Azure PR summary thread headed `DiffPal Review Summary`.
+- Azure PR status named `DiffPal Review`.
+- Failed task when `gate` is true and blocking findings exist.
 
 ## Context resolution
 

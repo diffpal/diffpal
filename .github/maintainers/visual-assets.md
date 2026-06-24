@@ -1,8 +1,7 @@
-# Visual Assets Plan
+# Maintainer Visual Assets
 
-DiffPal is easiest to understand when visitors can see the review outcome before
-they read configuration details. Use this page as the maintainer checklist for
-future screenshots, GIFs, and repository visuals.
+This page is a maintainer checklist for future repository visuals. It is not
+part of the public user documentation hierarchy.
 
 ## Hero Composite Screenshot
 
@@ -13,8 +12,6 @@ Show one pull request viewport containing:
 - the DiffPal check or status
 - a small callout for `.artifacts/diffpal/findings.json`
 
-Place the image near the README hero once the asset exists.
-
 ## First-Run GIF
 
 Show the shortest successful path:
@@ -24,8 +21,6 @@ Show the shortest successful path:
 - copy the CI workflow
 - open a same-repository pull request
 - see summary, inline finding, and findings bundle
-
-Use this in `docs/quickstart.md` after the static quickstart is stable.
 
 ## Architecture Diagram
 
@@ -47,13 +42,3 @@ Create a side-by-side image for:
 
 - `summary`: summary plus non-file artifacts
 - `review`: summary plus platform-native file-level findings
-
-Use it from the CI setup guide once the image exists.
-
-## Social Preview Image
-
-Create a repository social preview with:
-
-- `DiffPal`
-- `Open-source AI PR review you control`
-- three proof points: `findings`, `comments`, `gates`
