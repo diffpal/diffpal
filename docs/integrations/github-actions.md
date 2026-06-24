@@ -18,7 +18,7 @@ start with the [GitHub quickstart](../getting-started/github-quickstart.md).
 - A provider secret such as `OPENAI_API_KEY`.
 
 See [Shared Setup](README.md#shared-setup) and
-[Provider Recipes](README.md#provider-recipes).
+[Providers](../providers/README.md).
 
 ## Required Checkout Behavior
 
@@ -43,24 +43,9 @@ permissions:
 
 ## Provider Installation And Authentication
 
-For the Codex API-key recipe:
-
-```yaml
-- uses: actions/setup-node@v4
-  with:
-    node-version: 22
-
-- name: Install Codex provider
-  run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-
-- name: Authenticate Codex
-  run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-```
-
-For other providers, replace only the install/auth steps and matching config.
-See [Provider Recipes](README.md#provider-recipes).
+Install and authenticate the selected provider before the DiffPal step. Use
+[Providers](../providers/README.md) for Codex, Copilot, OpenCode, and custom
+ACP-compatible CLI setup.
 
 ## Minimal Pipeline
 

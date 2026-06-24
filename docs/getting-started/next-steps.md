@@ -6,9 +6,8 @@ Use this page after your first DiffPal review is working.
 
 Switch providers by changing the selected `runtime.providers` entry and the
 matching CI install/authentication step. Start with the
-[provider recipes](../integrations/README.md#provider-recipes) or use
-[Using Another ACP CLI](../integrations/README.md#using-another-acp-cli) for a
-custom ACP-compatible agent.
+[Providers](../providers/README.md) section or use
+[Custom ACP-Compatible CLI](../providers/custom-acp.md) for a custom agent.
 
 ## Enable Review Comments
 

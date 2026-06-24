@@ -58,7 +58,9 @@ DiffPal.
 ## Portable Example
 
 This vendor-neutral shell example performs an artifact-only review. It uses the
-current CLI command and flags for `diffpal review local`.
+current CLI command and flags for `diffpal review local`. The provider setup
+shown is the Codex API-key path; use [Providers](../providers/README.md) to
+replace those install and authentication commands for another provider.
 
 ```bash
 set -eu

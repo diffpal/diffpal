@@ -17,7 +17,7 @@ Use this page to run DiffPal in Azure Pipelines pull request validation.
 - Pipeline access to `System.AccessToken`.
 
 See [Shared Setup](README.md#shared-setup) and
-[Provider Recipes](README.md#provider-recipes).
+[Providers](../providers/README.md).
 
 ## Required Checkout Behavior
 
@@ -46,24 +46,9 @@ Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access. Use
 
 ## Provider Installation And Authentication
 
-For the Codex API-key recipe:
-
-```yaml
-- task: UseNode@1
-  inputs:
-    version: "22.x"
-
-- script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-  displayName: Install Codex provider
-
-- script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-  displayName: Authenticate Codex
-  env:
-    OPENAI_API_KEY: $(OPENAI_API_KEY)
-```
-
-For other providers, replace only the install/auth steps and matching config.
-See [Provider Recipes](README.md#provider-recipes).
+Install and authenticate the selected provider before the DiffPal step. Use
+[Providers](../providers/README.md) for Codex, Copilot, OpenCode, and custom
+ACP-compatible CLI setup.
 
 ## Minimal Pipeline
 

@@ -49,12 +49,11 @@ manual runs, pass explicit `base` and `head` revisions.
 
 - Confirm the provider CLI is installed before the DiffPal step.
 - Confirm the provider auth secret is present only in trusted pipelines.
-- For Codex API-key auth, set `OPENAI_API_KEY` and run
-  `codex login --with-api-key`.
-- For Codex subscription auth, regenerate `CODEX_AUTH_JSON_B64` with the recipe
-  in [examples](../../examples/README.md#generate-codexauthjsonb64).
-- For Copilot, use a fine-grained GitHub PAT v2 with the Copilot Requests
-  permission.
+- Check the selected provider page for the required install command, secret,
+  authentication step, and common failures.
+
+See [Providers](../providers/README.md) for provider-specific install and
+authentication checks.
 
 ## Gate Fails The Job
 

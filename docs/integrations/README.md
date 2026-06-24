@@ -11,6 +11,8 @@ host. Host-specific pages all follow the same shape:
 Copy-paste configs and pipelines live in [`examples/`](../../examples/README.md).
 Use the [GitHub quickstart](../getting-started/github-quickstart.md) when you
 want the shortest first setup path.
+Use [Providers](../providers/README.md) to choose Codex, Copilot, OpenCode, or
+a custom ACP-compatible CLI.
 
 ## Shared Setup
 
@@ -18,49 +20,13 @@ Every host needs:
 
 1. Full git history for the reviewed pull request or merge request.
 2. A DiffPal config committed at `.config/diffpal/config.yaml`.
-3. The provider CLI runtime required by the selected agent.
+3. The provider CLI runtime required by the selected
+   [provider](../providers/README.md).
 4. A provider auth secret.
 5. A platform token with permission to publish review feedback.
 
 For Jenkins, Buildkite, CircleCI, Bitbucket Pipelines, internal runners, or any
 other CI system, use the [Custom CI/CD guide](custom-ci.md).
-
-## Provider Recipes
-
-Choose a ready-made provider recipe or configure `generic_acp` for your own ACP
-CLI. The selected provider lives under `runtime.providers`; the host page only
-changes the CI syntax for install, auth, checkout, and publishing.
-
-| Setup | Config | Required secret |
-| --- | --- | --- |
-| Generic ACP CLI | [`examples/configs/generic-acp/config.yaml`](../../examples/configs/generic-acp/config.yaml) | provider-specific |
-| Codex API key | [`examples/configs/codex-api-key/config.yaml`](../../examples/configs/codex-api-key/config.yaml) | `OPENAI_API_KEY` |
-| Codex subscription auth | [`examples/configs/codex-subscription/config.yaml`](../../examples/configs/codex-subscription/config.yaml) | `CODEX_AUTH_JSON_B64` |
-| Copilot token | [`examples/configs/copilot-github-token/config.yaml`](../../examples/configs/copilot-github-token/config.yaml) | `COPILOT_GITHUB_TOKEN` |
-| OpenCode ACP | [`examples/configs/opencode-acp/config.yaml`](../../examples/configs/opencode-acp/config.yaml) | OpenCode-specific |
-
-These setup names are accepted by `diffpal init --wizard --setup ...`.
-
-## Using Another ACP CLI
-
-DiffPal can use any CLI that starts an ACP stdio server. Copy the CI example
-for your host, replace the provider install/authentication step with your CLI's
-setup, and use a config like:
-
-```yaml
-runtime:
-  providers:
-    my-review-agent:
-      type: generic_acp
-      generic_acp:
-        cmd: ["your-acp-cli", "acp", "--stdio"]
-
-diffpal:
-  provider: my-review-agent
-```
-
-The rest of the workflow stays the same: full checkout, DiffPal config,
-provider secret, platform token, feedback mode, and optional gate.
 
 ## Feedback Modes
 
