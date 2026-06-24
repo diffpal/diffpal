@@ -8,7 +8,8 @@ Use [Getting Started](getting-started/README.md) for the first successful
 review path. Start with the
 [GitHub quickstart](getting-started/github-quickstart.md), then verify the
 expected summary, comments, artifacts, and gate behavior with
-[Verify First Review](getting-started/verify-first-review.md).
+[Verify First Review](getting-started/verify-first-review.md). Continue with
+[Next Steps](getting-started/next-steps.md) after the first run works.
 
 ## Concepts
 
@@ -24,6 +25,7 @@ host-specific requirements:
 - [GitHub Actions](integrations/github-actions.md)
 - [GitLab CI](integrations/gitlab-ci.md)
 - [Azure Pipelines](integrations/azure-pipelines.md)
+- [Custom CI/CD](integrations/custom-ci.md)
 
 ## Reference
 

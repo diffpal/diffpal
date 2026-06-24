@@ -1,75 +1,60 @@
-# DiffPal Quickstart
+# GitHub Quickstart
 
-This guide is the fastest GitHub path for your first successful DiffPal review.
-It uses the Codex API-key recipe because it is a ready-made GitHub Actions
-setup, not because Codex is the product boundary.
+Use this page to add DiffPal to a new GitHub repository and see the first PR
+review.
 
-If you already have another ACP-compatible CLI, start with
-[Using Another ACP CLI](../integrations/README.md#using-another-acp-cli)
-instead.
+This path uses the Codex API-key recipe because it is a complete copy-paste
+GitHub Actions setup. Codex is not the product boundary; other supported
+providers and ACP agents can use the same DiffPal workflow.
 
-## What You Should See
+## 1. Create A Setup Branch
 
-After the first successful run, expect:
-
-- a `DiffPal Review Summary` PR review
-- inline review comments when actionable findings exist
-- `.artifacts/diffpal/findings.json` in the workflow workspace
-- a failed job only when `gate: true` and blocking findings exist, or when
-  setup, authentication, diff collection, or publishing fails
-
-For a fuller outcome checklist, see
-[Verify First Review](verify-first-review.md).
-
-## 1. Generate Config
-
-Run the onboarding wizard scaffold:
+Run this from the repository root:
 
 ```bash
-npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
+git switch -c diffpal-onboarding
 ```
 
-This creates `.config/diffpal/config.yaml` with:
+## 2. Add The Provider Secret
 
-- Codex ACP as the review provider
-- `diffpal.gate.block_on: high`
-- the standard review checks
-- a visible `profiles.ci` profile
-- a GitHub platform block
-
-The command keeps existing files unless you pass `--force`.
-
-Other setup recipes:
-
-| Setup | Use when |
-| --- | --- |
-| `codex-api-key` | CI authenticates Codex with `OPENAI_API_KEY`. |
-| `codex-subscription` | CI restores local Codex subscription auth. |
-| `copilot-github-token` | CI authenticates Copilot with a fine-grained GitHub token. |
-| `generic-acp` | You already have another ACP-compatible CLI. |
-| `opencode-acp` | You want CI to run OpenCode through ACP. |
-
-For manual setup, copy a config from
-[`examples/configs`](../../examples/configs).
-
-## 2. Add Secret
-
-Add this GitHub repository secret:
+Add this repository secret in GitHub:
 
 | Secret | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Lets the Codex CLI act as the review provider. |
 
-GitHub provides `GITHUB_TOKEN` automatically. The workflow grants it the
-permissions DiffPal needs to publish PR feedback.
+With GitHub CLI:
 
-For public repositories, do not expose provider credentials to fork PR code.
-Keep secret-backed DiffPal review limited to same-repository pull requests and
-let forks run no-secret CI only. See
-[troubleshooting](../help/troubleshooting.md#fork-pull-requests-and-secrets)
+```bash
+gh secret set OPENAI_API_KEY
+```
+
+Do not expose provider credentials to untrusted fork PR code. Keep
+secret-backed DiffPal review limited to same-repository pull requests and let
+forks run no-secret CI only. See
+[Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets)
 for the security rationale.
 
-## 3. Add Workflow
+## 3. Initialize Config
+
+Run this from the repository root:
+
+```bash
+npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
+```
+
+This creates `.config/diffpal/config.yaml` with Codex ACP as the provider,
+`block_on: high`, a `ci` profile, and a GitHub platform block. Existing files
+are preserved unless you pass `--force`.
+
+Commit the generated config:
+
+```bash
+git add .config/diffpal/config.yaml .config/diffpal/.gitignore
+git commit -m "chore: add diffpal config"
+```
+
+## 4. Install Workflow
 
 Copy the GitHub Actions example:
 
@@ -78,33 +63,40 @@ mkdir -p .github/workflows
 cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 ```
 
-The example:
+Commit the workflow:
 
-- performs a full checkout with `fetch-depth: 0`
-- installs the Codex provider command
-- authenticates Codex with `OPENAI_API_KEY`
-- uses the DiffPal action, which installs the DiffPal CLI
-- runs only on trusted same-repository PRs when secrets are required
+```bash
+git add .github/workflows/diffpal.yml
+git commit -m "ci: add diffpal review"
+```
 
-## 4. Open A Same-Repository Pull Request
+The workflow performs a full checkout, installs the Codex provider command,
+authenticates with `OPENAI_API_KEY`, runs `diffpal/action@v1`, publishes review
+feedback, and enables the gate.
 
-Open a pull request from a branch in the same repository so the provider secret
-is available to the review job. DiffPal should publish the summary, inline
-findings, and artifacts described above.
+## 5. Test A Trusted Pull Request
 
-After the first successful run, pin `diffpal-version`, provider CLIs, and bridge
-packages when you need fully reproducible credentialed CI.
+Push the branch and open a pull request from a branch in the same repository:
 
-## Bring Your Own Agent
+```bash
+git push -u origin HEAD
+```
 
-For another ACP CLI, keep the same workflow shape and replace the provider
-install/authentication step plus `.config/diffpal/config.yaml`. Start from the
-[generic ACP config](../../examples/configs/generic-acp/config.yaml) and the
-[integrations guide](../integrations/README.md#using-another-acp-cli).
+Use a same-repository pull request for the first test so the provider secret is
+available to the workflow.
 
-## Other Hosts And Recipes
+## Expected Result
 
-- GitHub Actions: [`examples/ci/github-actions`](../../examples/ci/github-actions)
-- GitLab CI: [`examples/ci/gitlab`](../../examples/ci/gitlab)
-- Azure Pipelines: [`examples/ci/azure-pipelines`](../../examples/ci/azure-pipelines)
-- Provider configs: [`examples/configs`](../../examples/configs)
+After the workflow completes, the pull request should show:
+
+- a `DiffPal Review Summary` review;
+- inline review comments when actionable findings exist;
+- a `diffpal` workflow check;
+- `.artifacts/diffpal/findings.json` in the workflow workspace.
+
+If the run has no actionable findings, the review summary and artifacts should
+still appear. If setup, authentication, diff collection, or publishing fails,
+the workflow should fail because the review is incomplete.
+
+Use [Verify First Review](verify-first-review.md) to check the first run, then
+continue with [Next Steps](next-steps.md).

@@ -1,16 +1,39 @@
 # GitHub Actions
 
-Use the [GitHub quickstart](../getting-started/github-quickstart.md) for the
-fastest setup. This page summarizes the GitHub Actions requirements for custom
-or adapted workflows.
+Use this page to run DiffPal in GitHub Actions. For the shortest first setup,
+start with the [GitHub quickstart](../getting-started/github-quickstart.md).
 
-Examples:
+## Supported Outputs
 
-- [Codex API key](../../examples/ci/github-actions/codex-api-key.yml)
-- [Codex subscription auth](../../examples/ci/github-actions/codex-subscription.yml)
-- [Copilot token](../../examples/ci/github-actions/copilot-github-token.yml)
+- Pull request review summary.
+- File-level review comments on changed lines.
+- SARIF upload output when enabled by the workflow.
+- CI check result from the `diffpal` workflow.
 
-Required permissions:
+## Prerequisites
+
+- A GitHub repository with Actions enabled.
+- Permission to add repository secrets and workflows.
+- A committed DiffPal config at `.config/diffpal/config.yaml`.
+- A provider secret such as `OPENAI_API_KEY`.
+
+See [Shared Setup](README.md#shared-setup) and
+[Provider Recipes](README.md#provider-recipes).
+
+## Required Checkout Behavior
+
+Use a full checkout so DiffPal can compare the pull request base and head:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
+## Required Token And Minimum Permissions
+
+GitHub provides `GITHUB_TOKEN`. Grant the workflow only the permissions DiffPal
+needs to read code and publish PR feedback:
 
 ```yaml
 permissions:
@@ -18,19 +41,120 @@ permissions:
   pull-requests: write
 ```
 
-Use a same-repository PR guard before exposing provider secrets:
+## Provider Installation And Authentication
+
+For the Codex API-key recipe:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: 22
+
+- name: Install Codex provider
+  run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+
+- name: Authenticate Codex
+  run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+For other providers, replace only the install/auth steps and matching config.
+See [Provider Recipes](README.md#provider-recipes).
+
+## Minimal Pipeline
+
+```yaml
+name: diffpal
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Codex provider
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+
+      - name: Authenticate Codex
+        run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Review pull request
+        uses: diffpal/action@v1
+        with:
+          profile: ci
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          repo: ${{ github.repository }}
+          review-id: github-pr-${{ github.event.pull_request.number }}
+          feedback: review
+          gate: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## Feedback Modes
+
+Use `feedback: review` for a PR summary plus file-level comments. Use
+`feedback: summary` for the summary and non-file artifacts only.
+
+See [Feedback Modes](README.md#feedback-modes).
+
+## Merge-Gate Setup
+
+Set `gate: true` on `diffpal/action@v1`. Blocking findings fail the workflow
+when they meet `diffpal.gate.block_on`.
+
+See [Merge Gates](README.md#merge-gates).
+
+## Fork Or Untrusted-Contribution Behavior
+
+Keep provider credentials out of fork PR code. The minimal pipeline restricts
+secret-backed review to same-repository PRs with:
 
 ```yaml
 if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
 ```
 
-What you should see:
+See [Untrusted Contributions](README.md#untrusted-contributions).
+
+## Expected Results
 
 - A PR review headed `DiffPal Review Summary`.
-- Inline review comments when DiffPal finds actionable issues.
-- Job failure only when `gate` is set and blocking findings exist, or when setup
-  or publish fails.
+- Inline review comments when actionable findings exist and feedback is
+  `review`.
+- `.artifacts/diffpal/findings.json` in the workflow workspace.
+- A failed workflow only for blocking gated findings or incomplete review setup.
 
-For provider setup and feedback modes, see the
-[integrations guide](README.md). For expected results, see
-[Verify First Review](../getting-started/verify-first-review.md).
+## Common Failures
+
+- `pull-requests: write` is missing.
+- `fetch-depth: 0` is missing.
+- `OPENAI_API_KEY` is missing or invalid.
+- The PR is from a fork, so the same-repository guard skipped secret-backed
+  review.
+
+See [Common Failures](README.md#common-failures).
+
+## Related Examples
+
+- [Codex API key](../../examples/ci/github-actions/codex-api-key.yml)
+- [Codex subscription auth](../../examples/ci/github-actions/codex-subscription.yml)
+- [Copilot token](../../examples/ci/github-actions/copilot-github-token.yml)

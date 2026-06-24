@@ -1,26 +1,35 @@
 # Integrations
 
-DiffPal's portability point is provider install and auth: CI chooses and
-authenticates the provider, while DiffPal keeps the PR review workflow,
-artifacts, publishing behavior, and gates consistent across hosts.
+Use this section to run DiffPal in CI and publish review feedback to your code
+host. Host-specific pages all follow the same shape:
 
-Copy-paste files live in [`examples/`](../../examples/README.md). Use the
-[GitHub quickstart](../getting-started/github-quickstart.md) for the fastest
-GitHub path.
+- [GitHub Actions](github-actions.md)
+- [GitLab CI](gitlab-ci.md)
+- [Azure Pipelines](azure-pipelines.md)
+- [Custom CI/CD](custom-ci.md)
 
-## Common Setup
+Copy-paste configs and pipelines live in [`examples/`](../../examples/README.md).
+Use the [GitHub quickstart](../getting-started/github-quickstart.md) when you
+want the shortest first setup path.
 
-Every CI system needs:
+## Shared Setup
 
-1. A full git checkout, so DiffPal can compare base and head commits.
-2. The provider CLI runtime required by your selected agent.
-3. A DiffPal config committed at `.config/diffpal/config.yaml`.
+Every host needs:
+
+1. Full git history for the reviewed pull request or merge request.
+2. A DiffPal config committed at `.config/diffpal/config.yaml`.
+3. The provider CLI runtime required by the selected agent.
 4. A provider auth secret.
-5. A platform token so DiffPal can publish PR feedback.
+5. A platform token with permission to publish review feedback.
+
+For Jenkins, Buildkite, CircleCI, Bitbucket Pipelines, internal runners, or any
+other CI system, use the [Custom CI/CD guide](custom-ci.md).
+
+## Provider Recipes
 
 Choose a ready-made provider recipe or configure `generic_acp` for your own ACP
-CLI. The selected provider lives under `runtime.providers`; the CI-specific
-steps are the install and authentication commands for that provider.
+CLI. The selected provider lives under `runtime.providers`; the host page only
+changes the CI syntax for install, auth, checkout, and publishing.
 
 | Setup | Config | Required secret |
 | --- | --- | --- |
@@ -50,33 +59,10 @@ diffpal:
   provider: my-review-agent
 ```
 
-The rest of the GitHub, GitLab, and Azure examples stay the same: checkout the
-full git history, run DiffPal with the selected profile, and pass the platform
-token for publishing feedback.
+The rest of the workflow stays the same: full checkout, DiffPal config,
+provider secret, platform token, feedback mode, and optional gate.
 
-OpenCode is available as a first-class ACP alias:
-
-```yaml
-runtime:
-  providers:
-    opencode-acp:
-      type: opencode_acp
-      opencode_acp:
-        model: opencode/big-pickle
-
-diffpal:
-  provider: opencode-acp
-```
-
-Install and authenticate `opencode` in CI before the DiffPal step.
-
-## Host Guides
-
-- [GitHub Actions](github-actions.md)
-- [GitLab CI](gitlab-ci.md)
-- [Azure Pipelines](azure-pipelines.md)
-
-## Feedback And Outputs
+## Feedback Modes
 
 Use `feedback` for normal setup:
 
@@ -84,10 +70,6 @@ Use `feedback` for normal setup:
 | --- | --- |
 | `summary` | PR/MR summary plus non-file artifacts such as status, SARIF, or Code Quality. No file-level findings are published. |
 | `review` | Summary plus file-level comments, threads, or discussions for the platform. Non-blocking findings remain visible without becoming merge blockers. |
-
-The semantic change overview is shown by default in PR reviews. Turn it off
-with `summary-overview: false` in GitHub Actions or `--summary-overview=false`
-on the CLI.
 
 Default review publish surfaces:
 
@@ -99,13 +81,32 @@ Default review publish surfaces:
 
 Common artifacts are listed in the [artifacts reference](../reference/artifacts.md).
 
-## Production Hardening
+## Merge Gates
 
-- Pin npm package versions after the first successful setup.
-- Keep provider secrets out of untrusted fork pipelines.
-- Start with `block_on: high`; lower the threshold only after tuning policy.
-- Keep `fetch-depth: 0`, `GIT_DEPTH: "0"`, or `fetchDepth: 0` in CI.
-- Run `diffpal doctor --mode <host>` before enabling a blocking gate.
+Enable `gate` when blocking findings should fail the CI job. Start with
+`block_on: high`; lower the threshold only after tuning review policy. See the
+[configuration gate reference](../reference/configuration.md#gate).
 
-For common failures and host-specific fixes, see
-[troubleshooting](../help/troubleshooting.md).
+Tooling failures such as setup, provider auth, diff collection, or publishing
+fail the job because the review result is incomplete, even when the merge gate
+is disabled.
+
+## Untrusted Contributions
+
+Keep provider credentials out of untrusted fork pipelines. Run secret-backed
+DiffPal review only for trusted branches, same-repository pull requests, or
+maintainer-approved workflows that do not execute untrusted code with secrets.
+
+See [Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets).
+
+## Common Failures
+
+Most integration failures come from:
+
+- shallow checkout;
+- missing provider secret;
+- provider CLI not installed or authenticated;
+- platform token missing write permission;
+- running secret-backed review on an untrusted fork PR.
+
+Use the [troubleshooting guide](../help/troubleshooting.md) for fixes.
