@@ -65,6 +65,6 @@ DiffPal did not produce a complete review.
 - Gate failures:
   [Gate Fails The Job](../help/troubleshooting.md#gate-fails-the-job)
 - Fork PR secrets:
-  [Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets)
+  [Secrets and fork PRs](../guides/secrets-and-fork-prs.md)
 
 After the first run is healthy, continue with [Next Steps](next-steps.md).

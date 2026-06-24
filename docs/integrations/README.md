@@ -28,6 +28,10 @@ Every host needs:
 4. A provider auth secret.
 5. A platform token with permission to publish review feedback.
 
+DiffPal runs in your CI and sends review input to the provider you configure.
+Protect provider credentials before enabling secret-backed review. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
+
 For Jenkins, Buildkite, CircleCI, Bitbucket Pipelines, internal runners, or any
 other CI system, use the [Custom CI/CD guide](custom-ci.md).
 
@@ -67,7 +71,7 @@ Keep provider credentials out of untrusted fork pipelines. Run secret-backed
 DiffPal review only for trusted branches, same-repository pull requests, or
 maintainer-approved workflows that do not execute untrusted code with secrets.
 
-See [Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets).
+See [Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Common Failures
 

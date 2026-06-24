@@ -43,12 +43,18 @@ DiffPal can publish with:
 
 Use protected/masked variables for provider tokens. Prefer the least-privilege
 token that can create MR discussions, publish commit status, and upload reports.
+Keep host tokens separate from provider credentials such as `OPENAI_API_KEY`.
 
 ## Provider Installation And Authentication
 
 Install and authenticate the selected provider before the DiffPal step. Use
 [Providers](../providers/README.md) for Codex, Copilot, OpenCode, and custom
 ACP-compatible CLI setup.
+
+Provider credentials allow the selected third-party provider to process the
+review input. Store them as protected and masked variables, and expose them only
+to trusted pipelines. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Minimal Pipeline
 
@@ -113,7 +119,7 @@ pipeline and examples use same-project conditions, a manual
 `DIFFPAL_TRUSTED_REVIEW` guard, and protected variables for secret-backed
 review.
 
-See [Untrusted Contributions](README.md#untrusted-contributions).
+See [Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Expected Results
 

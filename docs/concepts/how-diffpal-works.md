@@ -19,6 +19,10 @@ DiffPal owns the review workflow around the provider:
 DiffPal is not the model, the provider account, or a mandatory hosted review
 service.
 
+When a remote provider is configured, DiffPal sends review input to that
+provider from the CI job. Use
+[Security controls](../security.md) before enabling secret-backed review.
+
 ## Provider Boundary
 
 The selected provider or ACP-compatible CLI owns model reasoning, model access,

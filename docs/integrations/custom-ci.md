@@ -89,6 +89,10 @@ diffpal --profile ci review local \
   > .artifacts/diffpal/summary.md
 ```
 
+`OPENAI_API_KEY` is a provider credential. Do not run this example in a job that
+executes untrusted fork code with secrets available. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
+
 To publish to a native host, use the matching command and host credentials:
 
 - `diffpal review github`
@@ -142,6 +146,9 @@ For untrusted contributions, run no-secret CI checks only, or require a
 maintainer-controlled rerun after reviewing the submitted workflow changes.
 Artifact-only review still runs a provider-backed review, so it must not receive
 provider credentials in a job that executes untrusted fork code.
+
+Use [Secrets and fork PRs](../guides/secrets-and-fork-prs.md) for the full
+credential and fork PR guide.
 
 ## Failure Handling
 

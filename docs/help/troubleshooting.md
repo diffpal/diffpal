@@ -5,13 +5,11 @@ summary, comments, status, or artifacts.
 
 ## Fork Pull Requests And Secrets
 
-Do not expose provider credentials to untrusted fork PR code. Fork workflow
-approval settings control whether external workflows run automatically; they do
-not make it safe to release provider secrets to fork code.
-
-Keep secret-backed DiffPal review limited to same-repository pull requests,
-trusted branches, or maintainer-controlled automation that does not execute fork
-code. Fork PRs should run no-secret CI only.
+Use [Secrets and fork PRs](../guides/secrets-and-fork-prs.md) for the complete
+credential handling guide. Do not expose provider credentials to untrusted fork
+PR code. Fork workflow approval settings control whether external workflows run
+automatically; they do not make it safe to release provider secrets to fork
+code.
 
 For GitHub Actions, keep a guard like:
 

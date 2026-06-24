@@ -41,11 +41,19 @@ permissions:
   pull-requests: write
 ```
 
+`GITHUB_TOKEN` is the host publishing credential. Keep it separate from provider
+credentials such as `OPENAI_API_KEY`.
+
 ## Provider Installation And Authentication
 
 Install and authenticate the selected provider before the DiffPal step. Use
 [Providers](../providers/README.md) for Codex, Copilot, OpenCode, and custom
 ACP-compatible CLI setup.
+
+Provider credentials allow the selected third-party provider to process the
+review input. Store them as GitHub secrets and keep the credentialed review job
+restricted to trusted pull requests. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Minimal Pipeline
 
@@ -118,7 +126,7 @@ secret-backed review to same-repository PRs with:
 if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
 ```
 
-See [Untrusted Contributions](README.md#untrusted-contributions).
+See [Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 ## Expected Results
 

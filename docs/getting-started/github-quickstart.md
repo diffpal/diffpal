@@ -25,17 +25,20 @@ Add this repository secret in GitHub:
 | --- | --- |
 | `OPENAI_API_KEY` | Lets the Codex CLI act as the review provider. |
 
+DiffPal runs in your CI and sends review input to the provider you configure.
+For this setup, `OPENAI_API_KEY` belongs to the Codex provider, not to GitHub.
+Store it as a repository secret and do not expose it to untrusted fork PR code.
+
 With GitHub CLI:
 
 ```bash
 gh secret set OPENAI_API_KEY
 ```
 
-Do not expose provider credentials to untrusted fork PR code. Keep
-secret-backed DiffPal review limited to same-repository pull requests and let
-forks run no-secret CI only. See
-[Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets)
-for the security rationale.
+Keep secret-backed DiffPal review limited to same-repository pull requests and
+let forks run no-secret CI only. See
+[Secrets and fork PRs](../guides/secrets-and-fork-prs.md) for the security
+rationale.
 
 ## 3. Initialize Config
 
