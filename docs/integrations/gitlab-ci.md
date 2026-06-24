@@ -67,9 +67,11 @@ diffpal-review:
   stage: review
   image: node:22
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH'
-      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH == $CI_PROJECT_PATH && $DIFFPAL_TRUSTED_REVIEW == "true"'
+      when: manual
+      allow_failure: false
     - when: never
+  resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
     - npm install --global @diffpal/diffpal@latest @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
     - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
@@ -112,8 +114,10 @@ See [Merge Gates](README.md#merge-gates).
 ## Fork Or Untrusted-Contribution Behavior
 
 Keep provider credentials available only to trusted pipelines. For fork merge
-requests, use no-secret CI or a maintainer-approved manual job. The examples use
-same-project conditions and protected variables for secret-backed review.
+requests, use no-secret CI or a maintainer-approved manual job. The minimal
+pipeline and examples use same-project conditions, a manual
+`DIFFPAL_TRUSTED_REVIEW` guard, and protected variables for secret-backed
+review.
 
 See [Untrusted Contributions](README.md#untrusted-contributions).
 

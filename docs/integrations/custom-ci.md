@@ -75,6 +75,7 @@ git rev-parse --verify "$DIFFPAL_HEAD_REV^{commit}"
 npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 npm install --global @diffpal/diffpal@latest
+mkdir -p .artifacts/diffpal
 
 diffpal --profile ci review local \
   --base "$DIFFPAL_BASE_REV" \
@@ -82,7 +83,8 @@ diffpal --profile ci review local \
   --repo "$DIFFPAL_REPO_ID" \
   --review-id "custom-ci-${DIFFPAL_HEAD_REV}" \
   --feedback review \
-  --out .artifacts/diffpal/findings.json
+  --out .artifacts/diffpal/findings.json \
+  > .artifacts/diffpal/summary.md
 ```
 
 To publish to a native host, use the matching command and host credentials:
@@ -100,17 +102,22 @@ Pass `--gate` when blocking findings should fail the CI job.
 | Checkout | Clone the repository and fetch the target/base revision plus the reviewed/head revision. |
 | Protected secrets | Expose provider credentials, and host credentials when publishing, only to trusted jobs. |
 | Pull-request metadata | Provide stable base revision, head revision, repository id, and review id. |
-| Artifact upload | Persist `.artifacts/diffpal/` after the review step. |
+| Artifact upload | Persist the files created by the selected review command. |
 | Required check/gate | Use the DiffPal process exit result as the CI job result when `--gate` is enabled. |
 
 ## Outputs
 
-Verified artifact paths:
+Verified local artifact paths for the portable `review local` example:
 
 | Path | Purpose |
 | --- | --- |
 | `.artifacts/diffpal/findings.json` | Canonical structured findings bundle. |
-| `.artifacts/diffpal/summary.md` | Human-readable review summary. |
+| `.artifacts/diffpal/summary.md` | Human-readable review summary captured from stdout. |
+
+Native host publishers can create additional platform artifacts:
+
+| Path | Purpose |
+| --- | --- |
 | `.artifacts/diffpal/diffpal.sarif` | SARIF report when enabled by the platform output. |
 | `.artifacts/diffpal/codequality.json` | GitLab Code Quality report. |
 
