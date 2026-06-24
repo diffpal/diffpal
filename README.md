@@ -76,6 +76,7 @@ Azure users can install the
 | --- | --- |
 | Run the first GitHub review | [GitHub quickstart](docs/getting-started/github-quickstart.md) |
 | Confirm the first run worked | [Verify First Review](docs/getting-started/verify-first-review.md) |
+| Improve a working setup | [Next Steps](docs/getting-started/next-steps.md) |
 | Use another ACP agent | [Using Another ACP CLI](docs/integrations/README.md#using-another-acp-cli) |
 | Set up GitLab or Azure | [Integrations](docs/integrations/README.md) |
 | Tune review policy | [Configuration reference](docs/reference/configuration.md) |

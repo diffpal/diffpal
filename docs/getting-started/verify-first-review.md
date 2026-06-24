@@ -1,40 +1,70 @@
 # Verify First Review
 
-After the first successful DiffPal run, the pull request should show review
-feedback in the host UI and the CI job should write machine-readable artifacts.
+Use this page to confirm that the first DiffPal run produced a complete review,
+even when it found no issues.
 
-## Pull Request Feedback
+## Pull Request Signals
 
-- A `DiffPal Review Summary` or equivalent summary thread for the PR/MR.
-- Inline comments, discussions, or PR threads when actionable findings exist on
-  changed lines.
-- A check, commit status, or PR status named for the DiffPal review job.
+The PR or MR must show:
 
-## Artifacts
+- a `DiffPal Review Summary` review, discussion, or thread;
+- inline comments, discussions, or PR threads when actionable findings exist;
+- a check, commit status, or PR status for the DiffPal review job.
+
+## Required Artifacts
+
+The CI workspace must contain:
 
 | Path | Purpose |
 | --- | --- |
 | `.artifacts/diffpal/findings.json` | Canonical structured findings bundle. |
 | `.artifacts/diffpal/summary.md` | Human-readable review summary. |
-| `.artifacts/diffpal/diffpal.sarif` | SARIF report when enabled by the host output. |
+
+Depending on the host and feedback mode, the run may also write:
+
+| Path | Purpose |
+| --- | --- |
+| `.artifacts/diffpal/diffpal.sarif` | SARIF report when enabled by the platform output. |
 | `.artifacts/diffpal/codequality.json` | GitLab Code Quality report. |
 
-The findings bundle includes prompt metadata such as prompt id, prompt version,
-purpose, and findings schema version. That makes review output auditable even
-when teams use different providers.
+## No Findings Vs Broken Review
+
+`No findings` is healthy when:
+
+- the review summary appears;
+- `findings.json` exists and is valid JSON;
+- the CI job succeeds unless a configured gate blocks it;
+- logs show DiffPal collected the diff and completed publishing.
+
+A broken review usually has one of these symptoms:
+
+- no summary appears in the PR/MR;
+- `findings.json` is missing;
+- provider authentication failed;
+- the workflow used a shallow checkout and could not compare base and head;
+- the platform token could not publish feedback.
 
 ## Gate Behavior
 
-DiffPal fails the CI job only when `--gate` or the matching action/task input is
-enabled and at least one finding meets `diffpal.gate.block_on`. Setup,
-authentication, diff collection, and publishing failures also fail the job
-because they mean the review result is incomplete.
+When gating is enabled, DiffPal fails the CI job if at least one finding meets
+`diffpal.gate.block_on`. Setup, authentication, diff collection, and publishing
+failures also fail the job because the review result is incomplete.
 
-Start with `block_on: high` for early rollout. Lower the threshold only after
-your team has tuned review instructions and provider behavior.
+When gating is disabled, blocking findings can still be published as review
+feedback, but they do not fail the CI job. Tooling failures still fail because
+DiffPal did not produce a complete review.
 
-## If You Do Not See This
+## Troubleshooting
 
-Use [troubleshooting](../help/troubleshooting.md) to check platform
-permissions, fork PR secret exposure, full git history, base/head resolution,
-and provider authentication.
+- Missing summary or inline comments:
+  [Missing Summary Or Inline Comments](../help/troubleshooting.md#missing-summary-or-inline-comments)
+- Missing or incomplete diff:
+  [Missing Or Incomplete Diff](../help/troubleshooting.md#missing-or-incomplete-diff)
+- Provider auth failures:
+  [Provider Authentication Fails](../help/troubleshooting.md#provider-authentication-fails)
+- Gate failures:
+  [Gate Fails The Job](../help/troubleshooting.md#gate-fails-the-job)
+- Fork PR secrets:
+  [Fork Pull Requests And Secrets](../help/troubleshooting.md#fork-pull-requests-and-secrets)
+
+After the first run is healthy, continue with [Next Steps](next-steps.md).
