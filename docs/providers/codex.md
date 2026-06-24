@@ -33,7 +33,7 @@ printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 ```
 
 For subscription auth, generate `CODEX_AUTH_JSON_B64` with the recipe in
-[`examples/README.md`](../../examples/README.md#generate-codexauthjsonb64),
+[`examples/README.md`](../../examples/README.md#generate-codex_auth_json_b64),
 then restore it only in trusted CI:
 
 Do not expose restored Codex auth files to untrusted fork jobs.

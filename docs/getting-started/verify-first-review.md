@@ -34,7 +34,7 @@ Depending on the host and feedback mode, the run may also write:
 - the review summary appears;
 - `findings.json` exists and is valid JSON;
 - the CI job succeeds unless a configured gate blocks it;
-- logs show DiffPal collected the diff and completed publishing.
+- logs show DiffPal resolved the review scope and completed publishing.
 
 A broken review usually has one of these symptoms:
 
@@ -47,8 +47,8 @@ A broken review usually has one of these symptoms:
 ## Gate Behavior
 
 When gating is enabled, DiffPal fails the CI job if at least one finding meets
-`diffpal.gate.block_on`. Setup, authentication, diff collection, and publishing
-failures also fail the job because the review result is incomplete.
+`diffpal.gate.block_on`. Setup, authentication, review scope resolution, and
+publishing failures also fail the job because the review result is incomplete.
 
 When gating is disabled, blocking findings can still be published as review
 feedback, but they do not fail the CI job. Tooling failures still fail because

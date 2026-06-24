@@ -4,8 +4,9 @@ Use this section to understand DiffPal's product model before configuring CI.
 
 - [How DiffPal works](how-diffpal-works.md) explains DiffPal's product,
   provider, publisher, and configuration boundaries.
-- [Review lifecycle](review-lifecycle.md) explains the flow from diff collection
-  to provider review, validation, publishing, artifacts, and optional gates.
+- [Review lifecycle](review-lifecycle.md) explains the flow from review scope
+  resolution to provider review, validation, publishing, artifacts, and optional
+  gates.
 - [Providers and agents](providers-and-agents.md) explains the provider versus
   agent distinction and who owns authentication.
 - [Findings, feedback, and gates](findings-feedback-and-gates.md) explains the

@@ -61,9 +61,9 @@ Enable `gate` when blocking findings should fail the CI job. Start with
 [configuration gate reference](../reference/configuration.md#gate) and
 [exit behavior](../reference/exit-behavior.md).
 
-Tooling failures such as setup, provider auth, diff collection, or publishing
-fail the job because the review result is incomplete, even when the merge gate
-is disabled.
+Tooling failures such as setup, provider auth, review scope resolution, or
+publishing fail the job because the review result is incomplete, even when the
+merge gate is disabled.
 
 ## Untrusted Contributions
 

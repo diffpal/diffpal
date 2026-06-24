@@ -196,7 +196,7 @@ diffpal --profile ci doctor --mode github
 ## `diffpal debug prompt`
 
 Renders the system prompt, task snapshot, and a mock findings bundle without a
-provider call. It still loads config and collects the diff.
+provider call. It still loads config and resolves the review scope.
 
 Additional flags:
 
