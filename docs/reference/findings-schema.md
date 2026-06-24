@@ -32,8 +32,8 @@ Optional top-level fields:
 
 ## Prompt Versioning
 
-Prompt metadata is resolved from the versioned prompt registry in
-`internal/reviewer/promptpack`. The current default review prompt is:
+Prompt metadata is resolved from DiffPal's versioned prompt registry. The
+current default review prompt is:
 
 - `prompt_id`: `diffpal.review`
 - `prompt_version`: `v1.4.0`
@@ -41,10 +41,7 @@ Prompt metadata is resolved from the versioned prompt registry in
 - `schema_version`: `findings.v3`
 
 Prompt body, output schema, and task instructions are treated as a versioned
-product surface. When changing the prompt contract, add a new registered prompt
-version, update prompt snapshot tests, document the schema impact here, and add
-a changelog entry. Do not silently change `prompt_version` metadata without a
-matching prompt registry and golden-test update.
+product surface.
 
 Required finding fields:
 

@@ -12,8 +12,8 @@ DiffPal turns pull request diffs into structured findings, summaries, inline
 comments, and merge gates across GitHub, GitLab, and Azure DevOps without
 locking your team into a hosted review platform.
 
-[Get started in 5 minutes](docs/quickstart.md) ·
-[Bring your own agent](docs/ci-examples.md#using-another-acp-cli) ·
+[Get started in 5 minutes](docs/getting-started/github-quickstart.md) ·
+[Bring your own agent](docs/integrations/README.md#using-another-acp-cli) ·
 [See examples](examples/README.md) ·
 [Read the docs](docs/README.md)
 
@@ -33,10 +33,10 @@ different AI agents, accounts, or hosts.
 
 | Goal | Start here |
 | --- | --- |
-| Fastest GitHub setup | [Quickstart](docs/quickstart.md) with the default GitHub Actions recipe |
-| Keep an existing agent | [Generic ACP setup](docs/ci-examples.md#using-another-acp-cli) |
-| Use GitLab or Azure DevOps | [CI setup guide](docs/ci-examples.md) |
-| Tune policy and auditing | [Config reference](docs/config-reference.md), [findings schema](docs/findings-schema.md) |
+| Fastest GitHub setup | [Quickstart](docs/getting-started/github-quickstart.md) with the default GitHub Actions recipe |
+| Keep an existing agent | [Generic ACP setup](docs/integrations/README.md#using-another-acp-cli) |
+| Use GitLab or Azure DevOps | [Integrations guide](docs/integrations/README.md) |
+| Tune policy and auditing | [Config reference](docs/reference/configuration.md), [findings schema](docs/reference/findings-schema.md) |
 
 ## Why DiffPal
 
@@ -68,8 +68,8 @@ flowchart LR
 Review instructions are produced by DiffPal's versioned Prompt Pack. Findings
 artifacts include the prompt id, prompt version, purpose, and findings schema
 version, so a review can be traced back to the prompt contract that generated
-it. See the [config reference](docs/config-reference.md#prompt-pack) and
-[findings schema](docs/findings-schema.md) for the current metadata.
+it. See the [config reference](docs/reference/configuration.md#prompt-pack) and
+[findings schema](docs/reference/findings-schema.md) for the current metadata.
 
 ## GitHub In 5 Minutes
 
@@ -92,7 +92,7 @@ cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
 After the first successful run you should see a `DiffPal Review Summary`,
 inline findings when actionable issues exist, and
 `.artifacts/diffpal/findings.json` in the job workspace. Read the
-[quickstart](docs/quickstart.md) for the complete setup and fork-PR secret
+[quickstart](docs/getting-started/github-quickstart.md) for the complete setup and fork-PR secret
 guidance.
 
 ## Bring Your Own Agent
@@ -138,14 +138,14 @@ and use the `DiffPalReview@1` task.
 ## Documentation
 
 - [Start here](docs/README.md)
-- [Quickstart](docs/quickstart.md)
-- [What success looks like](docs/what-success-looks-like.md)
-- [CI setup guide](docs/ci-examples.md)
+- [Quickstart](docs/getting-started/github-quickstart.md)
+- [Verify first review](docs/getting-started/verify-first-review.md)
+- [Integrations guide](docs/integrations/README.md)
 - [Examples gallery](examples/README.md)
-- [Comparison guide](docs/comparison.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Config reference](docs/config-reference.md)
-- [Findings schema](docs/findings-schema.md)
-- [GitLab adapter reference](docs/platform-gitlab.md)
-- [Azure adapter reference](docs/platform-azure.md)
+- [Comparison guide](docs/concepts/comparison.md)
+- [Troubleshooting](docs/help/troubleshooting.md)
+- [Config reference](docs/reference/configuration.md)
+- [Findings schema](docs/reference/findings-schema.md)
+- [GitLab CI](docs/integrations/gitlab-ci.md)
+- [Azure Pipelines](docs/integrations/azure-pipelines.md)
 - [Contributing](CONTRIBUTING.md)

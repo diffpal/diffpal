@@ -106,13 +106,13 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 
 func TestRunWithRuntimeDoesNotInventChangeSummaryFromPaths(t *testing.T) {
 	repo := newGitRepo(t)
-	if err := os.MkdirAll(filepath.Join(repo, "docs"), 0o755); err != nil {
-		t.Fatalf("MkdirAll(docs) error = %v", err)
+	if err := os.MkdirAll(filepath.Join(repo, "docs", "getting-started"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(docs/getting-started) error = %v", err)
 	}
-	writeRepoFile(t, filepath.Join(repo, "docs", "quickstart.md"), "before\n")
-	runGitCmd(t, repo, "add", "docs/quickstart.md")
+	writeRepoFile(t, filepath.Join(repo, "docs", "getting-started", "github-quickstart.md"), "before\n")
+	runGitCmd(t, repo, "add", "docs/getting-started/github-quickstart.md")
 	runGitCmd(t, repo, "commit", "-m", "initial")
-	writeRepoFile(t, filepath.Join(repo, "docs", "quickstart.md"), "after\n")
+	writeRepoFile(t, filepath.Join(repo, "docs", "getting-started", "github-quickstart.md"), "after\n")
 
 	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
 		WorkingDir: repo,

@@ -28,7 +28,7 @@ For full workflow details: `bd prime`
   - `cmd/` for executable entrypoints.
   - `internal/` for local implementation packages.
   - `pkg/` for reusable exported packages.
-  - `docs/` for decisions and contracts.
+  - `docs/` for user documentation and public contracts.
   - `.github/` for CI and release workflows.
 - Prefer structured JSON outputs for machine interfaces.
 - Preserve deterministic IDs and stable output ordering where possible.

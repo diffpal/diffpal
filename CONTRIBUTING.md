@@ -45,7 +45,7 @@ go test -tags='integration,copilot' -count=1 ./internal/reviewer \
 - `cmd/` contains executable entrypoints.
 - `internal/` contains DiffPal implementation packages. These are not a
   supported public Go API.
-- `docs/` contains product contracts, config references, and platform behavior.
+- `docs/` contains user documentation, config references, and platform behavior.
 - Machine-facing output should be structured JSON where practical.
 - Keep release artifacts and local outputs under `.artifacts/` or `dist/`.
 - Use Conventional Commits when possible.

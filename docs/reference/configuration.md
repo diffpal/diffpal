@@ -311,14 +311,14 @@ returned findings against the changed ranges it collected internally.
 
 ## Provider Auth Recipes
 
-Copy-paste examples are in [`../examples`](../examples/README.md). The config
+Copy-paste examples are in [`examples`](../../examples/README.md). The config
 shape stays the same across CI systems; only the provider install/auth step
 changes. These recipes are maintained examples; the product boundary for
 provider choice is the `runtime.providers` entry selected by `diffpal.provider`.
 
 ### Generic ACP CLI
 
-Use [`examples/configs/generic-acp/config.yaml`](../examples/configs/generic-acp/config.yaml).
+Use [`examples/configs/generic-acp/config.yaml`](../../examples/configs/generic-acp/config.yaml).
 
 Replace `generic_acp.cmd` with the command that starts your provider's ACP
 stdio server:
@@ -339,7 +339,7 @@ Required secret: provider-specific.
 
 ### Codex API Key
 
-Use [`examples/configs/codex-api-key/config.yaml`](../examples/configs/codex-api-key/config.yaml).
+Use [`examples/configs/codex-api-key/config.yaml`](../../examples/configs/codex-api-key/config.yaml).
 
 Install and authenticate the provider in CI:
 
@@ -352,10 +352,10 @@ Required secret: `OPENAI_API_KEY`.
 
 ### Codex Subscription Auth
 
-Use [`examples/configs/codex-subscription/config.yaml`](../examples/configs/codex-subscription/config.yaml).
+Use [`examples/configs/codex-subscription/config.yaml`](../../examples/configs/codex-subscription/config.yaml).
 
 Generate a fresh `CODEX_AUTH_JSON_B64` value with the command recipe in
-[`examples/README.md`](../examples/README.md#generate-codex_auth_json_b64).
+[`examples/README.md`](../../examples/README.md#generate-codexauthjsonb64).
 
 Restore an existing Codex auth file in trusted CI:
 
@@ -372,7 +372,7 @@ file to untrusted fork pull requests or merge requests.
 
 ### Copilot Fine-Grained PAT
 
-Use [`examples/configs/copilot-github-token/config.yaml`](../examples/configs/copilot-github-token/config.yaml).
+Use [`examples/configs/copilot-github-token/config.yaml`](../../examples/configs/copilot-github-token/config.yaml).
 
 Install the provider in CI:
 
@@ -390,7 +390,7 @@ CLI.
 
 ### OpenCode ACP
 
-Use [`examples/configs/opencode-acp/config.yaml`](../examples/configs/opencode-acp/config.yaml).
+Use [`examples/configs/opencode-acp/config.yaml`](../../examples/configs/opencode-acp/config.yaml).
 
 DiffPal's runtime starts OpenCode with its ACP command:
 

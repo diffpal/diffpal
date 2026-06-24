@@ -1,4 +1,4 @@
-# What Success Looks Like
+# Verify First Review
 
 After the first successful DiffPal run, the pull request should show review
 feedback in the host UI and the CI job should write machine-readable artifacts.
@@ -35,6 +35,6 @@ your team has tuned review instructions and provider behavior.
 
 ## If You Do Not See This
 
-Use [troubleshooting](troubleshooting.md) to check platform permissions, fork PR
-secret exposure, full git history, base/head resolution, and provider
-authentication.
+Use [troubleshooting](../help/troubleshooting.md) to check platform
+permissions, fork PR secret exposure, full git history, base/head resolution,
+and provider authentication.

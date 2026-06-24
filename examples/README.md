@@ -17,7 +17,8 @@ OpenCode package or install source in your own CI setup the same way.
 | GitHub Actions with Codex subscription auth | [`configs/codex-subscription/config.yaml`](configs/codex-subscription/config.yaml) + [`ci/github-actions/codex-subscription.yml`](ci/github-actions/codex-subscription.yml) |
 | GitHub Actions with Copilot token | [`configs/copilot-github-token/config.yaml`](configs/copilot-github-token/config.yaml) + [`ci/github-actions/copilot-github-token.yml`](ci/github-actions/copilot-github-token.yml) |
 
-For the full first-run path, use the [quickstart](../docs/quickstart.md).
+For the full first-run path, use the
+[quickstart](../docs/getting-started/github-quickstart.md).
 
 ## Bring Your Own Agent
 
@@ -35,10 +36,10 @@ command that starts your provider's ACP stdio server.
 Use these references when you want stricter policy, auditing, or rollout
 control:
 
-- [Config reference](../docs/config-reference.md) for `runtime.providers`,
+- [Config reference](../docs/reference/configuration.md) for `runtime.providers`,
   review instructions, MCP servers, profiles, and `gate.block_on`
-- [Findings schema](../docs/findings-schema.md) for the structured bundle
-- [What success looks like](../docs/what-success-looks-like.md) for expected
+- [Findings schema](../docs/reference/findings-schema.md) for the structured bundle
+- [Verify First Review](../docs/getting-started/verify-first-review.md) for expected
   summary, comments, artifacts, and gate behavior
 
 ## Compare Publish Surfaces

@@ -225,9 +225,9 @@ func TestSeverityMatrixIsCompleteAndDocumented(t *testing.T) {
 	t.Parallel()
 
 	system := RenderReviewSystem(ReviewOptions{})
-	docsRaw, err := os.ReadFile("../../../docs/config-reference.md")
+	docsRaw, err := os.ReadFile("../../../docs/reference/configuration.md")
 	if err != nil {
-		t.Fatalf("ReadFile(config-reference) error = %v", err)
+		t.Fatalf("ReadFile(configuration reference) error = %v", err)
 	}
 	docs := string(docsRaw)
 	for _, line := range SeverityMatrixLines() {
@@ -299,7 +299,7 @@ func TestReviewSystemMatchesDiffPalProductContract(t *testing.T) {
 	}
 	for _, phrase := range required {
 		if !strings.Contains(system, phrase) {
-			t.Fatalf("review system prompt missing product contract phrase %q:\n%s", phrase, system)
+			t.Fatalf("review system prompt missing required phrase %q:\n%s", phrase, system)
 		}
 	}
 }
