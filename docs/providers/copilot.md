@@ -26,6 +26,10 @@ Store `COPILOT_GITHUB_TOKEN` as a protected CI secret. The Copilot CLI reads
 `COPILOT_GITHUB_TOKEN` for DiffPal so the provider token stays separate from
 the platform publishing token.
 
+Do not expose `COPILOT_GITHUB_TOKEN` to untrusted fork jobs. Keep the
+credentialed review job limited to trusted branches, same-repository pull
+requests, or maintainer-approved jobs that do not execute fork-controlled code.
+
 ## Minimal Verified Configuration
 
 Use [`examples/configs/copilot-github-token/config.yaml`](../../examples/configs/copilot-github-token/config.yaml).
@@ -62,6 +66,11 @@ diffpal --profile ci review local \
   --out .artifacts/diffpal/findings.json
 ```
 
+## Expected Result
+
+The smoke review should complete, write
+`.artifacts/diffpal/findings.json`, and print a Markdown summary to stdout.
+
 ## Security Considerations
 
 Do not reuse the platform publishing token as the Copilot provider token. Keep
@@ -83,3 +92,5 @@ that do not execute untrusted code with secrets.
 - [GitHub Actions with Copilot token](../../examples/ci/github-actions/copilot-github-token.yml)
 - [GitLab CI with Copilot token](../../examples/ci/gitlab/copilot-github-token.yml)
 - [Azure Pipelines with Copilot token](../../examples/ci/azure-pipelines/copilot-github-token.yml)
+
+Next step: choose the host-specific CI example that matches your code host.

@@ -50,6 +50,23 @@ go test -tags='integration,copilot' -count=1 ./internal/reviewer \
 - Keep release artifacts and local outputs under `.artifacts/` or `dist/`.
 - Use Conventional Commits when possible.
 
+## Documentation Contributions
+
+- User-facing documentation belongs under `docs/`, with task-oriented guides in
+  `docs/getting-started/`, `docs/integrations/`, `docs/providers/`, and
+  `docs/guides/`; stable contracts belong under `docs/reference/`; operational
+  fixes belong under `docs/help/`.
+- Maintainer-only instructions belong under `.github/maintainers/` and should
+  not be linked from public docs navigation.
+- Canonical public references are `docs/reference/configuration.md`,
+  `docs/reference/cli.md`, `docs/reference/findings-schema.md`,
+  `docs/reference/artifacts.md`, `docs/reference/exit-behavior.md`,
+  `docs/reference/versioning.md`, and `docs/reference/support-matrix.md`.
+  Tutorials should link to those pages instead of duplicating long tables.
+- When a workflow changes, update the matching docs and `examples/` files in
+  the same PR. Example paths, provider commands, host permissions, artifact
+  names, and config snippets should match current implementation and examples.
+
 ## Pull Request Checklist
 
 - [ ] One focused change

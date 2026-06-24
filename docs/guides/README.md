@@ -7,3 +7,5 @@ integrations, providers, and reference pages.
   pipelines, fork pull request safety, artifact retention, and security
   reporting.
 
+Next step: read [Secrets and fork PRs](secrets-and-fork-prs.md) before adding
+or changing provider credentials.

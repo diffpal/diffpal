@@ -143,3 +143,6 @@ See [Common Failures](README.md#common-failures).
 - [Codex API key](../../examples/ci/gitlab/codex-api-key.yml)
 - [Codex subscription auth](../../examples/ci/gitlab/codex-subscription.yml)
 - [Copilot token](../../examples/ci/gitlab/copilot-github-token.yml)
+
+Next step: use [Verify First Review](../getting-started/verify-first-review.md)
+after the first GitLab pipeline completes.

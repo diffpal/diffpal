@@ -11,6 +11,8 @@ diffpal-review:
     - when: never
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
+    # COPILOT_GITHUB_TOKEN is exposed only by the trusted same-project manual rule above.
+    # Fork MRs should run no-secret CI only.
     - npm install --global @diffpal/diffpal@latest @github/copilot@1.0.61
   script:
     - >-

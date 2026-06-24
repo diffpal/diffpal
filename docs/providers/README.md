@@ -61,3 +61,5 @@ diffpal init --wizard --setup <setup-name> --platform github
 
 Use the provider page for install and authentication, then use the
 [Integrations](../integrations/README.md) section for host-specific CI syntax.
+
+Next step: open the setup page for the provider you plan to authenticate in CI.
