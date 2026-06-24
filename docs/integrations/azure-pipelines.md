@@ -1,119 +1,154 @@
 # Azure Pipelines
 
-Public CLI naming uses `ado`; config uses `azure`:
+Use this page to run DiffPal in Azure Pipelines pull request validation.
 
-- command: `diffpal review ado`
-- config: `diffpal.platforms.azure`
+## Supported Outputs
 
-For a copy-paste Azure Pipelines setup, start with the
-[integrations guide](README.md). This page documents setup requirements,
-adapter behavior, and task requirements.
+- Azure PR summary thread.
+- File-bound PR threads for actionable findings.
+- Azure PR status named `DiffPal Review`.
 
-Examples:
+## Prerequisites
+
+- An Azure Repos project with PR validation.
+- The DiffPal Review extension installed, or `diffpal` available in the job.
+- A committed DiffPal config at `.config/diffpal/config.yaml`.
+- A provider secret such as `OPENAI_API_KEY`.
+- Pipeline access to `System.AccessToken`.
+
+See [Shared Setup](README.md#shared-setup) and
+[Provider Recipes](README.md#provider-recipes).
+
+## Required Checkout Behavior
+
+Use full checkout history:
+
+```yaml
+- checkout: self
+  fetchDepth: 0
+```
+
+When `base` and `head` are omitted, `DiffPalReview@1` uses PR metadata and the
+target branch to compute the merge base.
+
+## Required Token And Minimum Permissions
+
+Enable **Allow scripts to access the OAuth token** and pass
+`SYSTEM_ACCESSTOKEN` to the review task:
+
+```yaml
+env:
+  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+```
+
+Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access. Use
+`AZURE_DEVOPS_EXT_PAT` only when your organization requires a dedicated PAT.
+
+## Provider Installation And Authentication
+
+For the Codex API-key recipe:
+
+```yaml
+- task: UseNode@1
+  inputs:
+    version: "22.x"
+
+- script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+  displayName: Install Codex provider
+
+- script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+  displayName: Authenticate Codex
+  env:
+    OPENAI_API_KEY: $(OPENAI_API_KEY)
+```
+
+For other providers, replace only the install/auth steps and matching config.
+See [Provider Recipes](README.md#provider-recipes).
+
+## Minimal Pipeline
+
+```yaml
+trigger: none
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: UseNode@1
+    inputs:
+      version: "22.x"
+
+  - script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    displayName: Install Codex provider
+
+  - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+    displayName: Authenticate Codex
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
+
+  - task: DiffPalReview@1
+    displayName: DiffPal review
+    condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
+    inputs:
+      diffpalVersion: latest
+      profile: ci
+      feedback: review
+      gate: true
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+```
+
+## Feedback Modes
+
+Use `feedback: review` for status, summary thread, and PR threads. Use
+`feedback: summary` for status and summary thread without file-bound PR
+threads.
+
+See [Feedback Modes](README.md#feedback-modes).
+
+## Merge-Gate Setup
+
+Set `gate: true` on `DiffPalReview@1`. Blocking findings fail the task and set
+the Azure PR status to failed.
+
+See [Merge Gates](README.md#merge-gates).
+
+## Fork Or Untrusted-Contribution Behavior
+
+Keep credentialed review steps behind:
+
+```yaml
+condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
+```
+
+Use stricter organization-specific trusted-source conditions when needed. See
+[Untrusted Contributions](README.md#untrusted-contributions).
+
+## Expected Results
+
+- Azure PR threads for actionable findings when feedback is `review`.
+- A PR summary thread headed `DiffPal Review Summary`.
+- An Azure PR status named `DiffPal Review`.
+- Failed task only for blocking gated findings or incomplete review setup.
+
+## Common Failures
+
+- `fetchDepth: 0` is missing.
+- **Allow scripts to access the OAuth token** is disabled.
+- `SYSTEM_ACCESSTOKEN` is not passed to the review task.
+- Provider variables are unavailable in fork PR validation.
+
+See [Common Failures](README.md#common-failures).
+
+## Related Examples
 
 - [Codex API key](../../examples/ci/azure-pipelines/codex-api-key.yml)
 - [Codex subscription auth](../../examples/ci/azure-pipelines/codex-subscription.yml)
 - [Copilot token](../../examples/ci/azure-pipelines/copilot-github-token.yml)
-
-Required setup:
-
-- Enable **Allow scripts to access the OAuth token**.
-- Pass `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` to the `DiffPalReview@1` task.
-- Keep `fetchDepth: 0` on checkout.
-- Run the task from PR validation or an Azure branch policy. When `base` and
-  `head` are omitted, the task fetches the target branch and computes the PR
-  merge-base automatically.
-- Set `explain: true` while debugging to print the resolved PR id, branches,
-  base/head, merge-base, and redacted CLI arguments.
-- Keep credentialed steps behind `ne(variables['System.PullRequest.IsFork'], 'True')`
-  or a stricter organization-specific trusted-source condition.
-
-What you should see:
-
-- Azure PR threads for actionable findings.
-- An Azure PR summary thread headed `DiffPal Review Summary`.
-- Azure PR status named `DiffPal Review`.
-- Failed task when `gate` is true and blocking findings exist.
-
-## Context resolution
-
-`Azure` context is resolved from:
-
-1. Explicit command args (`--base`, `--head`)
-   Pull request identity is resolved from pipeline metadata and optional payload data.
-2. Pipeline variables:
-   - `SYSTEM_PULLREQUEST_PULLREQUESTID`
-   - `SYSTEM_PULLREQUEST_SOURCECOMMITID`
-   - `SYSTEM_PULLREQUEST_TARGETCOMMITID`
-   - `SYSTEM_PULLREQUEST_SOURCEBRANCH`
-   - `SYSTEM_PULLREQUEST_TARGETBRANCH`
-   - `BUILD_REPOSITORY_ID`
-   - `SYSTEM_COLLECTIONURI`
-3. Optional payload path (`SYSTEM_PULLREQUEST_EVENT_PAYLOAD`)
-
-Required:
-
-- pull request ID
-- head SHA
-- base SHA
-- repository/project context
-- token source:
-  - `system_access_token`
-  - `pat`
-
-## PR thread publishing
-
-- Thread modes publish all findings.
-- Findings with canonical `path`, `start_line > 0`, and `category` produce file-bound Azure threads.
-- Findings without canonical file/line mapping are grouped into fallback non-file threads:
-  - one active fallback thread for blocking findings
-  - one closed fallback thread for non-blocking findings
-- Merge blocking is evaluated separately by `block_on` and `gate`.
-- Blocking finding threads stay active; non-blocking finding threads are published as closed immediately.
-- Key model:
-  - `path + ":" + start_line + ":" + category`
-- Re-runs are idempotent via stored key + thread state:
-  - same key + same finding set + same open/closed status → skip
-  - same key + changed finding set or changed open/closed status → update
-- Thread plans also carry the PR comparison pair (`base_sha`, `head_sha`) used to map comments to the reviewed change range.
-
-## Status mapping
-
-- `succeeded`: no blocking findings, including advisory-only runs
-- `failed`: blocking findings or tooling error
-
-Status payload name should be stable and branch-policy-compatible, e.g.:
-
-- `DiffPal Review`
-
-## Token and setup guidance
-
-- The `DiffPalReview@1` task installs `@diffpal/diffpal` by default. Set
-  `diffpalVersion` to pin a version or dist-tag.
-- Install the provider command separately, for example
-  `npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3`.
-- Set `install: false` to use `diffpal` from `PATH`, or set `diffpalPath` to a
-  custom binary path. Custom paths skip automatic installation.
-- Optional task inputs `language`, `instructions`, `instructionsFile`, and
-  `feedback` map to the CLI flags `--language`, `--instructions`,
-  `--instructions-file`, and `--feedback`.
-- For large PRs or slower ACP providers, set `diffpal.review.timeout` in the
-  selected config profile, for example `profiles.ci.diffpal.review.timeout:
-  10m`.
-- `feedback: review` is the default and publishes status, a PR summary
-  thread, and Azure threads for all findings.
-- In `review`, the PR summary thread reports the overview/result
-  only; detailed finding text is published in the file-bound or fallback Azure
-  threads.
-- `feedback: summary` keeps the PR summary thread and status but does not
-  publish file-bound Azure threads.
-- Config auth values:
-  - `diffpal.platforms.azure.auth.system_access_token`
-  - `diffpal.platforms.azure.auth.pat`
-- Standard CI env fallbacks are `SYSTEM_ACCESSTOKEN` and `AZURE_DEVOPS_EXT_PAT`.
-- Use `SYSTEM_ACCESSTOKEN` for pipeline-scoped access.
-- Prefer the standard CI environment fallback for `SYSTEM_ACCESSTOKEN` rather than committed token placeholders. If you use envsubst placeholders for explicit config injection, define those variables in the pipeline before loading config.
-- Azure Pipelines must enable `Allow scripts to access the OAuth token` so `SYSTEM_ACCESSTOKEN` is present.
-- Keep token scope to PR validation service connections or project defaults.
-- Avoid broad service permissions in non-interactive PR contexts.
-- A typical rerun flow is: `review ado` recomputes the findings bundle, then `summary`, `threads`, and `status` reconcile against the same PR/base/head pair instead of creating duplicate thread keys.
