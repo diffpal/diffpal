@@ -6,6 +6,7 @@ host. Host-specific pages all follow the same shape:
 - [GitHub Actions](github-actions.md)
 - [GitLab CI](gitlab-ci.md)
 - [Azure Pipelines](azure-pipelines.md)
+- [Custom CI/CD](custom-ci.md)
 
 Copy-paste configs and pipelines live in [`examples/`](../../examples/README.md).
 Use the [GitHub quickstart](../getting-started/github-quickstart.md) when you
@@ -20,6 +21,9 @@ Every host needs:
 3. The provider CLI runtime required by the selected agent.
 4. A provider auth secret.
 5. A platform token with permission to publish review feedback.
+
+For Jenkins, Buildkite, CircleCI, Bitbucket Pipelines, internal runners, or any
+other CI system, use the [Custom CI/CD guide](custom-ci.md).
 
 ## Provider Recipes
 

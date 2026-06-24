@@ -64,6 +64,7 @@ For full setup details, provider alternatives, and fork PR guidance, use the
 | GitHub Actions | PR review summary, file-level review comments, SARIF | [GitHub Actions](docs/integrations/github-actions.md) |
 | GitLab CI | MR summary, discussions, Code Quality, SARIF, status | [GitLab CI](docs/integrations/gitlab-ci.md) |
 | Azure Pipelines | PR summary thread, PR threads, PR status | [Azure Pipelines](docs/integrations/azure-pipelines.md) |
+| Custom CI/CD | Artifact-only review, or publishing through a supported code host | [Custom CI/CD](docs/integrations/custom-ci.md) |
 
 GitHub users can also install the
 [DiffPal Review action](https://github.com/marketplace/actions/diffpal-review).
@@ -78,7 +79,7 @@ Azure users can install the
 | Confirm the first run worked | [Verify First Review](docs/getting-started/verify-first-review.md) |
 | Improve a working setup | [Next Steps](docs/getting-started/next-steps.md) |
 | Use another ACP agent | [Using Another ACP CLI](docs/integrations/README.md#using-another-acp-cli) |
-| Set up GitLab or Azure | [Integrations](docs/integrations/README.md) |
+| Set up GitLab, Azure, or custom CI | [Integrations](docs/integrations/README.md) |
 | Tune review policy | [Configuration reference](docs/reference/configuration.md) |
 | Consume artifacts or schemas | [Artifacts](docs/reference/artifacts.md) and [findings schema](docs/reference/findings-schema.md) |
 | Debug setup problems | [Troubleshooting](docs/help/troubleshooting.md) |

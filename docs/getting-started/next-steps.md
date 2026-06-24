@@ -40,4 +40,4 @@ Use the same DiffPal config shape and change the CI host setup:
 
 - [GitLab CI](../integrations/gitlab-ci.md)
 - [Azure Pipelines](../integrations/azure-pipelines.md)
-- [Custom CI and ACP agents](../integrations/README.md)
+- [Custom CI/CD](../integrations/custom-ci.md)

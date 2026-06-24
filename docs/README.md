@@ -25,6 +25,7 @@ host-specific requirements:
 - [GitHub Actions](integrations/github-actions.md)
 - [GitLab CI](integrations/gitlab-ci.md)
 - [Azure Pipelines](integrations/azure-pipelines.md)
+- [Custom CI/CD](integrations/custom-ci.md)
 
 ## Reference
 

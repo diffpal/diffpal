@@ -19,7 +19,7 @@ Before you start, have:
 | GitHub Actions | [GitHub quickstart](github-quickstart.md) |
 | GitLab CI | [GitLab CI guide](../integrations/gitlab-ci.md) |
 | Azure Pipelines | [Azure Pipelines guide](../integrations/azure-pipelines.md) |
-| Custom CI | [Integrations overview](../integrations/README.md) |
+| Custom CI/CD | [Custom CI/CD guide](../integrations/custom-ci.md) |
 
 ## Choose Provider
 
