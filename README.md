@@ -90,6 +90,7 @@ Azure users can install the
 | Tune review policy | [Configuration reference](docs/reference/configuration.md) |
 | Consume artifacts or schemas | [Artifacts](docs/reference/artifacts.md) and [findings schema](docs/reference/findings-schema.md) |
 | Debug setup problems | [Troubleshooting](docs/help/troubleshooting.md) |
+| Get quick answers | [FAQ](docs/help/faq.md) |
 | Compare DiffPal to alternatives | [Comparison guide](docs/concepts/comparison.md) |
 
 ## Project Status

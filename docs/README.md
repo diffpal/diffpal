@@ -67,7 +67,8 @@ Use [Reference](reference/README.md) for stable contracts:
 
 Use [Help](help/README.md) for operational fixes, including
 [troubleshooting](help/troubleshooting.md) for missing comments, token failures,
-fork PRs, and incomplete diffs.
+fork PRs, and incomplete diffs. Use the [FAQ](help/faq.md) for short answers
+to common product, provider, CI, and artifact questions.
 
 ## Examples
 
