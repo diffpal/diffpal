@@ -7,6 +7,9 @@ DiffPal does not own or manage third-party provider accounts. Create, license,
 authenticate, and secure the provider account or CLI with that provider's own
 tools.
 
+For the conceptual difference between providers and agents, see
+[Providers and agents](../concepts/providers-and-agents.md).
+
 ## Concepts
 
 | Term | Meaning |

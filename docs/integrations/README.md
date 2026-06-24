@@ -3,6 +3,9 @@
 Use this section to run DiffPal in CI and publish review feedback to your code
 host. Host-specific pages all follow the same shape:
 
+For the review flow behind these CI steps, see
+[Review lifecycle](../concepts/review-lifecycle.md).
+
 - [GitHub Actions](github-actions.md)
 - [GitLab CI](gitlab-ci.md)
 - [Azure Pipelines](azure-pipelines.md)

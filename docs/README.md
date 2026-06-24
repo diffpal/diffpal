@@ -17,6 +17,12 @@ Use [Concepts](concepts/README.md) to understand how DiffPal turns pull request
 diffs into structured findings and host-native feedback. The section also
 includes the [comparison guide](concepts/comparison.md).
 
+- [How DiffPal works](concepts/how-diffpal-works.md)
+- [Review lifecycle](concepts/review-lifecycle.md)
+- [Providers and agents](concepts/providers-and-agents.md)
+- [Findings, feedback, and gates](concepts/findings-feedback-and-gates.md)
+- [Glossary](concepts/glossary.md)
+
 ## Integrations
 
 Use [Integrations](integrations/README.md) for CI setup and host-specific
