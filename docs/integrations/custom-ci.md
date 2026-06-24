@@ -129,9 +129,10 @@ Do not expose provider or host secrets to untrusted fork builds. Run
 secret-backed review only for trusted branches, same-repository pull requests,
 or maintainer-approved jobs that do not execute untrusted code with secrets.
 
-For untrusted contributions, run no-secret CI, run artifact-only review without
-provider credentials, or require a maintainer-controlled rerun after reviewing
-the submitted workflow changes.
+For untrusted contributions, run no-secret CI checks only, or require a
+maintainer-controlled rerun after reviewing the submitted workflow changes.
+Artifact-only review still runs a provider-backed review, so it must not receive
+provider credentials in a job that executes untrusted fork code.
 
 ## Failure Handling
 
