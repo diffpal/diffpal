@@ -51,9 +51,9 @@ DiffPal needs two revisions:
 
 Your CI system must supply these values from pull-request metadata or from its
 own build variables. Shallow clones, missing target branches, and deleted base
-refs break diff collection because DiffPal cannot compute the reviewed change
-range. Fetch full history or explicitly fetch the target branch before running
-DiffPal.
+refs break review scope resolution because DiffPal cannot compute the reviewed
+change range. Fetch full history or explicitly fetch the target branch before
+running DiffPal.
 
 ## Portable Example
 
@@ -163,7 +163,7 @@ credential and fork PR guide.
 
 DiffPal returns success when the review completes and no enabled gate blocks the
 job. With `--gate`, blocking findings return a non-zero process result.
-Configuration, provider authentication, diff collection, and publishing
+Configuration, provider authentication, review scope resolution, and publishing
 failures also return non-zero because the review result is incomplete.
 
 Treat the process exit result as the stable public contract. Do not depend on

@@ -9,7 +9,7 @@ optionally blocks a merge.
 
 DiffPal owns the review workflow around the provider:
 
-- collecting the requested `base..head` diff;
+- resolving the requested base/head range and review scope;
 - building the review request;
 - validating provider output against changed files and lines;
 - rendering summaries, findings, and artifacts;

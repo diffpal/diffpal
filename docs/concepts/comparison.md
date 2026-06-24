@@ -21,7 +21,7 @@ for you.
 ## DiffPal Vs Lint Publishers
 
 Lint publishers take existing tool output and annotate pull requests. DiffPal
-collects the pull request diff, asks a selected AI provider for review findings,
+resolves the review scope, asks a selected AI provider for review findings,
 validates the structured output, and publishes both human feedback and
 machine-readable artifacts.
 

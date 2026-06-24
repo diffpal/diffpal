@@ -100,8 +100,8 @@ After the workflow completes, the pull request should show:
 - `.artifacts/diffpal/findings.json` in the workflow workspace.
 
 If the run has no actionable findings, the review summary and artifacts should
-still appear. If setup, authentication, diff collection, or publishing fails,
-the workflow should fail because the review is incomplete.
+still appear. If setup, authentication, review scope resolution, or publishing
+fails, the workflow should fail because the review is incomplete.
 
 Use [Verify First Review](verify-first-review.md) to check the first run, then
 continue with [Next Steps](next-steps.md).

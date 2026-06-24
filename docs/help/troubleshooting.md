@@ -59,8 +59,8 @@ exact authentication command.
 
 ## DiffPal Cannot Find The Base Or Head Revision
 
-**Symptom:** The review fails during diff collection with missing, ambiguous,
-or invalid base/head revisions.
+**Symptom:** The review fails during review scope resolution with missing,
+ambiguous, or invalid base/head revisions.
 
 **Likely causes:** The checkout is shallow, the target branch was not fetched,
 CI metadata is unavailable, `--base` or `--head` is empty, or the job is not

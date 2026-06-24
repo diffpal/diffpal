@@ -3,11 +3,11 @@
 DiffPal review is a CI job lifecycle. Each stage has a distinct role so
 failures are clear and artifacts are consistent.
 
-## Diff Collection
+## Review Scope Resolution
 
 DiffPal resolves the base and head revisions for the pull request, merge
-request, or candidate commit. It collects the changed files, changed line
-ranges, and related metadata that define the review scope.
+request, or candidate commit. It records changed files, changed line ranges,
+and related metadata that define the review scope.
 
 Shallow clones, missing target branches, or incorrect base/head values usually
 break this stage. Host-specific setup pages describe the required checkout
@@ -15,7 +15,7 @@ behavior.
 
 ## Review Request
 
-DiffPal combines the diff metadata, repository configuration, review
+DiffPal combines the review scope metadata, repository configuration, review
 instructions, language, and gate threshold into a provider request. The selected
 provider or ACP-compatible agent inspects the requested `base..head` change with
 its available tools.
