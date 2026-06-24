@@ -52,5 +52,6 @@ the configured blocking threshold and returns a failing CI result if blocking
 findings exist. When disabled, feedback and artifacts can still show blocking
 findings without failing the merge check.
 
-For exact config fields and exit behavior, use the
-[configuration reference](../reference/configuration.md).
+For exact config fields and exit behavior, use
+[Configuration](../reference/configuration.md) and
+[Exit behavior](../reference/exit-behavior.md).

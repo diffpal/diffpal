@@ -54,7 +54,8 @@ Common artifacts are listed in the [artifacts reference](../reference/artifacts.
 
 Enable `gate` when blocking findings should fail the CI job. Start with
 `block_on: high`; lower the threshold only after tuning review policy. See the
-[configuration gate reference](../reference/configuration.md#gate).
+[configuration gate reference](../reference/configuration.md#gate) and
+[exit behavior](../reference/exit-behavior.md).
 
 Tooling failures such as setup, provider auth, diff collection, or publishing
 fail the job because the review result is incomplete, even when the merge gate

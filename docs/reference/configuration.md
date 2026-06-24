@@ -1,136 +1,194 @@
-# DiffPal Config Reference
+# Configuration Reference
 
-DiffPal reads one repository config file:
+DiffPal reads repository configuration from `.config/diffpal/config.yaml`.
+The file is YAML, uses top-level `version: v1`, and keeps review policy with
+the repository.
 
-`.config/diffpal/config.yaml`
+Task-oriented setup lives in [Getting Started](../getting-started/README.md),
+[Providers](../providers/README.md), and [Integrations](../integrations/README.md).
 
-Generate a first-run onboarding config with:
+## Loading And Overrides
 
-```bash
-diffpal init --wizard --setup codex-api-key --platform github
+Default config root:
+
+- `.config/diffpal/config.yaml`
+
+When `--config-dir <root>` is set, DiffPal searches:
+
+1. `<root>/diffpal/config.yaml`
+2. `<root>/config.yaml`
+3. `.config/diffpal/config.yaml`
+
+Profiles are selected by `--profile` or `DIFFPAL_PROFILE`. Environment
+overrides are applied after config loading and before validation.
+
+## Complete Hierarchy
+
+```yaml
+version: v1
+
+runtime:
+  providers:
+    <provider-id>:
+      type: <provider-type>
+      mcp_servers: []
+      system_instructions: ""
+      <provider-type>: {}
+  mcp_servers:
+    <server-id>:
+      type: stdio
+
+diffpal:
+  provider: <provider-id>
+  gate:
+    block_on: high
+  review:
+    language: en
+    instructions: ""
+    timeout: 5m
+  platforms:
+    github:
+      auth:
+        token: ""
+    gitlab:
+      auth:
+        job_token: ""
+        api_token: ""
+    azure:
+      auth:
+        system_access_token: ""
+        pat: ""
+
+profiles:
+  ci:
+    runtime: {}
+    diffpal: {}
 ```
 
-Use plain `diffpal init` only when you want the older starter workspace plus
-template snippets. The wizard path writes a complete recipe config with a
-visible profile, for example `profiles.ci`.
+## Required Fields
 
-## Provider Model
+| Field | Required | Default | Allowed values |
+| --- | --- | --- | --- |
+| `version` | Optional | `v1` from defaults | empty or `v1` |
+| `runtime.providers` | Required for review | empty | map of provider IDs |
+| `runtime.providers.<id>.type` | Required | none | `generic_acp`, `gemini_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `openai`, `aistudio`, `pool` |
+| `diffpal.provider` | Required | empty | provider ID present in `runtime.providers` |
+| `diffpal.gate.block_on` | Optional | `high` | `low`, `medium`, `high`, `critical` |
+| `diffpal.review.language` | Optional | `en` | any single-line language value |
+| `diffpal.review.instructions` | Optional | empty | string |
+| `diffpal.review.timeout` | Optional | `5m` | positive Go duration such as `180s`, `5m`, `10m` |
 
-DiffPal's provider-agnostic boundary is `runtime.providers`. Each entry
-describes one AI provider, ACP-compatible CLI, hosted API provider, or provider
-pool. `diffpal.provider` selects the entry used for reviews.
+`diffpal.provider` must match one key in `runtime.providers`.
 
-Use `generic_acp` for any CLI that can start an ACP stdio server:
+## Runtime Providers
+
+Each provider is discriminated by `type`; the matching block contains
+type-specific settings.
 
 ```yaml
 runtime:
   providers:
-    my-review-agent:
-      type: generic_acp
-      generic_acp:
-        cmd: ["your-acp-cli", "acp", "--stdio"]
+    codex-acp:
+      type: codex_acp
+      codex_acp:
+        reasoning_effort: low
 
 diffpal:
-  provider: my-review-agent
+  provider: codex-acp
 ```
 
-Install and authenticate that CLI in CI before running DiffPal. DiffPal sends
-the structured diff review request and owns the review output contract; the ACP
-agent owns its model, tools, account, and provider-specific credentials.
+Common provider fields:
 
-Use [Providers](../providers/README.md) for Codex, Copilot, OpenCode, and
-custom ACP-compatible CLI setup instructions.
+| Field | Applies to | Purpose |
+| --- | --- | --- |
+| `mcp_servers` | all providers | IDs from `runtime.mcp_servers` attached to this provider. |
+| `system_instructions` | all providers | Provider-level instructions applied by the runtime. |
+| `generic_acp`, `gemini_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp` | ACP providers | ACP runtime block. |
+| `openai`, `aistudio` | hosted API providers | Hosted API runtime block. |
+| `pool` | pool provider | Ordered failover member list. |
 
-Supported runtime provider types include:
+ACP runtime block fields:
 
-- `generic_acp`
-- `codex_acp`
-- `copilot_acp`
-- `gemini_acp`
-- `claude_code_acp`
-- `opencode_acp`
-- `openai`
-- `aistudio`
-- `pool`
+| Field | Required | Default | Allowed values |
+| --- | --- | --- | --- |
+| `cmd` | Optional | provider alias default, or required for custom `generic_acp` use | string list |
+| `extra_args` | Optional | empty | string list |
+| `model` | Optional | provider-specific | non-blank string |
+| `reasoning_effort` | Optional | provider-specific | `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `mode` | Optional | provider-specific | non-blank string |
 
-## Root Sections
+Hosted API block fields:
 
-| Field | Purpose |
-| --- | --- |
-| `version` | Config schema version. Use `v1`. |
-| `runtime.providers` | Norma runtime provider definitions. |
-| `runtime.mcp_servers` | Optional MCP servers shared by providers. |
-| `diffpal.provider` | Provider ID selected for reviews. Must exist in `runtime.providers`. |
-| `diffpal.gate.block_on` | Minimum severity that marks a finding as blocking. |
-| `diffpal.review` | User-facing review language and check scopes. |
-| `diffpal.platforms` | Optional platform publishing configuration. |
-| `profiles.<name>.diffpal` | Profile-specific DiffPal overrides. |
-| `profiles.<name>.runtime` | Profile-specific runtime overrides. |
+| Field | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `api_key` | Required for hosted review unless supplied by env | empty | `OPENAI_API_KEY` for `openai`, `GEMINI_API_KEY` for `aistudio`. |
+| `model` | Required for hosted review | empty | Can be overridden for `openai` by `DIFFPAL_OPENAI_MODEL`. |
+
+Pool block fields:
+
+| Field | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `members` | Optional | empty | Provider IDs in ordered failover order. |
+
+Provider installation and authentication are documented in
+[Providers](../providers/README.md).
+
+## MCP Servers
+
+MCP servers are declared once and referenced by provider ID:
+
+```yaml
+runtime:
+  mcp_servers:
+    repo-docs:
+      type: stdio
+      cmd: ["your-docs-mcp-server"]
+      args: ["--root", "."]
+      env:
+        DOCS_TOKEN: "${DOCS_TOKEN}"
+  providers:
+    codex-acp:
+      type: codex_acp
+      mcp_servers: [repo-docs]
+      codex_acp:
+        reasoning_effort: low
+```
+
+MCP server fields:
+
+| Field | Required | Applies to | Purpose |
+| --- | --- | --- | --- |
+| `type` | Required | all | `stdio`, `http`, or `sse`. |
+| `cmd` | Optional | `stdio` | Executable argv prefix. |
+| `args` | Optional | `stdio` | Arguments appended after `cmd`. |
+| `env` | Optional | `stdio` | Environment variables for the server process. |
+| `working_dir` | Optional | `stdio` | Server working directory. |
+| `url` | Optional | `http`, `sse` | Server endpoint. |
+| `headers` | Optional | `http`, `sse` | Request headers. |
+
+Keep MCP credentials in CI secrets.
 
 ## Review Settings
 
-| Field | Default | Purpose |
+| Field | Default | Notes |
 | --- | --- | --- |
-| `diffpal.review.language` | `en` | Language for finding text and summaries. |
-| `diffpal.review.instructions` | empty | Optional repository-local prompt tuning and scope extensions appended to the review instruction. |
-| `diffpal.review.timeout` | `5m` | Per-attempt provider review timeout. Uses Go duration syntax such as `180s`, `5m`, or `10m`. |
+| `diffpal.review.language` | `en` | Used for finding text and summaries. Must be one line. |
+| `diffpal.review.instructions` | empty | Appended to the review prompt as repository-owned tuning. |
+| `diffpal.review.timeout` | `5m` | Per-attempt provider review timeout. |
 
-## Prompt Pack
+`--language`, `--instructions`, and `--instructions-file` can override or
+append instructions for one CLI run. See [CLI](cli.md).
 
-DiffPal review prompts are versioned as Prompt Pack v1. Generated findings
-artifacts include prompt metadata so review output can be traced back to the
-prompt contract:
+## Review Contract And Severity Matrix
 
-- `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.4.0`
-- `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v3`
+DiffPal asks providers to report only discrete issues the pull request author
+would likely fix before merging, only when the issue is introduced or made
+worse by the patch. Providers must use the DiffPal finding taxonomy, prefer
+high signal over high recall, use the smallest useful changed-line range, and
+may return `review_result` when they can summarize the outcome.
 
-`diffpal.review.instructions`, `--instructions`, and `--instructions-file`
-are appended as repository-local tuning in a dedicated prompt section. DiffPal
-sends a compact review task snapshot instead of preloading every patch or file
-snippet. Providers inspect the requested base/head diff through their available
-Git and filesystem tooling.
+Severity is based on concrete impact, not confidence or preference.
 
-Prompt Pack v1.4.0 labels commit messages, diffs, tool output, code, comments,
-docs, test fixtures, and file contents as untrusted review evidence, never as
-role changes or instructions to follow. It also follows DiffPal's CI review
-contract: report only discrete patch-introduced or patch-worsened issues the
-pull request author would likely fix before merging, anchor findings to the
-smallest useful changed-line range, and keep change summaries semantic instead
-of file-list based. It also allows providers to return an optional localized
-`review_result` sentence; when omitted, DiffPal falls back to deterministic
-renderer-owned result text.
-
-Use the offline debug harness to inspect the active prompt and task snapshot
-without spending provider quota:
-
-```bash
-diffpal debug prompt --base origin/main --head HEAD --profile ci --format text
-```
-
-The command still loads config, collects the git diff, runs review
-normalization, and writes a schema-valid mock findings bundle. It replaces only
-the provider call with a local debug runtime.
-
-DiffPal findings use this fixed taxonomy:
-
-| Category | Purpose |
-| --- | --- |
-| `security` | Vulnerabilities, credential exposure, injection paths, authz/authn regressions, and unsafe data handling. |
-| `correctness` | User-visible wrong behavior, data corruption, and functional regressions. |
-| `reliability` | Crashes, leaks, retry storms, cancellation bugs, deadlocks, and resilience issues. |
-| `performance` | Concrete common-path latency, memory, query, scaling, or resource regressions. |
-| `maintainability` | Structure or clarity issues with concrete future-change risk. |
-| `testing` | Missing meaningful coverage for new or risky behavior. |
-| `style` | Repo-enforced readability or consistency issues with clear action. |
-
-## Severity Matrix
-
-DiffPal asks providers to classify severity by concrete impact, not confidence
-or preference. The active Prompt Pack uses the same definitions:
-
-- Severity is based on concrete impact, not confidence or preference.
 - critical: changed code can directly cause severe compromise, destructive data loss, privilege bypass, total outage, or unrecoverable corruption.
 - high: changed code can cause an exploitable security flaw, user-visible data corruption, frequent crash, major outage risk, or severe performance regression on a common path.
 - medium: changed code can cause an edge-case correctness failure, intermittent reliability issue, meaningful performance cost, confusing maintainability risk, or missing coverage for important behavior.
@@ -143,28 +201,7 @@ or preference. The active Prompt Pack uses the same definitions:
 - testing: use critical only when missing validation can allow severe unsafe behavior to ship; high for untested high-risk behavior; medium for missing meaningful coverage of new behavior; low for small missing edge-case coverage.
 - style: use critical, high, or medium only when the issue has a non-style impact and should usually be reclassified; use low for repo-enforced style/readability issues that are actionable.
 
-Override review settings per run:
-
-```bash
-diffpal review github \
-  --base "$BASE_SHA" \
-  --head "$HEAD_SHA" \
-  --language en \
-  --instructions-file .config/diffpal/review-instructions.md \
-  --feedback review
-```
-
-For local review, `--feedback review` prints a Markdown report with summary and
-file-level comments to stdout while `--feedback summary` omits detailed
-comments:
-
-```bash
-diffpal review local --base origin/main --head HEAD --feedback review
-```
-
 ## Gate
-
-`diffpal.gate.block_on` controls which findings are blocking:
 
 ```yaml
 diffpal:
@@ -172,105 +209,29 @@ diffpal:
     block_on: high
 ```
 
-Allowed values:
-
-- `low`
-- `medium`
-- `high`
-- `critical`
-
-Use `--gate` in CI to fail the job when blocking findings exist.
-
-## MCP Servers
-
-MCP servers are declared once under `runtime.mcp_servers`, then attached to the
-provider that should see them. Use this when the review agent needs controlled
-access to repository tools, internal docs, ticket search, or another local
-capability.
-
-```yaml
-runtime:
-  mcp_servers:
-    repo-docs:
-      type: stdio
-      cmd: ["your-docs-mcp-server"]
-      args: ["--root", "."]
-      env:
-        DOCS_TOKEN: "${DOCS_TOKEN}"
-    policy-api:
-      type: http
-      url: "https://policy.example.com/mcp"
-      headers:
-        Authorization: "Bearer ${POLICY_MCP_TOKEN}"
-  providers:
-    codex-acp:
-      type: codex_acp
-      mcp_servers:
-        - repo-docs
-        - policy-api
-      codex_acp:
-        reasoning_effort: low
-
-diffpal:
-  provider: codex-acp
-```
-
-Keep MCP credentials in CI secrets. As with platform tokens, quote envsubst
-placeholders and avoid optional placeholders unless the variable always exists
-in that job.
+`block_on` sets the minimum severity that counts as blocking. The allowed values
+are `low`, `medium`, `high`, and `critical`. Use `--gate` in CI to make
+blocking findings fail the process. See [Exit behavior](exit-behavior.md).
 
 ## Platform Auth
 
-DiffPal can read platform tokens from config values, but CI environment
-variables are preferred.
+Platform auth can live in config, but standard CI environment variables are
+preferred.
 
-| Platform | Preferred env | Config field |
+| Platform | Config field | Preferred env |
 | --- | --- | --- |
-| GitHub | `GITHUB_TOKEN` | `diffpal.platforms.github.auth.token` |
-| GitLab | `CI_JOB_TOKEN` or `GITLAB_TOKEN` | `diffpal.platforms.gitlab.auth.job_token`, `diffpal.platforms.gitlab.auth.api_token` |
-| Azure | `SYSTEM_ACCESSTOKEN` | `diffpal.platforms.azure.auth.system_access_token` |
+| GitHub | `diffpal.platforms.github.auth.token` | `GITHUB_TOKEN` |
+| GitLab | `diffpal.platforms.gitlab.auth.job_token` | `CI_JOB_TOKEN` |
+| GitLab | `diffpal.platforms.gitlab.auth.api_token` | `GITLAB_TOKEN` |
+| Azure DevOps | `diffpal.platforms.azure.auth.system_access_token` | `SYSTEM_ACCESSTOKEN` |
+| Azure DevOps | `diffpal.platforms.azure.auth.pat` | `AZURE_DEVOPS_EXT_PAT` |
 
-Only use envsubst placeholders for values that are guaranteed to exist:
-
-```yaml
-diffpal:
-  platforms:
-    github:
-      auth:
-        token: "${GITHUB_TOKEN}"
-```
-
-Missing envsubst variables fail config loading. For optional CI credentials,
-omit the config value and let DiffPal read the standard environment variable.
-
-## Alternate Hosted OpenAI Provider
-
-Codex ACP is the default onboarding provider. If you prefer hosted OpenAI,
-switch the selected provider and add a matching runtime provider:
-
-```yaml
-runtime:
-  providers:
-    openai-api:
-      type: openai
-      openai:
-        model: "${DIFFPAL_OPENAI_MODEL}"
-        api_key: "${OPENAI_API_KEY}"
-
-diffpal:
-  provider: openai-api
-```
-
-Then set `OPENAI_API_KEY` in CI.
-
-DiffPal passes base/head review metadata to the provider. The provider inspects
-the diff and supporting code through its available Git and filesystem tooling;
-DiffPal keeps provider choice at the `runtime.providers` boundary and validates
-returned findings against the changed ranges it collected internally.
+Blank auth values fail validation. Missing optional config values are allowed
+when the matching environment variable will be present in CI.
 
 ## Profiles
 
-Profiles override the base document under the same root sections:
+Profiles override the same root sections:
 
 ```yaml
 profiles:
@@ -286,23 +247,15 @@ Select a profile with `--profile ci` or `DIFFPAL_PROFILE=ci`.
 
 ## Environment Overrides
 
-These environment variables override config values:
-
-- `DIFFPAL_PROFILE`
-- `DIFFPAL_PROVIDER`
-- `DIFFPAL_BLOCK_ON`
-- `DIFFPAL_OPENAI_MODEL`
-- `DIFFPAL_REVIEW_LANGUAGE`
-- `DIFFPAL_REVIEW_INSTRUCTIONS`
-
-## Exit Codes
-
-| Code | Meaning |
+| Variable | Overrides |
 | --- | --- |
-| `0` | Review completed. |
-| `1` | Blocking findings exist and `--gate` was set. |
-| `2` | Config, profile, provider, or auth validation failed. |
-| `3` | Provider timeout, rate limit, or transient failure. |
-| `4` | Platform publish failed. |
-| `5` | Internal tooling failure. |
-| `130` | Interrupted or cancelled. |
+| `DIFFPAL_PROFILE` | selected profile when `--profile` is not set |
+| `DIFFPAL_PROVIDER` | `diffpal.provider` |
+| `DIFFPAL_BLOCK_ON` | `diffpal.gate.block_on` |
+| `DIFFPAL_OPENAI_MODEL` | `runtime.providers.*.openai.model` |
+| `DIFFPAL_REVIEW_LANGUAGE` | `diffpal.review.language` |
+| `DIFFPAL_REVIEW_INSTRUCTIONS` | `diffpal.review.instructions` |
+| `DIFFPAL_REVIEW_TIMEOUT` | `diffpal.review.timeout` |
+
+Config loading also expands `$VAR` and `${VAR}` placeholders before YAML
+parsing. Missing placeholder variables fail config loading.
