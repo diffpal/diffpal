@@ -12,6 +12,9 @@ Before you start, have:
 - one supported review provider or ACP-compatible agent;
 - a pull request or merge request you can use for a trusted first test.
 
+If the terms are new, read [How DiffPal works](../concepts/how-diffpal-works.md)
+and the [Glossary](../concepts/glossary.md) first.
+
 ## Choose Code Host
 
 | Host | Start here |
