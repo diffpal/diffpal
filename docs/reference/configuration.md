@@ -38,6 +38,9 @@ Install and authenticate that CLI in CI before running DiffPal. DiffPal sends
 the structured diff review request and owns the review output contract; the ACP
 agent owns its model, tools, account, and provider-specific credentials.
 
+Use [Providers](../providers/README.md) for Codex, Copilot, OpenCode, and
+custom ACP-compatible CLI setup instructions.
+
 Supported runtime provider types include:
 
 - `generic_acp`
@@ -49,50 +52,6 @@ Supported runtime provider types include:
 - `openai`
 - `aistudio`
 - `pool`
-
-## Default Codex Recipe
-
-The default public onboarding recipe uses Codex ACP:
-
-```yaml
-version: v1
-
-runtime:
-  providers:
-    codex-acp:
-      type: codex_acp
-      codex_acp:
-        reasoning_effort: low
-
-diffpal:
-  provider: codex-acp
-  gate:
-    block_on: high
-  review:
-    language: en
-    instructions: |
-      Prefer actionable findings that are directly supported by the diff.
-  platforms:
-    github: {}
-    gitlab: {}
-    azure: {}
-
-profiles:
-  ci:
-    diffpal:
-      gate:
-        block_on: high
-```
-
-Install the matching provider command in CI:
-
-```bash
-npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-```
-
-Set `OPENAI_API_KEY` as a CI secret and authenticate Codex with
-`codex login --with-api-key`. Do not commit token values into the
-config file.
 
 ## Root Sections
 
@@ -308,107 +267,6 @@ DiffPal passes base/head review metadata to the provider. The provider inspects
 the diff and supporting code through its available Git and filesystem tooling;
 DiffPal keeps provider choice at the `runtime.providers` boundary and validates
 returned findings against the changed ranges it collected internally.
-
-## Provider Auth Recipes
-
-Copy-paste examples are in [`examples`](../../examples/README.md). The config
-shape stays the same across CI systems; only the provider install/auth step
-changes. These recipes are maintained examples; the product boundary for
-provider choice is the `runtime.providers` entry selected by `diffpal.provider`.
-
-### Generic ACP CLI
-
-Use [`examples/configs/generic-acp/config.yaml`](../../examples/configs/generic-acp/config.yaml).
-
-Replace `generic_acp.cmd` with the command that starts your provider's ACP
-stdio server:
-
-```yaml
-runtime:
-  providers:
-    my-review-agent:
-      type: generic_acp
-      generic_acp:
-        cmd: ["your-acp-cli", "acp", "--stdio"]
-
-diffpal:
-  provider: my-review-agent
-```
-
-Required secret: provider-specific.
-
-### Codex API Key
-
-Use [`examples/configs/codex-api-key/config.yaml`](../../examples/configs/codex-api-key/config.yaml).
-
-Install and authenticate the provider in CI:
-
-```bash
-npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
-printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-```
-
-Required secret: `OPENAI_API_KEY`.
-
-### Codex Subscription Auth
-
-Use [`examples/configs/codex-subscription/config.yaml`](../../examples/configs/codex-subscription/config.yaml).
-
-Generate a fresh `CODEX_AUTH_JSON_B64` value with the command recipe in
-[`examples/README.md`](../../examples/README.md#generate-codexauthjsonb64).
-
-Restore an existing Codex auth file in trusted CI:
-
-```bash
-mkdir -p "$HOME/.codex"
-printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
-chmod 600 "$HOME/.codex/auth.json"
-```
-
-Required secret: `CODEX_AUTH_JSON_B64`.
-
-Use this only in trusted same-repository CI. Do not expose a restored Codex auth
-file to untrusted fork pull requests or merge requests.
-
-### Copilot Fine-Grained PAT
-
-Use [`examples/configs/copilot-github-token/config.yaml`](../../examples/configs/copilot-github-token/config.yaml).
-
-Install the provider in CI:
-
-```bash
-npm install --global @github/copilot@1.0.61
-```
-
-Required secret: `COPILOT_GITHUB_TOKEN`.
-
-The Copilot CLI reads `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, then `GITHUB_TOKEN`.
-Use `COPILOT_GITHUB_TOKEN` for DiffPal so the provider token is separate from
-the platform publish token. The token must be a fine-grained GitHub PAT v2 with
-the Copilot Requests permission; classic PATs are not supported by the Copilot
-CLI.
-
-### OpenCode ACP
-
-Use [`examples/configs/opencode-acp/config.yaml`](../../examples/configs/opencode-acp/config.yaml).
-
-DiffPal's runtime starts OpenCode with its ACP command:
-
-```yaml
-runtime:
-  providers:
-    opencode-acp:
-      type: opencode_acp
-      opencode_acp:
-        model: opencode/big-pickle
-
-diffpal:
-  provider: opencode-acp
-```
-
-Install and authenticate `opencode` in CI before running DiffPal. If you need a
-custom OpenCode mode or model, add supported `opencode_acp` fields such as
-`mode`, `model`, or `extra_args`.
 
 ## Profiles
 

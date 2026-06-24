@@ -19,13 +19,23 @@ includes the [comparison guide](concepts/comparison.md).
 
 ## Integrations
 
-Use [Integrations](integrations/README.md) for CI setup, provider recipes, and
-host-specific requirements:
+Use [Integrations](integrations/README.md) for CI setup and host-specific
+requirements:
 
 - [GitHub Actions](integrations/github-actions.md)
 - [GitLab CI](integrations/gitlab-ci.md)
 - [Azure Pipelines](integrations/azure-pipelines.md)
 - [Custom CI/CD](integrations/custom-ci.md)
+
+## Providers
+
+Use [Providers](providers/README.md) to choose Codex, Copilot, OpenCode, or a
+custom ACP-compatible CLI:
+
+- [Codex](providers/codex.md)
+- [Copilot](providers/copilot.md)
+- [OpenCode](providers/opencode.md)
+- [Custom ACP-compatible CLI](providers/custom-acp.md)
 
 ## Reference
 

@@ -36,8 +36,10 @@ command that starts your provider's ACP stdio server.
 Use these references when you want stricter policy, auditing, or rollout
 control:
 
-- [Config reference](../docs/reference/configuration.md) for `runtime.providers`,
-  review instructions, MCP servers, profiles, and `gate.block_on`
+- [Providers](../docs/providers/README.md) for `runtime.providers`, install,
+  authentication, and provider-specific failure checks
+- [Config reference](../docs/reference/configuration.md) for review
+  instructions, MCP servers, profiles, and `gate.block_on`
 - [Findings schema](../docs/reference/findings-schema.md) for the structured bundle
 - [Verify First Review](../docs/getting-started/verify-first-review.md) for expected
   summary, comments, artifacts, and gate behavior
@@ -52,21 +54,14 @@ control:
 
 ## Auth Notes
 
-- Generic ACP CLI auth is provider-specific. Install and authenticate the CLI in
-  CI before running DiffPal, then point `generic_acp.cmd` at its ACP command.
-- Codex API key uses `codex login --with-api-key` with `OPENAI_API_KEY`.
-- Codex subscription auth restores an existing `~/.codex/auth.json` from
-  `CODEX_AUTH_JSON_B64`. Generate the secret with the recipe below and use it
-  only in trusted same-repository CI.
-- Copilot token auth uses `COPILOT_GITHUB_TOKEN`. It must be a fine-grained
-  GitHub PAT v2 with the Copilot Requests permission. Classic PATs are not
-  supported by the Copilot CLI.
-- OpenCode ACP uses the `opencode acp` command resolved by the runtime. Install
-  and authenticate OpenCode before running DiffPal.
+Use [Providers](../docs/providers/README.md) for provider-specific install and
+authentication. The examples below keep provider install/auth commands only
+where they are part of a complete copy-paste CI file.
+
 - The GitLab examples restrict secret-backed jobs to same-project merge
   requests, require a protected `DIFFPAL_TRUSTED_REVIEW=true` variable, and run
   as manual jobs so maintainers decide when provider credentials are exposed.
-  The Azure examples skip credentialed review steps when
+- The Azure examples skip credentialed review steps when
   `System.PullRequest.IsFork` is `True`.
 
 ## Generate CODEX_AUTH_JSON_B64

@@ -30,7 +30,7 @@ other supported providers and ACP-compatible agents.
 | Provider path | Start here |
 | --- | --- |
 | Codex API key | [GitHub quickstart](github-quickstart.md) |
-| Codex subscription auth, Copilot, OpenCode, or generic ACP | [Integrations overview](../integrations/README.md) |
+| Codex subscription auth, Copilot, OpenCode, or generic ACP | [Providers](../providers/README.md) |
 
 ## Choose Feedback Mode
 

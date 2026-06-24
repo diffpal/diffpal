@@ -6,6 +6,8 @@ review.
 This path uses the Codex API-key recipe because it is a complete copy-paste
 GitHub Actions setup. Codex is not the product boundary; other supported
 providers and ACP agents can use the same DiffPal workflow.
+See [Codex Provider](../providers/codex.md) for provider-specific setup
+details.
 
 ## 1. Create A Setup Branch
 
