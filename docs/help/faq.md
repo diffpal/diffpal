@@ -76,3 +76,6 @@ findings bundle is `.artifacts/diffpal/findings.json`. Host commands can also
 write `summary.md`, SARIF, Code Quality, and host-specific publishing payloads.
 
 See [Artifacts](../reference/artifacts.md).
+
+Next step: use [Getting Started](../getting-started/README.md) when you are
+ready to configure the first review.

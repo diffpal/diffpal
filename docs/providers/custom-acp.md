@@ -23,6 +23,10 @@ Authenticate the CLI with its own supported mechanism before running DiffPal.
 Store provider credentials in protected CI secrets and do not commit them to the
 DiffPal config.
 
+Do not expose provider credentials to untrusted fork jobs. Keep the
+credentialed review job limited to trusted branches, same-repository pull
+requests, or maintainer-approved jobs that do not execute fork-controlled code.
+
 ## Minimal Verified Configuration
 
 Use [`examples/configs/generic-acp/config.yaml`](../../examples/configs/generic-acp/config.yaml)
@@ -59,6 +63,11 @@ diffpal --profile ci review local \
   --out .artifacts/diffpal/findings.json
 ```
 
+## Expected Result
+
+The smoke review should complete, write
+`.artifacts/diffpal/findings.json`, and print a Markdown summary to stdout.
+
 ## Security Considerations
 
 DiffPal delegates provider-specific model, account, tool, sandbox, and approval
@@ -80,3 +89,6 @@ secrets.
 
 - [Generic ACP config](../../examples/configs/generic-acp/config.yaml)
 - [Custom CI/CD guide](../integrations/custom-ci.md)
+
+Next step: replace `generic_acp.cmd` with your ACP command, then run the
+portable [Custom CI/CD](../integrations/custom-ci.md) flow.

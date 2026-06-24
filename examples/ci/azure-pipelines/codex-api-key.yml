@@ -18,12 +18,14 @@ steps:
 
   - script: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
     displayName: Authenticate Codex
+    # Provider credentials are skipped for fork PR validation.
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     env:
       OPENAI_API_KEY: $(OPENAI_API_KEY)
 
   - task: DiffPalReview@1
     displayName: DiffPal review
+    # Keep provider and host credentials out of untrusted fork PR jobs.
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     inputs:
       diffpalVersion: latest

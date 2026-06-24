@@ -143,3 +143,6 @@ See [Common Failures](README.md#common-failures).
 - [Codex API key](../../examples/ci/azure-pipelines/codex-api-key.yml)
 - [Codex subscription auth](../../examples/ci/azure-pipelines/codex-subscription.yml)
 - [Copilot token](../../examples/ci/azure-pipelines/copilot-github-token.yml)
+
+Next step: use [Verify First Review](../getting-started/verify-first-review.md)
+after the first Azure Pipelines run completes.

@@ -151,3 +151,6 @@ See [Common Failures](README.md#common-failures).
 - [Codex API key](../../examples/ci/github-actions/codex-api-key.yml)
 - [Codex subscription auth](../../examples/ci/github-actions/codex-subscription.yml)
 - [Copilot token](../../examples/ci/github-actions/copilot-github-token.yml)
+
+Next step: use [Verify First Review](../getting-started/verify-first-review.md)
+after the first GitHub Actions run completes.

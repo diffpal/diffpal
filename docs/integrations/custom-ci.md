@@ -69,7 +69,12 @@ set -eu
 : "${DIFFPAL_HEAD_REV:?set DIFFPAL_HEAD_REV to the reviewed/head revision}"
 : "${DIFFPAL_REPO_ID:?set DIFFPAL_REPO_ID to a stable repository id}"
 : "${OPENAI_API_KEY:?set OPENAI_API_KEY for the Codex provider}"
+```
 
+`OPENAI_API_KEY` is a provider credential. Do not expose it to untrusted fork
+builds or jobs that execute fork-controlled code.
+
+```bash
 git fetch --tags --prune
 git rev-parse --verify "$DIFFPAL_BASE_REV^{commit}"
 git rev-parse --verify "$DIFFPAL_HEAD_REV^{commit}"
@@ -88,10 +93,6 @@ diffpal --profile ci review local \
   --out .artifacts/diffpal/findings.json \
   > .artifacts/diffpal/summary.md
 ```
-
-`OPENAI_API_KEY` is a provider credential. Do not run this example in a job that
-executes untrusted fork code with secrets available. See
-[Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 
 To publish to a native host, use the matching command and host credentials:
 
@@ -136,6 +137,14 @@ Gating is separate from feedback. `--gate` controls whether blocking findings
 make the process return non-zero. Feedback can still show blocking findings
 when the gate is disabled.
 
+## Expected Results
+
+The portable artifact-only example should create
+`.artifacts/diffpal/findings.json` and a captured
+`.artifacts/diffpal/summary.md`. Native host commands should additionally
+publish the feedback surfaces listed in the
+[support matrix](../reference/support-matrix.md).
+
 ## Security
 
 Do not expose provider or host secrets to untrusted fork builds. Run
@@ -173,3 +182,6 @@ When running against another code host, DiffPal can still produce local
 Markdown and artifacts, including `findings.json`, but it does not create
 native comments, discussions, threads, checks, statuses, or branch-policy
 signals for that host.
+
+Next step: upload `.artifacts/diffpal/` from your CI job and verify the first
+run with [Verify First Review](../getting-started/verify-first-review.md).

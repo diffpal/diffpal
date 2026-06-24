@@ -18,6 +18,7 @@ steps:
 
   - task: DiffPalReview@1
     displayName: DiffPal review
+    # Keep provider and host credentials out of untrusted fork PR jobs.
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     inputs:
       diffpalVersion: latest

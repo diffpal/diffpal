@@ -40,3 +40,6 @@ Use the same DiffPal config shape and change the CI host setup:
 - [GitLab CI](../integrations/gitlab-ci.md)
 - [Azure Pipelines](../integrations/azure-pipelines.md)
 - [Custom CI/CD](../integrations/custom-ci.md)
+
+Next step: choose the integration page for the CI system that will run the next
+DiffPal review.

@@ -134,3 +134,6 @@ private artifacts into a public issue.
 
 See the public [Security controls](../security.md) page for the shorter control
 summary.
+
+Next step: apply the trusted-source guard from your host integration page before
+enabling provider credentials in CI.

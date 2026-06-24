@@ -23,6 +23,10 @@ Authenticate OpenCode before running DiffPal. Store any OpenCode credentials in
 protected CI secrets and pass them to the OpenCode CLI using its supported
 authentication mechanism.
 
+Do not expose OpenCode credentials to untrusted fork jobs. Keep the
+credentialed review job limited to trusted branches, same-repository pull
+requests, or maintainer-approved jobs that do not execute fork-controlled code.
+
 ## Minimal Verified Configuration
 
 Use [`examples/configs/opencode-acp/config.yaml`](../../examples/configs/opencode-acp/config.yaml).
@@ -59,6 +63,11 @@ diffpal --profile ci review local \
   --out .artifacts/diffpal/findings.json
 ```
 
+## Expected Result
+
+The smoke review should complete, write
+`.artifacts/diffpal/findings.json`, and print a Markdown summary to stdout.
+
 ## Security Considerations
 
 DiffPal does not manage OpenCode accounts, credentials, models, or sandbox
@@ -78,3 +87,6 @@ maintainer-approved jobs that do not execute untrusted code with secrets.
 
 - [OpenCode ACP config](../../examples/configs/opencode-acp/config.yaml)
 - [Integration guides](../integrations/README.md)
+
+Next step: adapt the OpenCode config, then choose the integration page for your
+CI host.

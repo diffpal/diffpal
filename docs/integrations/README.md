@@ -84,3 +84,6 @@ Most integration failures come from:
 - running secret-backed review on an untrusted fork PR.
 
 Use the [troubleshooting guide](../help/troubleshooting.md) for fixes.
+
+Next step: open the host-specific integration page for the CI system that will
+run DiffPal.

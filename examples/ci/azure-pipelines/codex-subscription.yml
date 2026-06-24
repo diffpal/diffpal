@@ -22,12 +22,14 @@ steps:
       printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
       chmod 600 "$HOME/.codex/auth.json"
     displayName: Restore Codex auth
+    # Provider credentials are skipped for fork PR validation.
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     env:
       CODEX_AUTH_JSON_B64: $(CODEX_AUTH_JSON_B64)
 
   - task: DiffPalReview@1
     displayName: DiffPal review
+    # Keep provider and host credentials out of untrusted fork PR jobs.
     condition: and(succeeded(), ne(variables['System.PullRequest.IsFork'], 'True'))
     inputs:
       diffpalVersion: latest

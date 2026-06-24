@@ -326,3 +326,6 @@ pass host metadata or base/head values from CI variables.
 **Related:** [CLI reference](../reference/cli.md),
 [Custom CI lifecycle](../integrations/custom-ci.md#generic-execution-lifecycle),
 and [Providers](../providers/README.md).
+
+Next step: after applying the fix, rerun `diffpal doctor` in the same CI mode
+that failed.

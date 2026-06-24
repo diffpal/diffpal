@@ -12,6 +12,8 @@ diffpal-review:
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
     - npm install --global @diffpal/diffpal@latest @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    # Provider credentials are exposed only by the trusted same-project manual rule above.
+    # Fork MRs should run no-secret CI only.
     - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-

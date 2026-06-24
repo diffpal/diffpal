@@ -24,6 +24,10 @@ npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 
 For API-key auth, store `OPENAI_API_KEY` as a protected CI secret and run:
 
+Do not expose `OPENAI_API_KEY` to untrusted fork jobs. Keep the credentialed
+review job limited to trusted branches, same-repository pull requests, or
+maintainer-approved jobs that do not execute fork-controlled code.
+
 ```bash
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 ```
@@ -31,6 +35,8 @@ printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 For subscription auth, generate `CODEX_AUTH_JSON_B64` with the recipe in
 [`examples/README.md`](../../examples/README.md#generate-codexauthjsonb64),
 then restore it only in trusted CI:
+
+Do not expose restored Codex auth files to untrusted fork jobs.
 
 ```bash
 mkdir -p "$HOME/.codex"
@@ -77,6 +83,11 @@ diffpal --profile ci review local \
   --out .artifacts/diffpal/findings.json
 ```
 
+## Expected Result
+
+The smoke review should complete, write
+`.artifacts/diffpal/findings.json`, and print a Markdown summary to stdout.
+
 ## Security Considerations
 
 Do not expose `OPENAI_API_KEY` or restored Codex auth files to untrusted fork
@@ -99,3 +110,5 @@ maintainer-approved jobs that do not execute untrusted code with secrets.
 - [GitLab CI with Codex subscription auth](../../examples/ci/gitlab/codex-subscription.yml)
 - [Azure Pipelines with Codex API key](../../examples/ci/azure-pipelines/codex-api-key.yml)
 - [Azure Pipelines with Codex subscription auth](../../examples/ci/azure-pipelines/codex-subscription.yml)
+
+Next step: choose the host-specific CI example that matches your code host.

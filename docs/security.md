@@ -54,3 +54,5 @@ non-sensitive description and ask maintainers for a private reporting channel.
 Do not include secrets, exploit details, private code, provider responses, or
 private artifacts in a public issue.
 
+Next step: read [Secrets and fork PRs](guides/secrets-and-fork-prs.md) before
+enabling provider credentials in CI.
