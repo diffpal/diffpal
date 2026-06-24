@@ -98,11 +98,12 @@ See [Feedback Modes](README.md#feedback-modes).
 
 ## Merge-Gate Setup
 
-Pass `--gate`. Blocking findings return exit code `1` after publishing
+Pass `--gate`. Blocking findings return exit code `10` after publishing
 succeeds and are represented by unresolved blocker discussions plus the
 `DiffPal Review` status.
 
-See [Merge Gates](README.md#merge-gates).
+See [Merge Gates](README.md#merge-gates) and
+[Exit behavior](../reference/exit-behavior.md).
 
 ## Fork Or Untrusted-Contribution Behavior
 

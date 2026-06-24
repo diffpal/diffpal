@@ -1,133 +1,132 @@
-# Findings Schema v3
+# Findings Schema
 
-Canonical output is `internal/findings.FindingsBundle` serialized to JSON.
-New DiffPal review runs write `version: v3` and prompt metadata
-`schema_version: findings.v3`.
+The canonical review artifact is
+`.artifacts/diffpal/findings.json`, a JSON serialization of DiffPal's findings
+bundle. New review writes use `version: "v3"` unless a bundle version is
+already set by the caller.
 
-Required top-level fields:
+## Canonical Bundle
 
-- `version`
-- `review_id`
-- `base_sha`
-- `head_sha`
-- `findings[]`
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `version` | yes | Bundle version. New writes use `v3`; readers accept `v1`, `v2`, and `v3`. |
+| `review_id` | yes | Stable review identifier. |
+| `base_sha` | yes | Base revision used for the review. |
+| `head_sha` | yes | Head revision used for the review. |
+| `language` | no | Language requested for generated text. |
+| `prompt` | no | Prompt metadata. |
+| `inspection` | no | Provider inspection metadata. |
+| `change_summary` | no | Human-readable summary bullets. |
+| `review_result` | no | Human-readable review outcome sentence. |
+| `files` | no | Reviewed files. |
+| `findings` | yes | Finding array. May be empty. |
 
-Optional top-level fields:
+Prompt metadata fields:
 
-- `language`
-- `prompt` prompt pack metadata:
-  - `prompt_id`
-  - `prompt_version`
-  - `purpose`
-  - `schema_version`
-- `inspection` provider inspection metadata:
-  - `provider_type`
-  - `required`
-  - `tool_calls[]`
-  - `diff_inspected`
-  - `context_inspected`
-- `change_summary[]` human-readable overview bullets
-- `review_result` optional human-readable review outcome sentence
-- `files[]` reviewed file list
+| Field | Meaning |
+| --- | --- |
+| `prompt_id` | Prompt identifier, currently `diffpal.review` for review output. |
+| `prompt_version` | Prompt version used for the review. |
+| `purpose` | Prompt purpose. |
+| `schema_version` | Prompt output schema version, currently `findings.v3`. |
 
-## Prompt Versioning
+Inspection metadata fields:
 
-Prompt metadata is resolved from DiffPal's versioned prompt registry. The
-current default review prompt is:
+| Field | Meaning |
+| --- | --- |
+| `provider_type` | Runtime provider type when available. |
+| `required` | Whether inspection metadata was required by the runtime. |
+| `tool_calls` | Tool call names when available. |
+| `diff_inspected` | Whether the provider reported diff inspection. |
+| `context_inspected` | Whether the provider reported context inspection. |
 
-- `prompt_id`: `diffpal.review`
-- `prompt_version`: `v1.4.0`
-- `purpose`: `review_changed_diff`
-- `schema_version`: `findings.v3`
+## Finding Fields
 
-Prompt body, output schema, and task instructions are treated as a versioned
-product surface.
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id` | written by DiffPal | Deterministic fingerprint. |
+| `review_id` | written by DiffPal when missing | Review identifier copied from the bundle. |
+| `category` | yes | Finding category. |
+| `severity` | yes | `low`, `medium`, `high`, or `critical`. |
+| `confidence` | yes | Number from `0` to `1`. |
+| `path` | yes | File path for the finding. |
+| `start_line` | yes | Positive start line. |
+| `end_line` | yes | Positive end line, greater than or equal to `start_line`. |
+| `changed_span` | yes for v2/v3 | Changed-line span that anchors the finding. |
+| `supporting_span` | no | Additional context span. |
+| `title` | yes | Short finding title. |
+| `message` | yes | Finding explanation. |
+| `evidence` | yes | Structured evidence for v2/v3. |
+| `impact` | yes | Structured impact for v2/v3. |
+| `suggestion` | no | Suggested fix. |
+| `blocking` | written by DiffPal | Whether the finding meets the active threshold. |
+| `provider` | no | Provider ID that produced the finding. |
 
-Required finding fields:
-
-- `category`
-- `severity`
-- `confidence`
-- `path`
-- `start_line`
-- `end_line`
-- `changed_span`
-- `title`
-- `message`
-- `evidence`
-- `impact`
-
-`changed_span` is the changed diff range that anchors the finding:
+Line span representation:
 
 ```json
 {
-  "path": "app/session.go",
+  "path": "internal/session.go",
   "start_line": 12,
-  "end_line": 13
+  "end_line": 14
 }
 ```
 
-`supporting_span` is optional nearby context. It must not replace the changed
-line anchor.
-
-`evidence` is structured:
+Evidence representation:
 
 ```json
 {
-  "anchor": "L12-L13",
-  "reasoning_basis": "the changed lines concatenate request input into SQL",
+  "anchor": "changed lines call exec with request input",
+  "reasoning_basis": "the command arguments now include unsanitized user data",
   "source": "changed_line"
 }
 ```
 
-Allowed `evidence.source` values are:
-
-- `changed_line`
-- `nearby_context`
-- `tool_result`
-
-`impact` is structured:
+Impact representation:
 
 ```json
 {
-  "summary": "attackers can delete unrelated sessions",
-  "scope": "authenticated sessions"
+  "summary": "users can execute unintended shell commands",
+  "scope": "request handling path"
 }
 ```
 
-Optional finding fields:
+## Severity And Location
 
-- `supporting_span`
-- `suggestion`
-- `blocking`
-- `provider`
+Allowed severities are `low`, `medium`, `high`, and `critical`.
+DiffPal normalizes severity to lowercase.
 
-Stable fingerprint input:
+Location is represented twice for compatibility:
 
-- repository id
-- `platform` (`diffpal`)
-- `review_id`
-- `head_sha`
-- normalized path and line range
-- category
-- normalized message
-- structured evidence text hash
+- `path`, `start_line`, and `end_line` are the primary line fields;
+- `changed_span` carries the same changed-line anchor in structured form.
 
-`findings.Normalize` computes `finding.id` deterministically from fields above.
-
-## Inspection Metadata
-
-Providers inspect the requested base/head diff and supporting code through their
-available Git and filesystem tooling. DiffPal no longer requires provider-facing
-review tool telemetry before accepting structured output.
-
-The `inspection` object remains in the bundle schema for compatibility with
-older bundles and debug runtimes that can still emit inspection metadata.
+For v2/v3, `changed_span.path`, `changed_span.start_line`, and
+`changed_span.end_line` are required and must be positive.
 
 ## Compatibility
 
-DiffPal can still read existing `version: v1` bundles where `evidence` and
-`impact` are strings, plus `version: v2` bundles without `review_result`.
-New writes use `version: v3`; prompt output validation requires structured
-`evidence` and `impact`, accepts optional `review_result`, and rejects
-unexpected provider properties.
+DiffPal readers accept:
+
+- `v1` bundles where `evidence` and `impact` may be legacy strings;
+- `v2` bundles with structured evidence and impact;
+- `v3` bundles with optional `review_result`.
+
+New writes use `v3`. Consumers should ignore unknown fields and treat
+`findings[]` as the canonical machine-readable issue list.
+
+## Consumer Example
+
+Fail a CI step when the canonical bundle contains blocking findings:
+
+```bash
+jq -e '[.findings[] | select(.blocking == true)] | length == 0' \
+  .artifacts/diffpal/findings.json
+```
+
+Count high and critical findings regardless of whether the gate was enabled:
+
+```bash
+jq '[.findings[] | select(.severity == "high" or .severity == "critical")] | length' \
+  .artifacts/diffpal/findings.json
+```

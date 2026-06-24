@@ -48,8 +48,10 @@ custom ACP-compatible CLI:
 Use [Reference](reference/README.md) for stable contracts:
 
 - [Configuration](reference/configuration.md)
+- [CLI](reference/cli.md)
 - [Findings schema](reference/findings-schema.md)
 - [Artifacts](reference/artifacts.md)
+- [Exit behavior](reference/exit-behavior.md)
 - [Versioning](reference/versioning.md)
 - [Support matrix](reference/support-matrix.md)
 
