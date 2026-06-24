@@ -10,13 +10,14 @@ leave the CI job and be processed by that third-party provider.
 ## What Receives Repository Content
 
 The CI job checks out the repository working tree and runs DiffPal in that
-workspace. DiffPal reads the configured `base..head` diff, repository-owned
-configuration, and review instructions.
+workspace. DiffPal resolves the configured base/head review scope, reads
+repository-owned configuration, and applies review instructions.
 
 The selected provider or ACP-compatible agent receives the review request that
-DiffPal builds from the changed files. For remote providers, that request is
-sent outside the CI runner according to the provider's own service terms and
-account settings.
+DiffPal builds for that scope. For remote providers, that request is sent outside
+the CI runner according to the provider's own service terms and account settings,
+and the provider or agent may inspect source context according to its
+configuration.
 
 Host publishers receive validated review output. GitHub, GitLab, and Azure
 DevOps receive summaries, comments, discussions, threads, statuses, or reports
