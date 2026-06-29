@@ -93,6 +93,30 @@ func TestDebugLogsRenderProviderResponseBlock(t *testing.T) {
 	}
 }
 
+func TestDebugProviderResponseLogsProviderResponseBlock(t *testing.T) {
+	prevLevel := zerolog.GlobalLevel()
+	prevLogger := log.Logger
+	defer func() {
+		zerolog.SetGlobalLevel(prevLevel)
+		log.Logger = prevLogger
+	}()
+
+	var out bytes.Buffer
+	ctx := initWithWriter(context.Background(), true, &out)
+	DebugProviderResponse(ctx, "not json")
+
+	text := out.String()
+	for _, needle := range []string{
+		"DBG",
+		"provider returned invalid structured output",
+		"provider response:\nnot json",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("debug output missing %q:\n%s", needle, text)
+		}
+	}
+}
+
 func TestProviderResponseBlockIsDebugOnly(t *testing.T) {
 	prevLevel := zerolog.GlobalLevel()
 	prevLogger := log.Logger

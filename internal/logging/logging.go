@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -53,6 +54,16 @@ func initWithWriter(ctx context.Context, debug bool, out io.Writer) context.Cont
 // DebugEnabled reports whether debug logging is enabled globally.
 func DebugEnabled() bool {
 	return zerolog.GlobalLevel() <= zerolog.DebugLevel
+}
+
+// DebugProviderResponse logs provider text that failed structured-output parsing.
+func DebugProviderResponse(ctx context.Context, response string) {
+	if strings.TrimSpace(response) == "" {
+		return
+	}
+	zerolog.Ctx(ctx).Debug().
+		Str(validationJSONField, response).
+		Msg("provider returned invalid structured output")
 }
 
 func formatProviderResponse(evt map[string]interface{}, buf *bytes.Buffer) error {
