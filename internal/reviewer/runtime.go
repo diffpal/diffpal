@@ -8,6 +8,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	dpconfig "github.com/diffpal/diffpal/internal/config"
+	"github.com/diffpal/diffpal/internal/logging"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
@@ -110,6 +111,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 
 	var output ReviewOutput
 	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
+		logging.DebugProviderResponse(ctx, trimmed)
 		return ReviewOutput{}, usage, wrapError(KindInternal, fmt.Errorf("parse structured output: %w", err))
 	}
 	if len(nonEmptyChangeSummary(output.ChangeSummary)) == 0 {
