@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,11 +12,14 @@ import (
 	"testing"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	"github.com/normahq/norma/pkg/runtime/providererror"
+	"github.com/normahq/norma/pkg/runtime/structuredagent"
 )
 
 func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
@@ -694,15 +698,66 @@ func TestStructuredOutputErrorsAreTransient(t *testing.T) {
 	}
 }
 
-func TestProviderAuthAndQuotaErrorsAreTransient(t *testing.T) {
+func TestProviderErrorFromRuntimeErrorUsesJSONRPCData(t *testing.T) {
+	err := &acp.RequestError{
+		Code:    -32603,
+		Message: "Provider error",
+		Data: map[string]any{
+			"provider_error": map[string]any{
+				"kind":       "quota_exceeded",
+				"request_id": "req-1",
+			},
+		},
+	}
+
+	got, ok := providerErrorFromRuntimeError(err)
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got.Kind != providererror.KindQuotaExceeded {
+		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindQuotaExceeded)
+	}
+	if got.RequestID != "req-1" {
+		t.Fatalf("RequestID = %q, want req-1", got.RequestID)
+	}
+}
+
+func TestProviderErrorFromRuntimeErrorUsesAuthCode(t *testing.T) {
+	got, ok := providerErrorFromRuntimeError(&acp.RequestError{
+		Code:    -32000,
+		Message: "Authentication required",
+	})
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got.Kind != providererror.KindAuthenticationRequired {
+		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindAuthenticationRequired)
+	}
+}
+
+func TestProviderErrorFromRuntimeErrorUsesStructuredValidationMetadata(t *testing.T) {
+	validationErr := &structuredagent.OutputValidationError{
+		Err: errors.New("structured output schema validation error"),
+		ProviderError: &providererror.ProviderError{
+			Kind: providererror.KindRateLimited,
+		},
+	}
+	got, ok := providerErrorFromRuntimeError(fmt.Errorf("validate structured output: %w", validationErr))
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got.Kind != providererror.KindRateLimited {
+		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindRateLimited)
+	}
+}
+
+func TestPlainProviderErrorTextIsNotClassifiedAsTransient(t *testing.T) {
 	for _, msg := range []string{
-		`{"code":-32000,"message":"Authentication required"}`,
 		"402 You have exceeded your monthly quota",
 		"payment required",
-		"rate limit exceeded",
 	} {
-		if !isTransientProviderError(errors.New(msg)) {
-			t.Fatalf("isTransientProviderError(%q) = false, want true", msg)
+		if isTransientProviderError(errors.New(msg)) {
+			t.Fatalf("isTransientProviderError(%q) = true, want false", msg)
 		}
 	}
 }

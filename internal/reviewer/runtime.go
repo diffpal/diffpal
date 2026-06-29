@@ -3,6 +3,7 @@ package reviewer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
 	"github.com/normahq/norma/pkg/runtime/agentfactory"
 	"github.com/normahq/norma/pkg/runtime/mcpregistry"
+	"github.com/normahq/norma/pkg/runtime/providererror"
 	"github.com/normahq/norma/pkg/runtime/structuredagent"
 	adkagent "google.golang.org/adk/agent"
 	adkrunner "google.golang.org/adk/runner"
@@ -90,6 +92,9 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	var usage RuntimeUsage
 	for ev, runErr := range events {
 		if runErr != nil {
+			if providerErr, ok := providerErrorFromRuntimeError(runErr); ok {
+				return ReviewOutput{}, usage, wrapError(KindTransient, providerErr)
+			}
 			if isTransientProviderError(runErr) {
 				return ReviewOutput{}, usage, wrapError(KindTransient, runErr)
 			}
@@ -239,15 +244,33 @@ func isTransientProviderError(err error) bool {
 		return true
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return isStructuredOutputProviderMessage(msg) ||
-		strings.Contains(msg, "authentication required") ||
-		strings.Contains(msg, "exceeded your monthly quota") ||
-		strings.Contains(msg, "payment required") ||
-		strings.Contains(msg, "rate limit") ||
-		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
+	return isStructuredOutputProviderMessage(msg)
 }
 
 func isStructuredOutputProviderMessage(msg string) bool {
 	return strings.Contains(msg, "structured output schema validation") ||
 		strings.Contains(msg, "no json object found")
+}
+
+func providerErrorFromRuntimeError(err error) (*providererror.ProviderError, bool) {
+	if err == nil {
+		return nil, false
+	}
+	var validationErr *structuredagent.OutputValidationError
+	if errors.As(err, &validationErr) && validationErr.ProviderError != nil {
+		return validationErr.ProviderError, true
+	}
+	var reqErr *acp.RequestError
+	if errors.As(err, &reqErr) {
+		if providerErr, ok := providererror.FromWireData(reqErr.Data); ok {
+			return providerErr, true
+		}
+		if reqErr.Code == -32000 {
+			return &providererror.ProviderError{
+				Kind:    providererror.KindAuthenticationRequired,
+				Message: strings.TrimSpace(reqErr.Message),
+			}, true
+		}
+	}
+	return nil, false
 }
