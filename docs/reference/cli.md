@@ -21,8 +21,11 @@ The npm meta-package is `@diffpal/diffpal`.
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `--config-dir` | empty | Extra config root directory searched before `.config/diffpal/config.yaml`. |
-| `--debug` | `false` | Enable debug logging. |
+| `--debug` | `false` | Enable human-readable debug logging, including invalid provider responses when structured output validation fails. |
 | `--profile` | empty | Config profile name. |
+
+DiffPal logs are always emitted as human-readable text on stderr. Command
+outputs intended for machines remain on stdout as documented per command.
 
 ## Command Overview
 

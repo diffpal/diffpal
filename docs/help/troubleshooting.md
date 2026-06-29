@@ -301,6 +301,35 @@ Set `diffpal.gate.block_on` to the minimum severity that should fail the job.
 [Exit behavior](../reference/exit-behavior.md), and
 [Configuration gate](../reference/configuration.md#gate).
 
+## Provider Returns Invalid Structured Output
+
+**Symptom:** The review fails with `structured output schema validation error`,
+`no JSON object found`, or a CI wrapper message that the provider returned an
+empty or invalid structured response.
+
+**Likely causes:** The provider returned prose, partial output, an empty
+response, or JSON that did not match the DiffPal review schema after retries.
+
+**Diagnostic:** Rerun the resolved DiffPal command with `--debug`. In Azure
+Pipelines, copy the `final CLI args` line from the task log and add `--debug`
+before `review`:
+
+```bash
+diffpal --debug --profile ci review ado --base "$BASE_SHA" --head "$HEAD_SHA"
+```
+
+Debug logs include a `provider response:` block for invalid structured output.
+Treat that block as sensitive repository/provider output.
+
+**Fix:** Check provider availability, authentication, quota, and model
+configuration. If the provider response is valid review content but invalid
+JSON, use repository instructions or provider settings that preserve the
+structured output contract.
+
+**Related:** [CLI debug flag](../reference/cli.md#global-flags),
+[Providers](../providers/README.md), and
+[Security controls](../security.md#artifacts-and-logs).
+
 ## Local Execution Works But CI Execution Fails
 
 **Symptom:** `diffpal review local` works on a developer machine, but the same
