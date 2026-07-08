@@ -12,8 +12,8 @@ import (
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/platformauth"
 	"github.com/diffpal/diffpal/internal/provider"
-	"github.com/normahq/norma/pkg/runtime/agentfactory"
-	"github.com/normahq/norma/pkg/runtime/mcpregistry"
+	"github.com/normahq/runtime/v2/agentfactory"
+	"github.com/normahq/runtime/v2/mcpregistry"
 	"github.com/spf13/cobra"
 )
 

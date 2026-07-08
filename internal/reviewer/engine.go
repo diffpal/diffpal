@@ -16,7 +16,7 @@ import (
 	"github.com/diffpal/diffpal/internal/policy"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
-	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	"github.com/normahq/runtime/v2/agentconfig"
 )
 
 type Options struct {

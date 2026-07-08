@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,9 +16,10 @@ import (
 	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
-	"github.com/normahq/norma/pkg/runtime/agentconfig"
-	"github.com/normahq/norma/pkg/runtime/providererror"
-	"github.com/normahq/norma/pkg/runtime/structuredagent"
+	"github.com/normahq/go-adk-acpagent/v2/acperror"
+	"github.com/normahq/runtime/v2/agentconfig"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/session"
 )
 
 func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
@@ -714,8 +714,8 @@ func TestProviderErrorFromRuntimeErrorUsesJSONRPCData(t *testing.T) {
 	if !ok {
 		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
 	}
-	if got.Kind != providererror.KindQuotaExceeded {
-		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindQuotaExceeded)
+	if got.Kind != acperror.KindQuotaExceeded {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindQuotaExceeded)
 	}
 	if got.RequestID != "req-1" {
 		t.Fatalf("RequestID = %q, want req-1", got.RequestID)
@@ -730,24 +730,41 @@ func TestProviderErrorFromRuntimeErrorUsesAuthCode(t *testing.T) {
 	if !ok {
 		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
 	}
-	if got.Kind != providererror.KindAuthenticationRequired {
-		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindAuthenticationRequired)
+	if got.Kind != acperror.KindAuthenticationRequired {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindAuthenticationRequired)
 	}
 }
 
-func TestProviderErrorFromRuntimeErrorUsesStructuredValidationMetadata(t *testing.T) {
-	validationErr := &structuredagent.OutputValidationError{
-		Err: errors.New("structured output schema validation error"),
-		ProviderError: &providererror.ProviderError{
-			Kind: providererror.KindRateLimited,
+func TestProviderErrorFromEventUsesADKMetadata(t *testing.T) {
+	got, ok := providerErrorFromEvent(&session.Event{
+		LLMResponse: model.LLMResponse{
+			CustomMetadata: map[string]any{
+				acperror.ProviderErrorMetadataKey: map[string]any{
+					"kind": "rate_limited",
+				},
+			},
 		},
-	}
-	got, ok := providerErrorFromRuntimeError(fmt.Errorf("validate structured output: %w", validationErr))
+	})
 	if !ok {
-		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+		t.Fatal("providerErrorFromEvent() ok = false, want true")
 	}
-	if got.Kind != providererror.KindRateLimited {
-		t.Fatalf("Kind = %q, want %q", got.Kind, providererror.KindRateLimited)
+	if got.Kind != acperror.KindRateLimited {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindRateLimited)
+	}
+}
+
+func TestProviderErrorFromEventUsesErrorCode(t *testing.T) {
+	got, ok := providerErrorFromEvent(&session.Event{
+		LLMResponse: model.LLMResponse{
+			ErrorCode:    "acp_provider_error:quota_exceeded",
+			ErrorMessage: "provider error quota_exceeded",
+		},
+	})
+	if !ok {
+		t.Fatal("providerErrorFromEvent() ok = false, want true")
+	}
+	if got.Kind != acperror.KindQuotaExceeded {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindQuotaExceeded)
 	}
 }
 

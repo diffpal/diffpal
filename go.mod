@@ -3,7 +3,6 @@ module github.com/diffpal/diffpal
 go 1.26.4
 
 require (
-	github.com/normahq/norma v0.0.11
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 )
@@ -11,12 +10,14 @@ require (
 require gopkg.in/yaml.v3 v3.0.1
 
 require (
-	github.com/coder/acp-go-sdk v0.12.2
+	github.com/coder/acp-go-sdk v0.13.5
 	github.com/google/uuid v1.6.0
 	github.com/microsoft/azure-devops-go-api/azuredevops/v7 v7.1.0
+	github.com/normahq/go-adk-acpagent/v2 v2.0.1
+	github.com/normahq/runtime/v2 v2.0.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	gitlab.com/gitlab-org/api/client-go v1.46.0
-	google.golang.org/adk v1.3.0
+	google.golang.org/adk/v2 v2.0.0
 	google.golang.org/genai v1.57.0
 	modernc.org/sqlite v1.30.1
 )
@@ -250,7 +251,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
-	go.opentelemetry.io/otel/log v0.16.0 // indirect
+	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
