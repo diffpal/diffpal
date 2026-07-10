@@ -24,3 +24,5 @@
 - Fixed Azure DevOps PR gate publishing to update the active reviewer vote with
   the Azure reviewer upsert API instead of reviewer patch endpoints that do not
   accept vote updates.
+- Fixed `diffpal init` to stop exposing the unused `--state` flag and creating
+  the unused local state directory and config `.gitignore`.

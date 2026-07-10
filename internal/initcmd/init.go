@@ -10,13 +10,11 @@ import (
 type InitOptions struct {
 	WorkingDir string
 	ConfigPath string
-	StatePath  string
 	Force      bool
 }
 
 type InitResult struct {
 	ConfigPath  string
-	StatePath   string
 	IgnorePath  string
 	Templates   []string
 	ProviderSet []string
@@ -41,9 +39,6 @@ dist/
 .artifacts/
 `
 
-const defaultConfigGitignore = `state/
-`
-
 func InitWorkspace(opts InitOptions, detectedProviders []string) (InitResult, error) {
 	if opts.WorkingDir == "" {
 		opts.WorkingDir = "."
@@ -51,28 +46,16 @@ func InitWorkspace(opts InitOptions, detectedProviders []string) (InitResult, er
 	if opts.ConfigPath == "" {
 		opts.ConfigPath = filepath.Join(opts.WorkingDir, ".config", "diffpal", "config.yaml")
 	}
-	if opts.StatePath == "" {
-		opts.StatePath = filepath.Join(opts.WorkingDir, ".config", "diffpal", "state")
-	}
 	result := InitResult{
 		ConfigPath: opts.ConfigPath,
-		StatePath:  opts.StatePath,
 		IgnorePath: filepath.Join(opts.WorkingDir, ".diffpalignore"),
 	}
-	configIgnorePath := filepath.Join(filepath.Dir(opts.ConfigPath), ".gitignore")
 	templateDir := filepath.Join(filepath.Dir(opts.ConfigPath), "templates")
 
 	if err := os.MkdirAll(filepath.Dir(opts.ConfigPath), 0o755); err != nil {
 		return result, err
 	}
-	if err := os.MkdirAll(opts.StatePath, 0o755); err != nil {
-		return result, err
-	}
-
 	if err := writeIfMissing(opts.ConfigPath, composeConfig(detectedProviders), opts.Force); err != nil {
-		return result, err
-	}
-	if err := writeIfMissing(configIgnorePath, defaultConfigGitignore, opts.Force); err != nil {
 		return result, err
 	}
 	if err := os.MkdirAll(templateDir, 0o755); err != nil {
@@ -101,9 +84,6 @@ func InitWizardWorkspace(opts WizardOptions) (InitResult, error) {
 	if initOpts.ConfigPath == "" {
 		initOpts.ConfigPath = filepath.Join(initOpts.WorkingDir, ".config", "diffpal", "config.yaml")
 	}
-	if initOpts.StatePath == "" {
-		initOpts.StatePath = filepath.Join(initOpts.WorkingDir, ".config", "diffpal", "state")
-	}
 
 	setup, providerID, err := resolveWizardSetup(opts.Setup)
 	if err != nil {
@@ -130,7 +110,6 @@ func InitWizardWorkspace(opts WizardOptions) (InitResult, error) {
 
 	result := InitResult{
 		ConfigPath:  initOpts.ConfigPath,
-		StatePath:   initOpts.StatePath,
 		IgnorePath:  filepath.Join(initOpts.WorkingDir, ".diffpalignore"),
 		ProviderSet: []string{providerID},
 		Setup:       setup,
@@ -138,13 +117,9 @@ func InitWizardWorkspace(opts WizardOptions) (InitResult, error) {
 		Profile:     profile,
 		BlockOn:     blockOn,
 	}
-	configIgnorePath := filepath.Join(filepath.Dir(initOpts.ConfigPath), ".gitignore")
 	templateDir := filepath.Join(filepath.Dir(initOpts.ConfigPath), "templates")
 
 	if err := os.MkdirAll(filepath.Dir(initOpts.ConfigPath), 0o755); err != nil {
-		return result, err
-	}
-	if err := os.MkdirAll(initOpts.StatePath, 0o755); err != nil {
 		return result, err
 	}
 	if err := writeIfMissing(initOpts.ConfigPath, composeWizardConfig(wizardConfigOptions{
@@ -154,9 +129,6 @@ func InitWizardWorkspace(opts WizardOptions) (InitResult, error) {
 		Profile:    profile,
 		BlockOn:    blockOn,
 	}), initOpts.Force); err != nil {
-		return result, err
-	}
-	if err := writeIfMissing(configIgnorePath, defaultConfigGitignore, initOpts.Force); err != nil {
 		return result, err
 	}
 	if err := os.MkdirAll(templateDir, 0o755); err != nil {

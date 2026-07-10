@@ -55,7 +55,7 @@ are preserved unless you pass `--force`.
 Commit the generated config:
 
 ```bash
-git add .config/diffpal/config.yaml .config/diffpal/.gitignore
+git add .config/diffpal/config.yaml
 git commit -m "chore: add diffpal config"
 ```
 
