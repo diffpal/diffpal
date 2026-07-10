@@ -55,7 +55,7 @@ func newLocalReviewSubcommand(run reviewRunner) *cobra.Command {
 	local := &cobra.Command{
 		Use:   "local",
 		Short: "Review a local diff and print Markdown",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runReviewOnly(cmd, "local", run)
 		},
 	}
@@ -70,7 +70,7 @@ func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []
 		Use:     name,
 		Aliases: aliases,
 		Short:   fmt.Sprintf("Review and emit %s artifacts", hostDisplayName(name)),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runHostReview(cmd, platform, name, run)
 		},
 	}
@@ -228,7 +228,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	if err := publishBundleToAPI(cmd.Context(), auth, platform, execution.Config, bundle, execution.Repo, execution.BlockOn, execution.Gate, feedback, summaryOverview, execution.ReviewChannel); err != nil {
+	if err := publishBundleToAPI(cmd.Context(), auth, platform, bundle, execution.Repo, execution.BlockOn, execution.Gate, feedback, summaryOverview, execution.ReviewChannel); err != nil {
 		return withExitCode(4, err)
 	}
 	for _, item := range outputs {
@@ -450,10 +450,7 @@ func shouldSkipGitHubReview(cmd *cobra.Command) (bool, error) {
 	return ctx.IsFork, nil
 }
 
-func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, cfg config.Config, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, feedback string, summaryOverview bool, reviewChannel string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platform string, bundle findings.FindingsBundle, repo string, blockOn string, gateEnabled bool, feedback string, summaryOverview bool, reviewChannel string) error {
 	var err error
 	bundle, err = normalizeBundleBlocking(bundle, blockOn)
 	if err != nil {
@@ -470,117 +467,116 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 
 	switch platform {
 	case "github":
-		reviewCtx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
-		if err != nil {
-			return err
-		}
-		identity, err := github.NewReviewIdentity(reviewChannel)
-		if err != nil {
-			return err
-		}
-		return auth.WithToken(func(token string) error {
-			publishReview := false
-			includeInline := false
-			for _, surface := range surfaces {
-				switch normalizePublishSurface(platform, surface) {
-				case "github_comments":
-					publishReview = true
-					includeInline = true
-				case "summary":
-					publishReview = true
-				}
-			}
-			if publishReview {
-				plan := github.CommentPlan{}
-				if includeInline {
-					inlineFindings := publishableInlineFindings(bundle.Findings)
-					if err := github.ValidateInlineFindings(inlineFindings); err != nil {
-						return err
-					}
-					existing, err := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
-					if err != nil {
-						return err
-					}
-					plan = github.PlanInlineCommentsWithOptions(existing, inlineFindings, github.CommentOptions{
-						AllFindings: true,
-					})
-				}
-				// GitHub Actions cannot approve pull requests with GITHUB_TOKEN.
-				// DiffPal publishes comment reviews; --gate is enforced by the
-				// workflow exit status instead of sticky PR review state.
-				if err := github.PublishPullRequestReviewWithIdentity(ctx, token, reviewCtx, summary, identity, plan, nil); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
+		return publishGitHubBundle(ctx, auth, bundle, surfaces, summary, reviewChannel)
 	case "gitlab":
-		reviewCtx, err := gitlabpub.ResolveContext(bundle.BaseSHA, bundle.HeadSHA, "", "")
-		if err != nil {
-			return err
-		}
-		blockThresholds := []string{blockOn}
-		plan := gitlabpub.PlanDiscussions(nil, bundle.Findings, blockThresholds)
-		decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
-		status := gitlabpub.PolicyStatus(decision.BlockCount, decision.AdvisoryCount, gateEnabled, os.Getenv("CI_JOB_URL"))
-		return auth.WithToken(func(token string) error {
-			for _, surface := range surfaces {
-				switch normalizePublishSurface(platform, surface) {
-				case "discussions":
-					if err := gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
-						return err
-					}
-				case "gitlab_status":
-					if err := gitlabpub.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
-						return err
-					}
-				case "summary":
-					if err := gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		})
+		return publishGitLabBundle(ctx, auth, bundle, surfaces, summary, blockOn, gateEnabled)
 	case "azure":
-		reviewCtx, err := azure.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
-		if err != nil {
-			return err
-		}
-		plan := azure.PlanThreads(nil, bundle.Findings, reviewCtx)
-		blocking := countBlockingFindings(bundle)
-		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
-		return auth.WithToken(func(token string) error {
-			for _, surface := range surfaces {
-				switch normalizePublishSurface(platform, surface) {
-				case "threads":
-					if err := azure.PublishThreads(ctx, auth.Mode, token, reviewCtx, plan, nil); err != nil {
-						return err
-					}
-				case "status":
-					if err := azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil); err != nil {
-						return err
-					}
-				case "summary":
-					if err := azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, summary, nil); err != nil {
-						return err
-					}
-				}
-			}
-			if gateEnabled {
-				vote := 10
-				if blocking > 0 {
-					vote = -5
-				}
-				if err := azure.PublishGateVote(ctx, auth.Mode, token, reviewCtx, vote, nil); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
+		return publishAzureBundle(ctx, auth, bundle, surfaces, summary, blockOn, gateEnabled)
 	default:
 		return fmt.Errorf("unsupported platform %q", platform)
 	}
+}
+
+func publishGitHubBundle(ctx context.Context, auth platformauth.Resolved, bundle findings.FindingsBundle, surfaces []string, summary, reviewChannel string) error {
+	reviewCtx, err := github.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
+	if err != nil {
+		return err
+	}
+	identity, err := github.NewReviewIdentity(reviewChannel)
+	if err != nil {
+		return err
+	}
+	publishReview := hasPublishSurface("github", surfaces, "github_comments") || hasPublishSurface("github", surfaces, "summary")
+	includeInline := hasPublishSurface("github", surfaces, "github_comments")
+	if !publishReview {
+		return nil
+	}
+	return auth.WithToken(func(token string) error {
+		plan := github.CommentPlan{}
+		if includeInline {
+			inlineFindings := publishableInlineFindings(bundle.Findings)
+			if err := github.ValidateInlineFindings(inlineFindings); err != nil {
+				return err
+			}
+			existing, err := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
+			if err != nil {
+				return err
+			}
+			plan = github.PlanInlineCommentsWithOptions(existing, inlineFindings, github.CommentOptions{AllFindings: true})
+		}
+		// GitHub Actions cannot approve pull requests with GITHUB_TOKEN. The
+		// workflow exit status enforces --gate instead of sticky review state.
+		return github.PublishPullRequestReviewWithIdentity(ctx, token, reviewCtx, summary, identity, plan, nil)
+	})
+}
+
+func publishGitLabBundle(ctx context.Context, auth platformauth.Resolved, bundle findings.FindingsBundle, surfaces []string, summary, blockOn string, gateEnabled bool) error {
+	reviewCtx, err := gitlabpub.ResolveContext(bundle.BaseSHA, bundle.HeadSHA, "", "")
+	if err != nil {
+		return err
+	}
+	blockThresholds := []string{blockOn}
+	plan := gitlabpub.PlanDiscussions(nil, bundle.Findings, blockThresholds)
+	decision := gitlabpub.SummarizeDecision(bundle, blockThresholds)
+	status := gitlabpub.PolicyStatus(decision.BlockCount, decision.AdvisoryCount, gateEnabled, os.Getenv("CI_JOB_URL"))
+	return auth.WithToken(func(token string) error {
+		for _, surface := range surfaces {
+			switch normalizePublishSurface("gitlab", surface) {
+			case "discussions":
+				err = gitlabpub.PublishDiscussions(ctx, auth.Mode, token, reviewCtx, plan, nil)
+			case "gitlab_status":
+				err = gitlabpub.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil)
+			case "summary":
+				err = gitlabpub.PublishSummaryDiscussion(ctx, auth.Mode, token, reviewCtx, summary, nil)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func publishAzureBundle(ctx context.Context, auth platformauth.Resolved, bundle findings.FindingsBundle, surfaces []string, summary, blockOn string, gateEnabled bool) error {
+	reviewCtx, err := azure.ResolveContext(bundle.BaseSHA, bundle.HeadSHA)
+	if err != nil {
+		return err
+	}
+	plan := azure.PlanThreads(nil, bundle.Findings, reviewCtx)
+	blocking := countBlockingFindings(bundle)
+	status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
+	return auth.WithToken(func(token string) error {
+		for _, surface := range surfaces {
+			switch normalizePublishSurface("azure", surface) {
+			case "threads":
+				err = azure.PublishThreads(ctx, auth.Mode, token, reviewCtx, plan, nil)
+			case "status":
+				err = azure.PublishStatus(ctx, auth.Mode, token, reviewCtx, status, nil)
+			case "summary":
+				err = azure.PublishSummaryThread(ctx, auth.Mode, token, reviewCtx, summary, nil)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if !gateEnabled {
+			return nil
+		}
+		vote := 10
+		if blocking > 0 {
+			vote = -5
+		}
+		return azure.PublishGateVote(ctx, auth.Mode, token, reviewCtx, vote, nil)
+	})
+}
+
+func hasPublishSurface(platform string, surfaces []string, target string) bool {
+	for _, surface := range surfaces {
+		if normalizePublishSurface(platform, surface) == target {
+			return true
+		}
+	}
+	return false
 }
 
 func hostDisplayName(name string) string {

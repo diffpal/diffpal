@@ -1,3 +1,4 @@
+// Package policy applies severity, confidence, and suppression rules.
 package policy
 
 import (

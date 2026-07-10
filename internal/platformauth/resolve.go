@@ -1,3 +1,4 @@
+// Package platformauth resolves credentials for supported review hosts.
 package platformauth
 
 import (

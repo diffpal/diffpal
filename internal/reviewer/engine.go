@@ -219,11 +219,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	})
 	if err != nil {
 		return Result{}, err
-	} else {
-		inspection = mergeInspection(inspection, usage.Inspection)
-		summaries = append(summaries, output.ChangeSummary...)
-		collected = append(collected, validateReviewFindings(output.Findings, filtered, cfg.ProviderID())...)
 	}
+	inspection = mergeInspection(inspection, usage.Inspection)
+	summaries = append(summaries, output.ChangeSummary...)
+	collected = append(collected, validateReviewFindings(output.Findings, filtered, cfg.ProviderID())...)
 
 	bundle.ChangeSummary = normalizeChangeSummary(summaries)
 	bundle.ReviewResult = normalizeReviewResult(output.ReviewResult)

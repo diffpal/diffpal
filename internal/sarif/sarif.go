@@ -1,3 +1,4 @@
+// Package sarif converts DiffPal findings to SARIF reports.
 package sarif
 
 import (

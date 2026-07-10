@@ -1,7 +1,7 @@
+// Package provider discovers and diagnoses supported review providers.
 package provider
 
 import (
-	"os"
 	"os/exec"
 	"sort"
 )
@@ -99,8 +99,4 @@ func AutoPoolDefaults() []string {
 		keys = append(keys, candidate.Key)
 	}
 	return keys
-}
-
-func EnsureStatePath(path string) error {
-	return os.MkdirAll(path, 0o755)
 }

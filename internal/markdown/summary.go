@@ -221,7 +221,7 @@ type summaryFindingDetailOptions struct {
 
 func renderSummaryFindingDetail(finding findings.Finding, opts summaryFindingDetailOptions) string {
 	out := strings.Builder{}
-	fmt.Fprintf(&out, "#### %s", findingHeading(finding, false))
+	fmt.Fprintf(&out, "#### %s", findingHeading(finding))
 	if finding.StartLine > 0 {
 		fmt.Fprintf(&out, " - %s", lineRange(finding.StartLine, finding.EndLine))
 	}
@@ -257,7 +257,7 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	link := strings.TrimSpace(opts.Link)
 	hasLink := link != ""
 	fmt.Fprintf(&out, "%s%s\n", prefix, firstNonEmpty(finding.Message, finding.Title))
-	fmt.Fprintf(&out, "%s**Finding**: %s\n", detailPrefix, findingHeading(finding, hasLink))
+	fmt.Fprintf(&out, "%s**Finding**: %s\n", detailPrefix, findingHeading(finding))
 	if evidence := finding.EvidenceText(); evidence != "" {
 		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, evidence)
 	}
@@ -285,7 +285,7 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	return out.String()
 }
 
-func findingHeading(finding findings.Finding, linked bool) string {
+func findingHeading(finding findings.Finding) string {
 	severity := strings.ToLower(strings.TrimSpace(finding.Severity))
 	category := strings.ToLower(strings.TrimSpace(finding.Category))
 	return titleWord(severity) + " " + category

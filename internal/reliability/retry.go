@@ -1,3 +1,4 @@
+// Package reliability provides bounded retries for transient provider errors.
 package reliability
 
 import (

@@ -1,3 +1,4 @@
+// Package diff collects and describes Git changes for review.
 package diff
 
 import (

@@ -1,3 +1,4 @@
+// Package platformapi provides shared HTTP behavior for host integrations.
 package platformapi
 
 import (

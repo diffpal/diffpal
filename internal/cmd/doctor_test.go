@@ -172,7 +172,7 @@ func TestDiagnoseSelectedProviderHostedMissingAuthRequired(t *testing.T) {
 func TestDiagnoseWorkspaceReportsMissingConfig(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), ".config", "diffpal", "config.yaml")
 
-	issues := diagnoseWorkspace(configPath)
+	issues := diagnoseWorkspace(t.Context(), configPath)
 	joined := strings.Join(issues, "\n")
 	if !strings.Contains(joined, "not found; run `diffpal init`") {
 		t.Fatalf("diagnoseWorkspace() missing not-found warning:\n%s", joined)
@@ -187,7 +187,7 @@ func TestDiagnoseWorkspaceReportsStatErrors(t *testing.T) {
 	}
 	configPath := filepath.Join(parentFile, "diffpal", "config.yaml")
 
-	issues := diagnoseWorkspace(configPath)
+	issues := diagnoseWorkspace(t.Context(), configPath)
 	joined := strings.Join(issues, "\n")
 	if !strings.Contains(joined, "cannot inspect") {
 		t.Fatalf("diagnoseWorkspace() missing stat error warning:\n%s", joined)

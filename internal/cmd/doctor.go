@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ func newDoctorCommand() *cobra.Command {
 	doctor := &cobra.Command{
 		Use:   "doctor",
 		Short: "Validate local runtime and environment",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			var issues []string
 			errorIssues := []string{}
 			mode, err := cmd.Flags().GetString("mode")
@@ -62,7 +63,7 @@ func newDoctorCommand() *cobra.Command {
 			if platformError != "" {
 				errorIssues = append(errorIssues, platformError)
 			}
-			issues = append(issues, diagnoseWorkspace(configPath)...)
+			issues = append(issues, diagnoseWorkspace(cmd.Context(), configPath)...)
 
 			return printDoctorResult(cmd, issues, errorIssues)
 		},
@@ -173,7 +174,7 @@ func requiresProviderAuth(mode string) bool {
 	return selected != "" && selected != "local"
 }
 
-func diagnoseWorkspace(configPath string) []string {
+func diagnoseWorkspace(ctx context.Context, configPath string) []string {
 	issues := []string{}
 	if _, err := os.Stat(configPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -186,7 +187,7 @@ func diagnoseWorkspace(configPath string) []string {
 		issues = append(issues, "warn: git is not available; diff collection and SCM context will fail")
 		return issues
 	}
-	if !insideGitWorkTree() {
+	if !insideGitWorkTree(ctx) {
 		issues = append(issues, "warn: not inside a git work tree; review and SCM-aware commands are unsupported")
 	} else {
 		issues = append(issues, "ok: inside git work tree")
@@ -206,8 +207,8 @@ func diagnosePlatformAuth(cfg config.Config, mode string) ([]string, string) {
 	return []string{fmt.Sprintf("ok: %s auth resolved via %s (%s)", selected, auth.Source, auth.Mode)}, ""
 }
 
-func insideGitWorkTree() bool {
-	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+func insideGitWorkTree(ctx context.Context) bool {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--is-inside-work-tree")
 	out, err := cmd.Output()
 	if err != nil {
 		return false

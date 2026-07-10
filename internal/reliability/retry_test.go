@@ -15,7 +15,7 @@ func TestRetryWithPolicyRetriesTransientErrors(t *testing.T) {
 		Attempts:  3,
 		BaseDelay: time.Millisecond,
 		Timeout:   50 * time.Millisecond,
-	}, func(ctx context.Context) error {
+	}, func(_ context.Context) error {
 		attempts++
 		if attempts < 3 {
 			return errors.New("rate limit exceeded")
@@ -37,7 +37,7 @@ func TestRetryWithPolicyStopsOnNonTransientError(t *testing.T) {
 	err := RetryWithPolicy(context.Background(), Policy{
 		Attempts:  3,
 		BaseDelay: time.Millisecond,
-	}, func(ctx context.Context) error {
+	}, func(_ context.Context) error {
 		attempts++
 		return errors.New("validation failed")
 	})

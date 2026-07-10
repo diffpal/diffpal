@@ -1,3 +1,4 @@
+// Package promptpack defines versioned review prompts and schemas.
 package promptpack
 
 import (

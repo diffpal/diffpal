@@ -16,13 +16,15 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	result, err := InitWorkspace(InitOptions{
 		WorkingDir: dir,
 		ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-		StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 	}, []string{"openai-fast", "codex-acp"})
 	if err != nil {
 		t.Fatalf("InitWorkspace() error = %v", err)
 	}
-	if result.ConfigPath == "" || result.StatePath == "" || result.IgnorePath == "" {
+	if result.ConfigPath == "" || result.IgnorePath == "" {
 		t.Fatalf("InitWorkspace() returned incomplete paths: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".config", "diffpal", "state")); !os.IsNotExist(err) {
+		t.Fatalf("obsolete state directory was created: %v", err)
 	}
 	if len(result.Templates) != 3 {
 		t.Fatalf("len(Templates) = %d, want 3", len(result.Templates))
@@ -61,7 +63,6 @@ func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
 		InitOptions: InitOptions{
 			WorkingDir: dir,
 			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 		},
 		Setup:    "codex-api-key",
 		Platform: "auto",
@@ -236,7 +237,6 @@ func TestInitWizardWorkspaceWritesOpenCodeConfig(t *testing.T) {
 		InitOptions: InitOptions{
 			WorkingDir: dir,
 			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 		},
 		Setup:    "opencode-acp",
 		Platform: "github",
@@ -371,9 +371,6 @@ func TestComposeConfigWritesDiffpalArtifactsIgnore(t *testing.T) {
 
 	if !strings.Contains(defaultIgnore, ".artifacts/") {
 		t.Fatalf("defaultIgnore missing .artifacts entry:\n%s", defaultIgnore)
-	}
-	if strings.TrimSpace(defaultConfigGitignore) != "state/" {
-		t.Fatalf("defaultConfigGitignore = %q, want only state/", defaultConfigGitignore)
 	}
 }
 

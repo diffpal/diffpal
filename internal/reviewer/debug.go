@@ -1,3 +1,4 @@
+// Package reviewer orchestrates diff collection and provider review.
 package reviewer
 
 import (

@@ -95,6 +95,46 @@ func TestRenderSummaryGroupsBySeverityFileAndRule(t *testing.T) {
 	assertNotContains(t, got, "**Confidence:**")
 }
 
+func TestRenderFindingDetailIncludesAllRequestedSections(t *testing.T) {
+	t.Parallel()
+
+	got := RenderFindingDetail(findings.Finding{
+		Category:   "correctness",
+		Severity:   "high",
+		Confidence: 0.91,
+		Title:      "incorrect fallback",
+		Message:    "the fallback returns stale data",
+		Evidence: findings.FindingEvidence{
+			Anchor:         "return cached",
+			ReasoningBasis: "the cache is not refreshed",
+			Source:         "changed_line",
+		},
+		Impact:     findings.NewImpact("callers receive the previous value"),
+		Suggestion: "refresh before returning",
+	}, FindingDetailOptions{
+		ListItem: true,
+		Snippet: CodeSnippet{
+			Language: "go",
+			Code:     "return cached\n",
+		},
+		Link: "https://example.test/change#L12",
+	})
+	for _, want := range []string{
+		"- the fallback returns stale data",
+		"**Finding**: High correctness",
+		"**Evidence**: return cached the cache is not refreshed changed_line",
+		"**Impact**: callers receive the previous value",
+		"https://example.test/change#L12",
+		"```go",
+		"**Suggestion**: refresh before returning",
+		"**Confidence**: 0.91",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderFindingDetail() missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderSummaryHandlesEmptyBundle(t *testing.T) {
 	t.Parallel()
 

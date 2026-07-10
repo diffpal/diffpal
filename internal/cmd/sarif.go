@@ -12,7 +12,7 @@ func newSARIFCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sarif",
 		Short: "Convert findings bundle to SARIF",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			inputPath, _ := cmd.Flags().GetString("input")
 			outPath, _ := cmd.Flags().GetString("out")
 			bundle, err := findings.ReadBundle(inputPath)

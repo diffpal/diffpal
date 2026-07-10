@@ -1,3 +1,4 @@
+// Package gitlab integrates DiffPal with GitLab merge requests.
 package gitlab
 
 import (

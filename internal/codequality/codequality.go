@@ -1,3 +1,4 @@
+// Package codequality converts findings to GitLab Code Quality reports.
 package codequality
 
 import (

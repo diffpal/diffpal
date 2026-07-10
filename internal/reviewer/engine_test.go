@@ -906,7 +906,7 @@ func writeRepoFile(t *testing.T, path string, content string) {
 
 func runGitCmd(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(t.Context(), "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -936,6 +936,32 @@ func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 		if want := findings.Fingerprint("repo", "head", item); item.ID != want {
 			t.Fatalf("finding ID = %q, want %q", item.ID, want)
 		}
+	}
+}
+
+func TestDebugPromptRunsOfflineAgainstChangedDiff(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc main() {}\n")
+
+	result, err := DebugPrompt(context.Background(), testConfig(), Options{
+		WorkingDir:   repo,
+		Repo:         "acme/repo",
+		ReviewID:     "debug",
+		Instructions: "focus on correctness",
+	})
+	if err != nil {
+		t.Fatalf("DebugPrompt() error = %v", err)
+	}
+	if result.SystemPrompt == "" || result.TaskSnapshot == "" {
+		t.Fatalf("DebugPrompt() returned incomplete output: %+v", result)
+	}
+	if len(result.Bundle.ChangeSummary) != 1 || result.Bundle.Findings == nil {
+		t.Fatalf("debug bundle = %+v", result.Bundle)
 	}
 }
 

@@ -1,3 +1,4 @@
+// Package markdown renders findings and summaries for human review.
 package markdown
 
 import (

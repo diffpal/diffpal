@@ -9,6 +9,35 @@ import (
 	"github.com/diffpal/diffpal/internal/findings"
 )
 
+func TestLanguageForPath(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"main.go":       "go",
+		"app.tsx":       "ts",
+		"worker.mjs":    "js",
+		"data.json":     "json",
+		"config.yml":    "yaml",
+		"README.md":     "markdown",
+		"script.bash":   "bash",
+		"tool.py":       "python",
+		"task.rb":       "ruby",
+		"lib.rs":        "rust",
+		"Main.java":     "java",
+		"build.kts":     "kotlin",
+		"Program.cs":    "csharp",
+		"native.hpp":    "cpp",
+		"header.h":      "c",
+		"migration.sql": "sql",
+		"LICENSE":       "",
+	}
+	for path, want := range tests {
+		if got := languageForPath(path); got != want {
+			t.Errorf("languageForPath(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
 func TestWorktreeSnippetProviderRejectsSymlinkEscape(t *testing.T) {
 	t.Parallel()
 

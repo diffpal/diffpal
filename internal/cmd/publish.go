@@ -370,7 +370,7 @@ func publishesFileLevelFindings(platform string, surfaces []string) bool {
 	return false
 }
 
-func defaultSurfaceOutput(platform string, surface string) string {
+func defaultSurfaceOutput(_ string, surface string) string {
 	switch surface {
 	case "summary":
 		return ".artifacts/diffpal/summary.md"

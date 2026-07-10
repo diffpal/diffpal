@@ -26,7 +26,7 @@ func newDebugPromptCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prompt",
 		Short: "Render review prompts and task snapshots offline",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			var debugResult reviewer.DebugResult
 			runner := func(ctx context.Context, cfg config.Config, opts reviewer.Options) (reviewer.Result, error) {
 				var err error

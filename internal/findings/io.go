@@ -1,3 +1,4 @@
+// Package findings defines DiffPal's deterministic findings contract.
 package findings
 
 import (

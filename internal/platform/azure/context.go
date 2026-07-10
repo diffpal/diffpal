@@ -1,3 +1,4 @@
+// Package azure integrates DiffPal with Azure DevOps pull requests.
 package azure
 
 import (

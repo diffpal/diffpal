@@ -1,3 +1,4 @@
+// Package github integrates DiffPal with GitHub pull requests.
 package github
 
 import (

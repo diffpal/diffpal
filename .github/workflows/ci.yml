@@ -61,8 +61,14 @@ jobs:
       - name: Run prompt and eval fixture tests
         run: go test ./internal/reviewer ./internal/reviewer/promptpack -run 'Test(RenderReview|ReviewTask|ReviewEval|RunWithRuntimeLabelsPromptInjectionDiffAsUntrusted|RenderReviewTaskInputEscapesCommitAndPathInjectionFixtures|RunWithRuntimeDoesNotPreloadInjectionFixtureContent)'
 
-      - name: Run tests
-        run: go test ./...
+      - name: Run tests with coverage
+        shell: bash
+        run: |
+          mkdir -p .artifacts
+          go test ./... -coverprofile=.artifacts/coverage.out
+          coverage="$(go tool cover -func=.artifacts/coverage.out | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
+          echo "total coverage: ${coverage}%"
+          awk -v coverage="${coverage}" 'BEGIN { if (coverage + 0 < 75) exit 1 }'
 
       - name: Run race tests
         run: go test -race ./...

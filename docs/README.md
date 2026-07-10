@@ -49,6 +49,7 @@ Use [Guides](guides/README.md) for operational guidance that spans setup and
 reference material:
 
 - [Secrets and fork PRs](guides/secrets-and-fork-prs.md)
+- [Migrate from 0.1.x to v1](guides/migrate-to-v1.md)
 - [Security controls](security.md)
 
 ## Reference

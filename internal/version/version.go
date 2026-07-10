@@ -1,3 +1,4 @@
+// Package version exposes build-time DiffPal version metadata.
 package version
 
 import "fmt"

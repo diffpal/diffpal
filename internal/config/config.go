@@ -1,3 +1,4 @@
+// Package config loads and validates DiffPal configuration.
 package config
 
 import (
@@ -372,10 +373,6 @@ func ConfigPath(workingDir, configuredRoot string) string {
 		return filepath.Join(trimmedRoot, AppName, configFileName)
 	}
 	return filepath.Join(ConfigDir(workingDir), configFileName)
-}
-
-func StatePath(workingDir string) string {
-	return filepath.Join(ConfigDir(workingDir), "state")
 }
 
 func ConfigExists(workingDir, configuredRoot string) (bool, string, error) {

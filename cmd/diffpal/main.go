@@ -1,3 +1,4 @@
+// Command diffpal provides AI-assisted pull request review.
 package main
 
 import (

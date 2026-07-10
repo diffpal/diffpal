@@ -821,7 +821,7 @@ func TestReviewGitHubDryRunPrintsMarkdownWithoutPublishing(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_PATH", writeGitHubEvent(t, `{"number":10,"repository":{"full_name":"acme/diffpal"}}`))
 
 	var requests atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
 		http.Error(w, "unexpected request", http.StatusBadRequest)
 	}))
@@ -1481,7 +1481,7 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 			_, _ = w.Write([]byte(`{"id":1,"comments":[]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/reviewers/"+reviewerID:
 			var payload struct {
-				Id   string `json:"id"`
+				ID   string `json:"id"`
 				Vote int    `json:"vote"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -1489,8 +1489,8 @@ func TestReviewADOGatePublishesStatusAndReviewerVote(t *testing.T) {
 				http.Error(w, "bad payload", http.StatusBadRequest)
 				return
 			}
-			if payload.Id != reviewerID {
-				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.Id, reviewerID)
+			if payload.ID != reviewerID {
+				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.ID, reviewerID)
 				http.Error(w, "unexpected reviewer id", http.StatusBadRequest)
 				return
 			}
@@ -1778,7 +1778,7 @@ func TestReviewADOReviewFeedbackPublishesClosedAdvisoryThreadAndApproveVote(t *t
 			_, _ = w.Write([]byte(`{"id":1}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/proj/_apis/git/repositories/repo-1/pullRequests/55/reviewers/"+reviewerID:
 			var payload struct {
-				Id   string `json:"id"`
+				ID   string `json:"id"`
 				Vote int    `json:"vote"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -1786,8 +1786,8 @@ func TestReviewADOReviewFeedbackPublishesClosedAdvisoryThreadAndApproveVote(t *t
 				http.Error(w, "bad payload", http.StatusBadRequest)
 				return
 			}
-			if payload.Id != reviewerID {
-				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.Id, reviewerID)
+			if payload.ID != reviewerID {
+				handlerErrs <- fmt.Errorf("reviewer payload id = %q, want %q", payload.ID, reviewerID)
 				http.Error(w, "unexpected reviewer id", http.StatusBadRequest)
 				return
 			}
