@@ -50,6 +50,7 @@ jobs:
           format: spdx-json
           output-file: .artifacts/diffpal.spdx.json
           upload-artifact: false
+          upload-release-assets: false
       - name: Attest build provenance
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
         with:
