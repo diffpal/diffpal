@@ -11,11 +11,15 @@ import (
 	"testing"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
-	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	"github.com/normahq/go-adk-acpagent/v2/acperror"
+	"github.com/normahq/runtime/v2/agentconfig"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/session"
 )
 
 func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
@@ -694,15 +698,83 @@ func TestStructuredOutputErrorsAreTransient(t *testing.T) {
 	}
 }
 
-func TestProviderAuthAndQuotaErrorsAreTransient(t *testing.T) {
+func TestProviderErrorFromRuntimeErrorUsesJSONRPCData(t *testing.T) {
+	err := &acp.RequestError{
+		Code:    -32603,
+		Message: "Provider error",
+		Data: map[string]any{
+			"provider_error": map[string]any{
+				"kind":       "quota_exceeded",
+				"request_id": "req-1",
+			},
+		},
+	}
+
+	got, ok := providerErrorFromRuntimeError(err)
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got.Kind != acperror.KindQuotaExceeded {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindQuotaExceeded)
+	}
+	if got.RequestID != "req-1" {
+		t.Fatalf("RequestID = %q, want req-1", got.RequestID)
+	}
+}
+
+func TestProviderErrorFromRuntimeErrorUsesAuthCode(t *testing.T) {
+	got, ok := providerErrorFromRuntimeError(&acp.RequestError{
+		Code:    -32000,
+		Message: "Authentication required",
+	})
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got.Kind != acperror.KindAuthenticationRequired {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindAuthenticationRequired)
+	}
+}
+
+func TestProviderErrorFromEventUsesADKMetadata(t *testing.T) {
+	got, ok := providerErrorFromEvent(&session.Event{
+		LLMResponse: model.LLMResponse{
+			CustomMetadata: map[string]any{
+				acperror.ProviderErrorMetadataKey: map[string]any{
+					"kind": "rate_limited",
+				},
+			},
+		},
+	})
+	if !ok {
+		t.Fatal("providerErrorFromEvent() ok = false, want true")
+	}
+	if got.Kind != acperror.KindRateLimited {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindRateLimited)
+	}
+}
+
+func TestProviderErrorFromEventUsesErrorCode(t *testing.T) {
+	got, ok := providerErrorFromEvent(&session.Event{
+		LLMResponse: model.LLMResponse{
+			ErrorCode:    "acp_provider_error:quota_exceeded",
+			ErrorMessage: "provider error quota_exceeded",
+		},
+	})
+	if !ok {
+		t.Fatal("providerErrorFromEvent() ok = false, want true")
+	}
+	if got.Kind != acperror.KindQuotaExceeded {
+		t.Fatalf("Kind = %q, want %q", got.Kind, acperror.KindQuotaExceeded)
+	}
+}
+
+func TestPlainProviderErrorTextIsNotClassifiedAsTransient(t *testing.T) {
 	for _, msg := range []string{
-		`{"code":-32000,"message":"Authentication required"}`,
 		"402 You have exceeded your monthly quota",
 		"payment required",
-		"rate limit exceeded",
 	} {
-		if !isTransientProviderError(errors.New(msg)) {
-			t.Fatalf("isTransientProviderError(%q) = false, want true", msg)
+		if isTransientProviderError(errors.New(msg)) {
+			t.Fatalf("isTransientProviderError(%q) = true, want false", msg)
 		}
 	}
 }

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/normahq/norma/pkg/runtime/agentconfig"
-	"github.com/normahq/norma/pkg/runtime/appconfig"
+	"github.com/normahq/runtime/v2/agentconfig"
+	"github.com/normahq/runtime/v2/appconfig"
 )
 
 const (

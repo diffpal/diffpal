@@ -3,7 +3,9 @@ package reviewer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"iter"
 	"strings"
 
 	acp "github.com/coder/acp-go-sdk"
@@ -11,12 +13,13 @@ import (
 	"github.com/diffpal/diffpal/internal/logging"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
-	"github.com/normahq/norma/pkg/runtime/agentfactory"
-	"github.com/normahq/norma/pkg/runtime/mcpregistry"
-	"github.com/normahq/norma/pkg/runtime/structuredagent"
-	adkagent "google.golang.org/adk/agent"
-	adkrunner "google.golang.org/adk/runner"
-	"google.golang.org/adk/session"
+	"github.com/normahq/go-adk-acpagent/v2/acperror"
+	"github.com/normahq/runtime/v2/agentfactory"
+	"github.com/normahq/runtime/v2/mcpregistry"
+	"github.com/normahq/runtime/v2/structuredagent"
+	adkagent "google.golang.org/adk/v2/agent"
+	adkrunner "google.golang.org/adk/v2/runner"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 )
 
@@ -53,7 +56,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	}
 
 	prompt := promptpack.DefaultReviewPrompt()
-	wrapped, err := structuredagent.NewAgent(agentRuntime,
+	wrapped, err := structuredagent.NewAgent(providerErrorDetectingAgent{Agent: agentRuntime},
 		structuredagent.WithoutInputSchema(),
 		structuredagent.WithOutputSchema(prompt.OutputSchema),
 		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
@@ -90,6 +93,9 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	var usage RuntimeUsage
 	for ev, runErr := range events {
 		if runErr != nil {
+			if providerErr, ok := providerErrorFromRuntimeError(runErr); ok {
+				return ReviewOutput{}, usage, wrapError(KindTransient, providerErr)
+			}
 			if isTransientProviderError(runErr) {
 				return ReviewOutput{}, usage, wrapError(KindTransient, runErr)
 			}
@@ -231,6 +237,28 @@ func appendVisibleText(out *strings.Builder, content *genai.Content) {
 	}
 }
 
+type providerErrorDetectingAgent struct {
+	adkagent.Agent
+}
+
+func (a providerErrorDetectingAgent) Run(ctx adkagent.InvocationContext) iter.Seq2[*session.Event, error] {
+	return func(yield func(*session.Event, error) bool) {
+		for ev, err := range a.Agent.Run(ctx) {
+			if err != nil {
+				yield(ev, err)
+				return
+			}
+			if providerErr, ok := providerErrorFromEvent(ev); ok {
+				yield(ev, providerErr)
+				return
+			}
+			if !yield(ev, nil) {
+				return
+			}
+		}
+	}
+}
+
 func isTransientProviderError(err error) bool {
 	if err == nil {
 		return false
@@ -239,15 +267,48 @@ func isTransientProviderError(err error) bool {
 		return true
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return isStructuredOutputProviderMessage(msg) ||
-		strings.Contains(msg, "authentication required") ||
-		strings.Contains(msg, "exceeded your monthly quota") ||
-		strings.Contains(msg, "payment required") ||
-		strings.Contains(msg, "rate limit") ||
-		(strings.Contains(msg, "generate content") && strings.Contains(msg, "request"))
+	return isStructuredOutputProviderMessage(msg)
 }
 
 func isStructuredOutputProviderMessage(msg string) bool {
 	return strings.Contains(msg, "structured output schema validation") ||
 		strings.Contains(msg, "no json object found")
+}
+
+func providerErrorFromEvent(ev *session.Event) (*acperror.ProviderError, bool) {
+	if ev == nil {
+		return nil, false
+	}
+	if providerErr, ok := acperror.FromADKMetadata(ev.CustomMetadata); ok {
+		return providerErr, true
+	}
+	if strings.HasPrefix(strings.TrimSpace(ev.ErrorCode), "acp_provider_error:") {
+		kind := strings.TrimPrefix(strings.TrimSpace(ev.ErrorCode), "acp_provider_error:")
+		if providerErr, ok := acperror.FromWireValue(map[string]any{
+			"kind":    kind,
+			"message": ev.ErrorMessage,
+		}); ok {
+			return providerErr, true
+		}
+	}
+	return nil, false
+}
+
+func providerErrorFromRuntimeError(err error) (*acperror.ProviderError, bool) {
+	if err == nil {
+		return nil, false
+	}
+	var reqErr *acp.RequestError
+	if errors.As(err, &reqErr) {
+		if providerErr, ok := acperror.FromWireData(reqErr.Data); ok {
+			return providerErr, true
+		}
+		if reqErr.Code == -32000 {
+			return &acperror.ProviderError{
+				Kind:    acperror.KindAuthenticationRequired,
+				Message: strings.TrimSpace(reqErr.Message),
+			}, true
+		}
+	}
+	return nil, false
 }

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	dpconfig "github.com/diffpal/diffpal/internal/config"
-	"github.com/normahq/norma/pkg/runtime/agentconfig"
+	"github.com/normahq/runtime/v2/agentconfig"
 )
 
 func TestADKRuntimeCopilotACPProviderErrorPath(t *testing.T) {
