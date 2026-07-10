@@ -66,6 +66,11 @@ them masked when the CI system supports masking, and restrict them to trusted
 branches, protected environments, same-repository pull requests, or
 maintainer-approved jobs.
 
+Treat credentialed autonomous review as trusted-code execution. DiffPal passes
+review scope to the configured provider, and that provider may have broad file,
+process, or network tools. Provider autonomy does not turn adversarial code,
+comments, workflow changes, package scripts, or hooks into safe input.
+
 Do not commit provider credentials to `.config/diffpal/config.yaml`, workflow
 files, examples, artifacts, or issue comments.
 
@@ -78,7 +83,9 @@ test code in ways that run before or during the review job.
 Safe patterns for external contributions:
 
 - Run normal no-secret CI on fork pull requests.
-- Run DiffPal with provider credentials only on same-repository pull requests.
+- Run DiffPal with provider credentials only on maintainer-controlled branches
+  or behind an explicit environment/manual approval gate. Same-repository
+  location alone is not a sufficient trust signal.
 - Use a maintainer-approved job that does not execute fork-controlled code with
   secrets.
 - Review workflow changes before manually re-running any credentialed job.
@@ -91,6 +98,10 @@ credentialed review job:
 ```yaml
 if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
 ```
+
+For repositories where non-maintainers can push same-repository branches, add a
+protected GitHub Environment with required reviewers or an equivalent
+maintainer-controlled approval before the credentialed job starts.
 
 GitLab CI can combine same-project merge request conditions, protected
 variables, and a manual maintainer gate such as `DIFFPAL_TRUSTED_REVIEW`.

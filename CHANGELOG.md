@@ -2,25 +2,36 @@
 
 ## Unreleased
 
-- Added the DiffPal CLI command set and findings bundle runtime.
-- Added GitHub, GitLab, and Azure adapter contracts and platform-specific task wrappers.
-- Added the composite GitHub Action wrapper for `diffpal review github`.
-- Added GitHub review channels so parallel DiffPal workflows publish separate checks and PR reviews.
-- Added the Azure DevOps `DiffPalReview@1` and `DiffPalReviewDev@1` extension packaging.
-- Added the `omnidist-release` GitHub workflow for npm-only `@diffpal/diffpal` releases.
-- Added the `diffpal-dev` GitHub workflow so DiffPal reviews same-repository pull requests using the locally built CLI, and left the released-package `diffpal` workflow disabled until the action is ready for PR gating.
-- Added lint, test, race-test, actionlint, and govulncheck coverage for CI.
-- Added a versioned prompt registry for Prompt Pack v1.2.0 so review prompt metadata, schema, and task rendering resolve from one registered prompt contract.
-- Updated the GitHub Action default and CI examples to use the current `0.1.7` CLI release.
-- Fixed Azure DevOps Marketplace packaging by adding the required extension overview asset.
-- Fixed Azure DevOps Marketplace packaging by adding the required 128x128 extension icon asset.
-- Fixed Azure DevOps Marketplace extension IDs to publish as `diffpal.diffpal` and `diffpal.diffpal-dev`.
-- Fixed Azure DevOps Marketplace task UUIDs for the corrected extension identity.
-- Fixed Azure DevOps Marketplace release cleanup for stale extension IDs.
-- Fixed Azure DevOps Marketplace task UUIDs for the final `diffpal.diffpal` extension identity.
-- Fixed Azure DevOps review threads to bind comments to the reviewed file and
-  line range while removing duplicated severity/category metadata from thread
-  bodies.
-- Fixed Azure DevOps PR gate publishing to update the active reviewer vote with
-  the Azure reviewer upsert API instead of reviewer patch endpoints that do not
-  accept vote updates.
+### Breaking changes
+
+- Removed `diffpal init --state` and generation of
+  `.config/diffpal/state/`. Host review state is reconciled directly from the
+  active pull request or merge request.
+
+### Added
+
+- Added deterministic live-thread reconciliation for GitHub, GitLab, and Azure
+  DevOps, including stale finding resolution.
+- Added bounded platform HTTP clients, structured platform errors, atomic
+  private artifact writes, and cancellation-aware Git collection.
+- Added robust diff parsing for long lines, quoted and Unicode paths, renames,
+  deletions, and binary changes.
+- Added a 75% coverage gate and stricter context, HTTP, SQL, error, revive, and
+  cognitive-complexity lint checks.
+- Added a v1 migration guide and explicit trusted-code guidance for autonomous
+  credentialed providers.
+
+### Changed
+
+- Changed credentialed CI examples to pin DiffPal `1.0.0`; interactive
+  onboarding may continue using the `latest` tag.
+- Simplified the runtime by removing unused SQLite cache, idempotency, and
+  telemetry implementations.
+
+### Fixed
+
+- Fixed empty in-memory finding IDs that caused host markers to lose stable
+  identity.
+- Fixed GitLab and Azure artifact state loaders to understand their documented
+  output envelopes.
+- Fixed reruns that could duplicate Azure threads or GitHub and GitLab findings.

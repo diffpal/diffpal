@@ -72,7 +72,7 @@ diffpal-review:
     - when: never
   resource_group: "diffpal:$CI_MERGE_REQUEST_IID"
   before_script:
-    - npm install --global @diffpal/diffpal@latest @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+    - npm install --global @diffpal/diffpal@1.0.0 @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
     - printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
   script:
     - >-

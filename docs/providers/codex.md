@@ -28,6 +28,10 @@ Do not expose `OPENAI_API_KEY` to untrusted fork jobs. Keep the credentialed
 review job limited to trusted branches, same-repository pull requests, or
 maintainer-approved jobs that do not execute fork-controlled code.
 
+The CI examples intentionally preserve broad Codex tool autonomy. Use them only
+inside the trusted workflow boundary above; Codex sandbox or approval settings
+do not make hostile pull request content safe to execute with secrets.
+
 ```bash
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 ```

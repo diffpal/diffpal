@@ -12,6 +12,9 @@ before enabling provider-backed review.
   to the selected provider or ACP-compatible agent.
 - The provider owns model execution, provider account security, and provider
   credentials.
+- Provider tool permissions are delegated to the configured provider. DiffPal
+  does not sandbox provider tools or make adversarial pull request content safe
+  to execute with credentials.
 - GitHub, GitLab, and Azure DevOps publishers receive review output only when a
   publishing command or action runs with host credentials.
 
@@ -30,9 +33,10 @@ minimum permission needed to publish the selected feedback mode.
 ## Fork Pull Requests
 
 Do not expose provider or host credentials to untrusted fork code. Run
-secret-backed DiffPal review only for same-repository pull requests, trusted
-branches, or maintainer-approved jobs that do not execute fork-controlled code
-with secrets.
+secret-backed DiffPal review only for maintainer-controlled branches or an
+explicitly approved environment. A same-repository pull request is not by
+itself trusted when an untrusted author can push to its branch. Do not execute
+pull-request-controlled scripts, hooks, tools, or workflow changes with secrets.
 
 Use [Secrets and fork PRs](guides/secrets-and-fork-prs.md) for host-specific
 guards and safe external contribution patterns.
@@ -46,10 +50,8 @@ protection for debug logs or restored provider auth files.
 
 ## Reporting Security Issues
 
-This repository does not currently include a `SECURITY.md` policy file. If the
-GitHub repository exposes **Report a vulnerability** on the Security tab, use
-that private channel. Otherwise, open a GitHub issue with a minimal,
-non-sensitive description and ask maintainers for a private reporting channel.
+Use the repository's `SECURITY.md` policy and GitHub's private **Report a
+vulnerability** channel for security reports.
 
 Do not include secrets, exploit details, private code, provider responses, or
 private artifacts in a public issue.

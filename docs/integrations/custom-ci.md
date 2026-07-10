@@ -81,7 +81,7 @@ git rev-parse --verify "$DIFFPAL_HEAD_REV^{commit}"
 
 npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
-npm install --global @diffpal/diffpal@latest
+npm install --global @diffpal/diffpal@1.0.0
 mkdir -p .artifacts/diffpal
 
 diffpal --profile ci review local \
