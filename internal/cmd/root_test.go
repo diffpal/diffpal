@@ -117,4 +117,7 @@ func TestInitHelpShowsWizardFlags(t *testing.T) {
 	if strings.Contains(text, "openai-fast") {
 		t.Fatalf("init help exposed internal provider name:\n%s", text)
 	}
+	if strings.Contains(text, "--state") {
+		t.Fatalf("init help exposed removed --state flag:\n%s", text)
+	}
 }

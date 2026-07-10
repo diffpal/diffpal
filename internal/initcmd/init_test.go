@@ -16,17 +16,23 @@ func TestInitWorkspaceWritesRunnableConfig(t *testing.T) {
 	result, err := InitWorkspace(InitOptions{
 		WorkingDir: dir,
 		ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-		StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 	}, []string{"openai-fast", "codex-acp"})
 	if err != nil {
 		t.Fatalf("InitWorkspace() error = %v", err)
 	}
-	if result.ConfigPath == "" || result.StatePath == "" || result.IgnorePath == "" {
+	if result.ConfigPath == "" || result.IgnorePath == "" {
 		t.Fatalf("InitWorkspace() returned incomplete paths: %+v", result)
 	}
 	if len(result.Templates) != 3 {
 		t.Fatalf("len(Templates) = %d, want 3", len(result.Templates))
 	}
+	for _, path := range result.Templates {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("generated template %q: %v", path, err)
+		}
+	}
+	assertPathDoesNotExist(t, filepath.Join(dir, ".config", "diffpal", "state"))
+	assertPathDoesNotExist(t, filepath.Join(dir, ".config", "diffpal", ".gitignore"))
 
 	cfg, err := dc.LoadConfig(dir, "", "")
 	if err != nil {
@@ -61,7 +67,6 @@ func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
 		InitOptions: InitOptions{
 			WorkingDir: dir,
 			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 		},
 		Setup:    "codex-api-key",
 		Platform: "auto",
@@ -74,6 +79,16 @@ func TestInitWizardWorkspaceWritesGitHubCIProfileConfig(t *testing.T) {
 	if result.Setup != "codex-api-key" || result.Platform != "github" || result.Profile != "ci" || result.BlockOn != "high" {
 		t.Fatalf("InitWizardWorkspace() result = %+v, want codex GitHub ci high", result)
 	}
+	if len(result.Templates) != 3 {
+		t.Fatalf("len(Templates) = %d, want 3", len(result.Templates))
+	}
+	for _, path := range result.Templates {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("generated template %q: %v", path, err)
+		}
+	}
+	assertPathDoesNotExist(t, filepath.Join(dir, ".config", "diffpal", "state"))
+	assertPathDoesNotExist(t, filepath.Join(dir, ".config", "diffpal", ".gitignore"))
 
 	renderedBytes, err := os.ReadFile(result.ConfigPath)
 	if err != nil {
@@ -137,6 +152,34 @@ func TestInitWizardWorkspacePreservesExistingConfigWithoutForce(t *testing.T) {
 	if string(gotBytes) != original {
 		t.Fatalf("wizard overwrote existing config without force:\n%s", gotBytes)
 	}
+}
+
+func TestInitWorkspacePreservesExistingStateFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, ".config", "diffpal")
+	statePath := filepath.Join(configDir, "state", "cache.db")
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, []byte("existing state\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configIgnorePath := filepath.Join(configDir, ".gitignore")
+	if err := os.WriteFile(configIgnorePath, []byte("custom entry\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := InitWorkspace(InitOptions{
+		WorkingDir: dir,
+		Force:      true,
+	}, []string{"codex-acp"}); err != nil {
+		t.Fatalf("InitWorkspace() error = %v", err)
+	}
+
+	assertFileContent(t, statePath, "existing state\n")
+	assertFileContent(t, configIgnorePath, "custom entry\n")
 }
 
 func TestComposeWizardConfigUsesSetupRecipes(t *testing.T) {
@@ -236,7 +279,6 @@ func TestInitWizardWorkspaceWritesOpenCodeConfig(t *testing.T) {
 		InitOptions: InitOptions{
 			WorkingDir: dir,
 			ConfigPath: filepath.Join(dir, ".config", "diffpal", "config.yaml"),
-			StatePath:  filepath.Join(dir, ".config", "diffpal", "state"),
 		},
 		Setup:    "opencode-acp",
 		Platform: "github",
@@ -366,14 +408,11 @@ func TestConfigTemplatesUseDirectEnvsubstValues(t *testing.T) {
 	}
 }
 
-func TestComposeConfigWritesDiffpalArtifactsIgnore(t *testing.T) {
+func TestDefaultIgnoreIncludesDiffpalArtifacts(t *testing.T) {
 	t.Parallel()
 
 	if !strings.Contains(defaultIgnore, ".artifacts/") {
 		t.Fatalf("defaultIgnore missing .artifacts entry:\n%s", defaultIgnore)
-	}
-	if strings.TrimSpace(defaultConfigGitignore) != "state/" {
-		t.Fatalf("defaultConfigGitignore = %q, want only state/", defaultConfigGitignore)
 	}
 }
 
@@ -408,5 +447,25 @@ func TestSelectedDefaultProviderPrefersCodex(t *testing.T) {
 	got := selectedDefaultProvider([]string{"openai-fast", "copilot-acp", "codex-acp"})
 	if got != "codex-acp" {
 		t.Fatalf("selectedDefaultProvider() = %q, want codex-acp", got)
+	}
+}
+
+func assertPathDoesNotExist(t *testing.T, path string) {
+	t.Helper()
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("os.Stat(%q) error = %v, want path not to exist", path, err)
+	}
+}
+
+func assertFileContent(t *testing.T, path, want string) {
+	t.Helper()
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("os.ReadFile(%q) error = %v", path, err)
+	}
+	if string(got) != want {
+		t.Fatalf("file %q content = %q, want %q", path, got, want)
 	}
 }

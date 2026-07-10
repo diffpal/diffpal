@@ -47,8 +47,8 @@ commands documented below.
 
 ## `diffpal init`
 
-Generates `.config/diffpal/config.yaml`, `.config/diffpal/.gitignore`,
-`.config/diffpal/templates/*`, `.config/diffpal/state/`, and `.diffpalignore`.
+Generates `.config/diffpal/config.yaml`, `.config/diffpal/templates/*`, and
+`.diffpalignore`.
 
 | Flag | Default | Allowed values |
 | --- | --- | --- |
@@ -58,7 +58,6 @@ Generates `.config/diffpal/config.yaml`, `.config/diffpal/.gitignore`,
 | `--profile` | `ci` | letters, numbers, `.`, `_`, `-` |
 | `--block-on` | `high` | `low`, `medium`, `high`, `critical` |
 | `--config` | `.config/diffpal/config.yaml` | path |
-| `--state` | `.config/diffpal/state` | path |
 | `--force` | `false` | overwrite existing files |
 
 Example:

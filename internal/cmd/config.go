@@ -18,7 +18,6 @@ func newInitCommand() *cobra.Command {
 				return err
 			}
 			configPath, _ := cmd.Flags().GetString("config")
-			statePath, _ := cmd.Flags().GetString("state")
 			force, _ := cmd.Flags().GetBool("force")
 			wizard, _ := cmd.Flags().GetBool("wizard")
 			if wizard {
@@ -30,7 +29,6 @@ func newInitCommand() *cobra.Command {
 					InitOptions: initcmd.InitOptions{
 						WorkingDir: workingDir,
 						ConfigPath: configPath,
-						StatePath:  statePath,
 						Force:      force,
 					},
 					Setup:    setup,
@@ -52,7 +50,6 @@ func newInitCommand() *cobra.Command {
 			result, err := initcmd.InitWorkspace(initcmd.InitOptions{
 				WorkingDir: workingDir,
 				ConfigPath: configPath,
-				StatePath:  statePath,
 				Force:      force,
 			}, detectedKeys)
 			if err != nil {
@@ -63,7 +60,6 @@ func newInitCommand() *cobra.Command {
 		},
 	}
 	initCmd.Flags().String("config", "", "Path to write repo config (defaults to .config/diffpal/config.yaml)")
-	initCmd.Flags().String("state", "", "State directory for local cache (defaults to .config/diffpal/state)")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files")
 	initCmd.Flags().Bool("wizard", false, "Generate first-run onboarding config")
 	initCmd.Flags().String("setup", "codex-api-key", "Wizard setup: codex-api-key, codex-subscription, copilot-github-token, opencode-acp, or generic-acp")
