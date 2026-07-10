@@ -29,5 +29,6 @@ profiles:
                 package: '@diffpal/diffpal'
                 registry: https://registry.npmjs.org
                 access: public
-                publish-auth: token
+                publish-auth: trusted
+                repository-url: git+https://github.com/diffpal/diffpal.git
                 include-readme: true

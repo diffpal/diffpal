@@ -8,13 +8,17 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     permissions:
+      attestations: write
       contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 20
       - name: Set release version
@@ -25,6 +29,10 @@ jobs:
             exit 1
           fi
           echo "OMNIDIST_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Verify tag commit is on main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Install omnidist
         run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Build artifacts
@@ -35,15 +43,19 @@ jobs:
         run: node ./tools/omnidist/normalize-npm-bin.js
       - name: Verify artifacts
         run: node ./tools/omnidist/node_modules/@omnidist/omnidist/omnidist.js --profile default npm verify
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: .omnidist/default/dist/**/*
       - name: Pack staged artifacts
         run: tar -czf omnidist-staged.tgz .omnidist/default
       - name: Upload staged artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: omnidist-staged
           path: omnidist-staged.tgz
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist
           path: .omnidist/default/dist/**/*
@@ -54,20 +66,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     env:
-      NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-      NPM_CONFIG_PROVENANCE: "false"
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
       - name: Install omnidist
         run: npm ci --prefix tools/omnidist --ignore-scripts
       - name: Download staged artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: omnidist-staged
       - name: Restore staged artifacts
@@ -84,7 +95,7 @@ jobs:
       contents: write
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: .omnidist/default/dist
@@ -112,7 +123,7 @@ jobs:
           find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum -- > checksums.tmp
           mv checksums.tmp checksums.txt
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             release-assets/*
