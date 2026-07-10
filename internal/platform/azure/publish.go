@@ -405,9 +405,19 @@ func LoadExistingState(path string) (map[string]string, error) {
 		}
 		return nil, err
 	}
-	var plan ThreadPlan
-	if err := json.Unmarshal(raw, &plan); err != nil {
+	var payload struct {
+		Threads ThreadPlan `json:"threads"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, err
+	}
+	plan := payload.Threads
+	if len(plan.State) == 0 {
+		// Accept the original top-level plan shape for callers that persist a
+		// ThreadPlan directly.
+		if err := json.Unmarshal(raw, &plan); err != nil {
+			return nil, err
+		}
 	}
 	if len(plan.State) == 0 {
 		return nil, nil

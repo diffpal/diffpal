@@ -25,7 +25,7 @@ func WriteBundle(path string, bundle FindingsBundle, repo string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, raw, 0o644)
+	return writeArtifact(path, raw)
 }
 
 func ReadBundle(path string) (FindingsBundle, error) {
@@ -52,7 +52,10 @@ func EnsurePath(path string) error {
 	if dir == "." {
 		return nil
 	}
-	return os.MkdirAll(dir, 0o755)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return os.Chmod(dir, 0o700)
 }
 
 func ensureVersion(v string) string {
@@ -69,7 +72,41 @@ func WriteStringBundle(path string, payload string) error {
 	if err := EnsurePath(path); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(payload), 0o644)
+	return writeArtifact(path, []byte(payload))
+}
+
+func writeArtifact(path string, payload []byte) (err error) {
+	dir := filepath.Dir(path)
+	if dir == "" {
+		dir = "."
+	}
+	tmp, err := os.CreateTemp(dir, ".diffpal-artifact-*")
+	if err != nil {
+		return fmt.Errorf("create temporary artifact: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		if err != nil {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if err = tmp.Chmod(0o600); err != nil {
+		return fmt.Errorf("set artifact permissions: %w", err)
+	}
+	if _, err = tmp.Write(payload); err != nil {
+		return fmt.Errorf("write artifact: %w", err)
+	}
+	if err = tmp.Sync(); err != nil {
+		return fmt.Errorf("sync artifact: %w", err)
+	}
+	if err = tmp.Close(); err != nil {
+		return fmt.Errorf("close artifact: %w", err)
+	}
+	if err = os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("replace artifact: %w", err)
+	}
+	return nil
 }
 
 func FormatBundle(bundle FindingsBundle, repo string) ([]byte, error) {

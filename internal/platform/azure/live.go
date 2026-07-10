@@ -2,12 +2,14 @@ package azure
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/diffpal/diffpal/internal/platformapi"
 	azuredevops "github.com/microsoft/azure-devops-go-api/azuredevops/v7"
 	azgit "github.com/microsoft/azure-devops-go-api/azuredevops/v7/git"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/v7/identity"
@@ -20,8 +22,11 @@ type gateVoteClient interface {
 
 type threadGitClient interface {
 	CreateThread(context.Context, azgit.CreateThreadArgs) (*azgit.GitPullRequestCommentThread, error)
+	GetThreads(context.Context, azgit.GetThreadsArgs) (*[]azgit.GitPullRequestCommentThread, error)
 	GetPullRequestIterations(context.Context, azgit.GetPullRequestIterationsArgs) (*[]azgit.GitPullRequestIteration, error)
 	GetPullRequestIterationChanges(context.Context, azgit.GetPullRequestIterationChangesArgs) (*azgit.GitPullRequestIterationChanges, error)
+	UpdateComment(context.Context, azgit.UpdateCommentArgs) (*azgit.Comment, error)
+	UpdateThread(context.Context, azgit.UpdateThreadArgs) (*azgit.GitPullRequestCommentThread, error)
 }
 
 type pullRequestChangeRef struct {
@@ -45,18 +50,49 @@ func PublishThreads(ctx context.Context, tokenMode, token string, reviewCtx Cont
 }
 
 func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, args gitClientArgs, plan ThreadPlan) error {
-	var targets map[string]resolvedThreadTarget
-	if needsAzureThreadTargets(plan.Actions) {
-		iterationID, changes, err := listPullRequestIterationChanges(ctx, gitClient, args)
-		if err != nil {
-			return err
-		}
-		targets = resolveThreadTargets(plan.Actions, iterationID, changes)
+	existing, err := existingFindingThreads(ctx, gitClient, args)
+	if err != nil {
+		return fmt.Errorf("list Azure finding threads: %w", err)
 	}
+	desired := make(map[string]struct{}, len(plan.Actions))
+	createActions := make([]ThreadAction, 0, len(plan.Actions))
 	for _, action := range plan.Actions {
 		if action.Type == ActionSkip {
 			continue
 		}
+		location := azureActionLocation(action)
+		desired[location] = struct{}{}
+		body := strings.TrimSpace(action.Body) + "\n" + azureFindingMarker(action) + "\n"
+		if prior, ok := existing[location]; ok {
+			if prior.FindingID == action.FindingID && strings.TrimSpace(prior.Body) == strings.TrimSpace(body) && prior.Status == action.Status {
+				continue
+			}
+			if err := updateFindingThread(ctx, gitClient, args, prior, body, action.Status); err != nil {
+				return err
+			}
+			continue
+		}
+		action.Body = body
+		createActions = append(createActions, action)
+	}
+	for location, prior := range existing {
+		if _, ok := desired[location]; ok || prior.Status == ThreadStatusClosed {
+			continue
+		}
+		if err := updateFindingThreadStatus(ctx, gitClient, args, prior.ThreadID, ThreadStatusClosed); err != nil {
+			return err
+		}
+	}
+
+	var targets map[string]resolvedThreadTarget
+	if needsAzureThreadTargets(createActions) {
+		iterationID, changes, err := listPullRequestIterationChanges(ctx, gitClient, args)
+		if err != nil {
+			return err
+		}
+		targets = resolveThreadTargets(createActions, iterationID, changes)
+	}
+	for _, action := range createActions {
 		payload := threadPayload(action.Body, action.Status, action.Path, action.Line, action.EndLine)
 		if hasCanonicalAzureThreadLocation(action.Path, action.Line) {
 			target, ok := targets[action.ThreadID]
@@ -75,6 +111,132 @@ func publishThreadsWithClient(ctx context.Context, gitClient threadGitClient, ar
 		}
 	}
 	return nil
+}
+
+type existingFindingThread struct {
+	ThreadID  int
+	CommentID int
+	FindingID string
+	Body      string
+	Status    ThreadStatus
+}
+
+func existingFindingThreads(ctx context.Context, gitClient threadGitClient, args gitClientArgs) (map[string]existingFindingThread, error) {
+	threads, err := gitClient.GetThreads(ctx, azgit.GetThreadsArgs{
+		RepositoryId:  args.RepositoryID,
+		PullRequestId: args.PullRequestID,
+		Project:       args.Project,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]existingFindingThread{}
+	if threads == nil {
+		return out, nil
+	}
+	for _, thread := range *threads {
+		if thread.Id == nil || thread.Comments == nil {
+			continue
+		}
+		for _, comment := range *thread.Comments {
+			if comment.Id == nil || comment.Content == nil {
+				continue
+			}
+			findingID, location := azureFindingMarkerValues(*comment.Content)
+			if findingID == "" || location == "" {
+				continue
+			}
+			out[location] = existingFindingThread{
+				ThreadID:  *thread.Id,
+				CommentID: *comment.Id,
+				FindingID: findingID,
+				Body:      *comment.Content,
+				Status:    azureThreadStatus(thread.Status),
+			}
+			break
+		}
+	}
+	return out, nil
+}
+
+func updateFindingThread(ctx context.Context, gitClient threadGitClient, args gitClientArgs, prior existingFindingThread, body string, status ThreadStatus) error {
+	if _, err := gitClient.UpdateComment(ctx, azgit.UpdateCommentArgs{
+		Comment:       &azgit.Comment{Content: &body},
+		RepositoryId:  args.RepositoryID,
+		PullRequestId: args.PullRequestID,
+		ThreadId:      &prior.ThreadID,
+		CommentId:     &prior.CommentID,
+		Project:       args.Project,
+	}); err != nil {
+		return fmt.Errorf("update Azure finding comment: %w", err)
+	}
+	return updateFindingThreadStatus(ctx, gitClient, args, prior.ThreadID, status)
+}
+
+func updateFindingThreadStatus(ctx context.Context, gitClient threadGitClient, args gitClientArgs, threadID int, status ThreadStatus) error {
+	if _, err := gitClient.UpdateThread(ctx, azgit.UpdateThreadArgs{
+		CommentThread: threadStatusPayload(status),
+		RepositoryId:  args.RepositoryID,
+		PullRequestId: args.PullRequestID,
+		ThreadId:      &threadID,
+		Project:       args.Project,
+	}); err != nil {
+		return fmt.Errorf("update Azure finding thread: %w", err)
+	}
+	return nil
+}
+
+func azureActionLocation(action ThreadAction) string {
+	if action.FindingID != "" {
+		if location := strings.TrimSuffix(action.ThreadID, ":"+action.FindingID); location != action.ThreadID {
+			return location
+		}
+	}
+	return action.ThreadID
+}
+
+func azureFindingMarker(action ThreadAction) string {
+	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(action.FindingID))
+	location := base64.RawURLEncoding.EncodeToString([]byte(azureActionLocation(action)))
+	return "<!-- diffpal:finding id:" + id + " loc:" + location + " -->"
+}
+
+func azureFindingMarkerValues(body string) (string, string) {
+	const prefix = "<!-- diffpal:finding "
+	idx := strings.Index(body, prefix)
+	if idx < 0 {
+		return "", ""
+	}
+	end := strings.Index(body[idx:], "-->")
+	if end < 0 {
+		return "", ""
+	}
+	marker := strings.TrimSuffix(strings.TrimPrefix(body[idx:idx+end+3], "<!--"), "-->")
+	var findingID, encodedLocation string
+	for _, part := range strings.Fields(marker) {
+		key, value, ok := strings.Cut(part, ":")
+		if !ok {
+			continue
+		}
+		switch key {
+		case "id":
+			findingID = value
+		case "loc":
+			encodedLocation = value
+		}
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(encodedLocation)
+	if err != nil {
+		return "", ""
+	}
+	return findingID, string(decoded)
+}
+
+func azureThreadStatus(status *azgit.CommentThreadStatus) ThreadStatus {
+	if status != nil && *status == azgit.CommentThreadStatusValues.Closed {
+		return ThreadStatusClosed
+	}
+	return ThreadStatusActive
 }
 
 func needsAzureThreadTargets(actions []ThreadAction) bool {
@@ -193,7 +355,7 @@ type gitClientArgs struct {
 	Project       *string
 }
 
-func newGitClient(ctx context.Context, tokenMode, token string, reviewCtx Context, client *http.Client) (azgit.Client, gitClientArgs, error) {
+func newGitClient(_ context.Context, tokenMode, token string, reviewCtx Context, client *http.Client) (azgit.Client, gitClientArgs, error) {
 	if strings.TrimSpace(reviewCtx.CollectionURI) == "" || strings.TrimSpace(reviewCtx.ProjectName) == "" || strings.TrimSpace(reviewCtx.RepositoryID) == "" || strings.TrimSpace(reviewCtx.PullRequestID) == "" {
 		return nil, gitClientArgs{}, fmt.Errorf("missing Azure DevOps collection/project/repository/pull request context")
 	}
@@ -202,18 +364,7 @@ func newGitClient(ctx context.Context, tokenMode, token string, reviewCtx Contex
 		return nil, gitClientArgs{}, fmt.Errorf("invalid Azure DevOps pull request id %q: %w", reviewCtx.PullRequestID, err)
 	}
 	connection := azureConnection(reviewCtx.CollectionURI, tokenMode, token)
-	if client == nil {
-		gitClient, err := azgit.NewClient(ctx, connection)
-		if err != nil {
-			return nil, gitClientArgs{}, err
-		}
-		return gitClient, gitClientArgs{
-			RepositoryID:  &reviewCtx.RepositoryID,
-			PullRequestID: &prID,
-			Project:       &reviewCtx.ProjectName,
-		}, nil
-	}
-	sdkClient := azuredevops.NewClientWithOptions(connection, connection.BaseUrl, azuredevops.WithHTTPClient(client))
+	sdkClient := azuredevops.NewClientWithOptions(connection, connection.BaseUrl, azuredevops.WithHTTPClient(platformapi.DefaultClient(client)))
 	gitClient := &azgit.ClientImpl{
 		Client: *sdkClient,
 	}
@@ -224,12 +375,9 @@ func newGitClient(ctx context.Context, tokenMode, token string, reviewCtx Contex
 	}, nil
 }
 
-func newLocationClient(ctx context.Context, tokenMode, token string, reviewCtx Context, client *http.Client) location.Client {
+func newLocationClient(_ context.Context, tokenMode, token string, reviewCtx Context, client *http.Client) location.Client {
 	connection := azureConnection(reviewCtx.CollectionURI, tokenMode, token)
-	if client == nil {
-		return location.NewClient(ctx, connection)
-	}
-	sdkClient := azuredevops.NewClientWithOptions(connection, connection.BaseUrl, azuredevops.WithHTTPClient(client))
+	sdkClient := azuredevops.NewClientWithOptions(connection, connection.BaseUrl, azuredevops.WithHTTPClient(platformapi.DefaultClient(client)))
 	return &location.ClientImpl{
 		Client: *sdkClient,
 	}

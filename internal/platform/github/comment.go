@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ const (
 type CommentAction struct {
 	Type      CommentActionType
 	FindingID string
+	Category  string
 	Body      string
 	Path      string
 	Line      int
@@ -74,7 +76,7 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		}
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
-			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Category: f.Category, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		prior, ok := existing[key]
@@ -82,14 +84,14 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
 		}
 		if ok && prior == f.ID {
-			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Category: f.Category, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
 		if ok {
-			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Category: f.Category, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 			continue
 		}
-		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Category: f.Category, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
 	}
 	return CommentPlan{
 		Actions: out,
@@ -174,10 +176,11 @@ func linkForFinding(provider markdown.FindingLinkProvider, finding findings.Find
 	return link
 }
 
-func findingMarker(identity ReviewIdentity, findingID string) string {
-	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(findingID))
+func findingMarker(identity ReviewIdentity, action CommentAction) string {
+	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(action.FindingID))
 	if id == "" {
 		return ""
 	}
-	return "<!-- diffpal:finding:" + identity.channel() + " id:" + id + " -->"
+	location := base64.RawURLEncoding.EncodeToString([]byte(commentLocationKey(action.Path, action.Line, action.Category)))
+	return "<!-- diffpal:finding:" + identity.channel() + " id:" + id + " loc:" + location + " -->"
 }

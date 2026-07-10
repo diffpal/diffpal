@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +23,7 @@ func TestCollectResolvesRefsAndParsesRename(t *testing.T) {
 	runGitCmd(t, repo, "commit", "-am", "rename")
 	head := strings.TrimSpace(runGitCmd(t, repo, "rev-parse", "HEAD"))
 
-	result, err := Collect(Options{
+	result, err := Collect(context.Background(), Options{
 		BaseSHA: "HEAD~1",
 		HeadSHA: "HEAD",
 		WorkDir: repo,
@@ -67,7 +68,7 @@ func TestCollectDefaultsHeadToHEAD(t *testing.T) {
 	head := strings.TrimSpace(runGitCmd(t, repo, "rev-parse", "HEAD"))
 
 	writeFile(t, filepath.Join(repo, "a.txt"), "changed\n")
-	result, err := Collect(Options{WorkDir: repo})
+	result, err := Collect(context.Background(), Options{WorkDir: repo})
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
@@ -91,7 +92,7 @@ func TestCollectMarksDeletedFiles(t *testing.T) {
 		t.Fatalf("Remove() error = %v", err)
 	}
 
-	result, err := Collect(Options{WorkDir: repo})
+	result, err := Collect(context.Background(), Options{WorkDir: repo})
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
@@ -103,6 +104,40 @@ func TestCollectMarksDeletedFiles(t *testing.T) {
 	}
 	if result.Files[0].ToPath != "/dev/null" {
 		t.Fatalf("ToPath = %q, want /dev/null", result.Files[0].ToPath)
+	}
+}
+
+func TestCollectHandlesLongLinesAndQuotedPaths(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	name := "space ü.txt"
+	writeFile(t, filepath.Join(repo, name), "short\n")
+	runGitCmd(t, repo, "add", name)
+	runGitCmd(t, repo, "commit", "-m", "initial")
+
+	writeFile(t, filepath.Join(repo, name), strings.Repeat("x", 70<<10)+"\n")
+	result, err := Collect(context.Background(), Options{WorkDir: repo})
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(result.Files) != 1 {
+		t.Fatalf("len(Files) = %d, want 1", len(result.Files))
+	}
+	if result.Files[0].FromPath != name || result.Files[0].ToPath != name {
+		t.Fatalf("file paths = %q -> %q, want %q", result.Files[0].FromPath, result.Files[0].ToPath, name)
+	}
+}
+
+func TestCollectRespectsCancellation(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := Collect(ctx, Options{WorkDir: repo, HeadSHA: "HEAD"})
+	if err == nil {
+		t.Fatal("Collect() error = nil, want cancellation")
 	}
 }
 

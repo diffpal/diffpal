@@ -260,24 +260,39 @@ func TestPlanThreadsKeepsLineRange(t *testing.T) {
 func TestLoadExistingStateReadsPriorThreadPlan(t *testing.T) {
 	t.Parallel()
 
-	path := filepath.Join(t.TempDir(), "threads.json")
-	raw := []byte(`{
+	for name, raw := range map[string]string{
+		"top-level": `{
   "actions": [],
   "state": [
     {"thread_id":"a.go:10:rule-a","finding_id":"fp-a","finding_ids":["fp-a"],"status":"active"}
   ],
   "comparison": {"pull_request_id":"11","base_sha":"b","head_sha":"h"}
-}`)
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
+		}`,
+		"published-envelope": `{
+  "threads": {
+    "actions": [],
+    "state": [
+      {"thread_id":"a.go:10:rule-a","finding_id":"fp-a","finding_ids":["fp-a"],"status":"active"}
+    ],
+    "comparison": {"pull_request_id":"11","base_sha":"b","head_sha":"h"}
+  }
+}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "threads.json")
+			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
 
-	state, err := LoadExistingState(path)
-	if err != nil {
-		t.Fatalf("LoadExistingState() error = %v", err)
-	}
-	if state["a.go:10:rule-a"] != "fp-a|active" {
-		t.Fatalf("unexpected state map: %#v", state)
+			state, err := LoadExistingState(path)
+			if err != nil {
+				t.Fatalf("LoadExistingState() error = %v", err)
+			}
+			if state["a.go:10:rule-a"] != "fp-a|active" {
+				t.Fatalf("unexpected state map: %#v", state)
+			}
+		})
 	}
 }
 

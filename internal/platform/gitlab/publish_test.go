@@ -138,23 +138,38 @@ func TestPlanDiscussionsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testin
 func TestLoadExistingStateReadsPriorDiscussionPlan(t *testing.T) {
 	t.Parallel()
 
-	path := filepath.Join(t.TempDir(), "discussions.json")
-	raw := []byte(`{
+	for name, raw := range map[string]string{
+		"top-level": `{
   "actions": [],
   "state": [
     {"thread_hash":"a.go:10:rule-a","finding_id":"fp-a"}
   ]
-}`)
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
+		}`,
+		"published-envelope": `{
+  "decision": "warn",
+  "plan": {
+    "actions": [],
+    "state": [
+      {"thread_hash":"a.go:10:rule-a","finding_id":"fp-a"}
+    ]
+  }
+}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "discussions.json")
+			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
 
-	state, err := LoadExistingState(path)
-	if err != nil {
-		t.Fatalf("LoadExistingState() error = %v", err)
-	}
-	if state["a.go:10:rule-a"] != "fp-a" {
-		t.Fatalf("unexpected state map: %#v", state)
+			state, err := LoadExistingState(path)
+			if err != nil {
+				t.Fatalf("LoadExistingState() error = %v", err)
+			}
+			if state["a.go:10:rule-a"] != "fp-a" {
+				t.Fatalf("unexpected state map: %#v", state)
+			}
+		})
 	}
 }
 
@@ -233,6 +248,24 @@ func TestPolicyStatus(t *testing.T) {
 	advisory := PolicyStatus(0, 1, true, "")
 	if advisory.State != "success" || !strings.Contains(advisory.Description, "Advisory findings") {
 		t.Fatalf("advisory status = %+v, want success advisory description", advisory)
+	}
+}
+
+func TestFindingMarkerRoundTripsLogicalLocation(t *testing.T) {
+	t.Parallel()
+
+	action := DiscussionAction{
+		FindingID:  "fp-a",
+		Path:       "internal/app.go",
+		Line:       12,
+		ThreadHash: discussionKey("internal/app.go", 12, "security", "fp-a"),
+	}
+	findingID, location := findingMarkerValues("body\n" + findingMarker(action))
+	if findingID != action.FindingID {
+		t.Fatalf("finding ID = %q, want %q", findingID, action.FindingID)
+	}
+	if want := discussionLocationKey("internal/app.go", 12, "security"); location != want {
+		t.Fatalf("location = %q, want %q", location, want)
 	}
 }
 

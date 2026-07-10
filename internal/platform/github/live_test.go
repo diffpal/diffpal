@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/diffpal/diffpal/internal/findings"
@@ -85,7 +86,7 @@ func TestPublishPullRequestReviewCreatesReviewWithInlineComments(t *testing.T) {
 	if posted.Comments[0].Path != "internal/app.go" || posted.Comments[0].Line != 12 || posted.Comments[0].Side != "RIGHT" {
 		t.Fatalf("unexpected review comment: %#v", posted.Comments[0])
 	}
-	if !strings.Contains(posted.Comments[0].Body, "<!-- diffpal:finding:diffpal-dev id:fp-1 -->") {
+	if !strings.Contains(posted.Comments[0].Body, "<!-- diffpal:finding:diffpal-dev id:fp-1 loc:") {
 		t.Fatalf("review comment missing finding marker:\n%s", posted.Comments[0].Body)
 	}
 }
@@ -281,7 +282,7 @@ func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
 
-	state := ActiveReviewThreadState(context.Background(), "token", Context{
+	state, err := ActiveReviewThreadState(context.Background(), "token", Context{
 		Repo:     "acme/diffpal",
 		PRNumber: 7,
 	}, ReviewIdentity{Channel: "diffpal-dev"}, []findings.Finding{{
@@ -295,6 +296,9 @@ func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
 		StartLine: 24,
 		Category:  "security",
 	}}, server.Client())
+	if err != nil {
+		t.Fatalf("ActiveReviewThreadState() error = %v", err)
+	}
 	select {
 	case err := <-handlerErrs:
 		t.Fatal(err)
@@ -303,6 +307,61 @@ func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
 	wantKey := commentKey("internal/app.go", 12, "security", "current-finding")
 	if len(state) != 1 || state[wantKey] != "current-finding" {
 		t.Fatalf("state = %#v, want only active current finding", state)
+	}
+}
+
+func TestActiveReviewThreadStateResolvesChangedLocation(t *testing.T) {
+	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
+	var mutationCalls atomic.Int32
+	current := CommentAction{
+		FindingID: "new-finding",
+		Category:  "security",
+		Path:      "internal/app.go",
+		Line:      12,
+	}
+	old := current
+	old.FindingID = "old-finding"
+	oldMarker := findingMarker(ReviewIdentity{Channel: "diffpal-dev"}, old)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Query string `json:"query"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(payload.Query, "resolveReviewThread") {
+			mutationCalls.Add(1)
+			_, _ = w.Write([]byte(`{"data":{"resolveReviewThread":{"thread":{"id":"old-thread","isResolved":true}}}}`))
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{
+  "data":{"repository":{"pullRequest":{"reviewThreads":{
+    "nodes":[{"id":"old-thread","isResolved":false,"comments":{"nodes":[{"body":%q}]}}],
+    "pageInfo":{"hasNextPage":false,"endCursor":""}
+  }}}}
+}`, "old body\n"+oldMarker)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("DIFFPAL_GITHUB_API_URL", server.URL)
+
+	state, err := ActiveReviewThreadState(context.Background(), "token", Context{
+		Repo:     "acme/diffpal",
+		PRNumber: 7,
+	}, ReviewIdentity{Channel: "diffpal-dev"}, []findings.Finding{{
+		ID:        current.FindingID,
+		Path:      current.Path,
+		StartLine: current.Line,
+		Category:  current.Category,
+	}}, server.Client())
+	if err != nil {
+		t.Fatalf("ActiveReviewThreadState() error = %v", err)
+	}
+	if len(state) != 0 {
+		t.Fatalf("state = %#v, want changed finding to be republished", state)
+	}
+	if mutationCalls.Load() != 1 {
+		t.Fatalf("resolve mutation calls = %d, want 1", mutationCalls.Load())
 	}
 }
 

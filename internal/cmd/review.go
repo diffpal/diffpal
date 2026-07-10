@@ -497,7 +497,10 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 					if err := github.ValidateInlineFindings(inlineFindings); err != nil {
 						return err
 					}
-					existing := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
+					existing, err := github.ActiveReviewThreadState(ctx, token, reviewCtx, identity, inlineFindings, nil)
+					if err != nil {
+						return err
+					}
 					plan = github.PlanInlineCommentsWithOptions(existing, inlineFindings, github.CommentOptions{
 						AllFindings: true,
 					})
@@ -544,11 +547,7 @@ func publishBundleToAPI(ctx context.Context, auth platformauth.Resolved, platfor
 		if err != nil {
 			return err
 		}
-		existing, err := azure.LoadExistingState(defaultSurfaceOutput(platform, "threads"))
-		if err != nil {
-			return err
-		}
-		plan := azure.PlanThreads(existing, bundle.Findings, reviewCtx)
+		plan := azure.PlanThreads(nil, bundle.Findings, reviewCtx)
 		blocking := countBlockingFindings(bundle)
 		status := azure.PolicyStatus(azure.PolicyContext{BlockOn: blockOn, GateEnabled: gateEnabled, FatalOnFailures: true}, blocking, len(bundle.Findings)-blocking, false)
 		return auth.WithToken(func(token string) error {

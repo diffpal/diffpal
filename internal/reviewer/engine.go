@@ -117,7 +117,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		}
 		workingDir = cwd
 	}
-	result, err := diff.Collect(diff.Options{
+	result, err := diff.Collect(ctx, diff.Options{
 		BaseSHA: opts.BaseSHA,
 		HeadSHA: opts.HeadSHA,
 		WorkDir: workingDir,
@@ -153,7 +153,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		instructions = cfg.ReviewInstructions()
 	}
 	filtered := filterFilesWithReviewPath(result.Files)
-	commitMessages, err := collectCommitMessages(workingDir, result.BaseSHA, result.HeadSHA)
+	commitMessages, err := collectCommitMessages(ctx, workingDir, result.BaseSHA, result.HeadSHA)
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
 	}
@@ -358,11 +358,11 @@ func reviewInputFromChanges(reviewID, repo, baseSHA, headSHA, blockOn, language 
 	}
 }
 
-func collectCommitMessages(workingDir, baseSHA, headSHA string) ([]string, error) {
+func collectCommitMessages(ctx context.Context, workingDir, baseSHA, headSHA string) ([]string, error) {
 	if strings.TrimSpace(baseSHA) == "" || strings.TrimSpace(headSHA) == "" {
 		return nil, nil
 	}
-	cmd := exec.Command("git", "log", "--format=%s", "--max-count=20", fmt.Sprintf("%s..%s", baseSHA, headSHA))
+	cmd := exec.CommandContext(ctx, "git", "log", "--format=%s", "--max-count=20", fmt.Sprintf("%s..%s", baseSHA, headSHA))
 	cmd.Dir = workingDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -533,6 +533,7 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 			continue
 		}
 		seen[fp] = struct{}{}
+		item.ID = fp
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {

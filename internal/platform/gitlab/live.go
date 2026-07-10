@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/diffpal/diffpal/internal/platformapi"
 	gl "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -32,11 +34,24 @@ func PublishDiscussions(ctx context.Context, tokenMode, token string, reviewCtx 
 	if err != nil {
 		return err
 	}
+	used := map[string]struct{}{}
 	for _, action := range plan.Actions {
 		if strings.TrimSpace(action.Body) == "" {
 			continue
 		}
-		if err := publishFindingDiscussion(ctx, gitlabClient, reviewCtx, mrIID, action, positions, existing); err != nil {
+		discussionID, err := publishFindingDiscussion(ctx, gitlabClient, reviewCtx, mrIID, action, positions, existing)
+		if err != nil {
+			return err
+		}
+		if discussionID != "" {
+			used[discussionID] = struct{}{}
+		}
+	}
+	for _, prior := range existing {
+		if _, ok := used[prior.DiscussionID]; ok || prior.Resolved {
+			continue
+		}
+		if err := setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, prior.DiscussionID, true); err != nil {
 			return err
 		}
 	}
@@ -103,22 +118,28 @@ type existingDiscussion struct {
 	NoteID       int64
 	FindingID    string
 	Resolved     bool
+	Location     string
 }
 
-func publishFindingDiscussion(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, action DiscussionAction, positions map[string]gl.PositionOptions, existing map[string]existingDiscussion) error {
-	body := action.Body + "\n" + findingMarker(action.FindingID) + "\n"
+func publishFindingDiscussion(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, action DiscussionAction, positions map[string]gl.PositionOptions, existing map[string]existingDiscussion) (string, error) {
+	body := action.Body + "\n" + findingMarker(action) + "\n"
 	key := discussionKey(action.Path, action.Line, "", action.FindingID)
-	if found, ok := existing[action.FindingID]; ok {
+	location := discussionActionLocation(action)
+	found, ok := existing[location]
+	if !ok {
+		found, ok = existing["id:"+action.FindingID]
+	}
+	if ok {
 		if strings.TrimSpace(found.DiscussionID) == "" || found.NoteID <= 0 {
-			return nil
+			return "", nil
 		}
 		_, _, err := gitlabClient.Discussions.UpdateMergeRequestDiscussionNote(reviewCtx.Repo, mrIID, found.DiscussionID, found.NoteID, &gl.UpdateMergeRequestDiscussionNoteOptions{
 			Body: &body,
 		}, gl.WithContext(ctx))
 		if err != nil {
-			return err
+			return "", err
 		}
-		return setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, found.DiscussionID, action.Resolved)
+		return found.DiscussionID, setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, found.DiscussionID, action.Resolved)
 	}
 	position, ok := positions[positionKey(action.Path, action.Line)]
 	if !ok {
@@ -129,25 +150,25 @@ func publishFindingDiscussion(ctx context.Context, gitlabClient *gl.Client, revi
 		Position: &position,
 	}, gl.WithContext(ctx))
 	if err != nil {
-		return fmt.Errorf("create GitLab discussion for %s: %w", key, err)
+		return "", fmt.Errorf("create GitLab discussion for %s: %w", key, err)
 	}
 	if discussion == nil || discussion.ID == "" {
-		return nil
+		return "", nil
 	}
-	return setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, discussion.ID, action.Resolved)
+	return discussion.ID, setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, discussion.ID, action.Resolved)
 }
 
-func publishFallbackFinding(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, body string, resolved bool) error {
+func publishFallbackFinding(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, body string, resolved bool) (string, error) {
 	discussion, _, err := gitlabClient.Discussions.CreateMergeRequestDiscussion(reviewCtx.Repo, mrIID, &gl.CreateMergeRequestDiscussionOptions{
 		Body: &body,
 	}, gl.WithContext(ctx))
 	if err != nil {
-		return err
+		return "", err
 	}
 	if discussion == nil || discussion.ID == "" {
-		return nil
+		return "", nil
 	}
-	return setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, discussion.ID, resolved)
+	return discussion.ID, setDiscussionResolved(ctx, gitlabClient, reviewCtx, mrIID, discussion.ID, resolved)
 }
 
 func setDiscussionResolved(ctx context.Context, gitlabClient *gl.Client, reviewCtx Context, mrIID int64, discussionID string, resolved bool) error {
@@ -273,15 +294,19 @@ func activeDiscussionState(ctx context.Context, gitlabClient *gl.Client, reviewC
 				if note == nil {
 					continue
 				}
-				findingID := findingIDFromMarker(note.Body)
+				findingID, location := findingMarkerValues(note.Body)
 				if findingID == "" {
 					continue
 				}
-				out[findingID] = existingDiscussion{
+				if location == "" {
+					location = "id:" + findingID
+				}
+				out[location] = existingDiscussion{
 					DiscussionID: discussion.ID,
 					NoteID:       note.ID,
 					FindingID:    findingID,
 					Resolved:     note.Resolved,
+					Location:     location,
 				}
 			}
 		}
@@ -316,32 +341,56 @@ func findSummaryDiscussion(ctx context.Context, gitlabClient *gl.Client, reviewC
 	}
 }
 
-func findingMarker(findingID string) string {
-	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(findingID))
+func findingMarker(action DiscussionAction) string {
+	id := strings.NewReplacer("--", "-", "\n", " ", "\r", " ").Replace(strings.TrimSpace(action.FindingID))
 	if id == "" {
 		return ""
 	}
-	return "<!-- diffpal:finding id:" + id + " -->"
+	location := base64.RawURLEncoding.EncodeToString([]byte(discussionActionLocation(action)))
+	return "<!-- diffpal:finding id:" + id + " loc:" + location + " -->"
 }
 
-func findingIDFromMarker(body string) string {
+func findingMarkerValues(body string) (string, string) {
 	const prefix = "<!-- diffpal:finding "
 	idx := strings.Index(body, prefix)
 	if idx < 0 {
-		return ""
+		return "", ""
 	}
 	end := strings.Index(body[idx:], "-->")
 	if end < 0 {
-		return ""
+		return "", ""
 	}
 	marker := strings.TrimSuffix(strings.TrimPrefix(body[idx:idx+end+3], "<!--"), "-->")
+	var findingID, encodedLocation string
 	for _, part := range strings.Fields(marker) {
 		key, value, ok := strings.Cut(part, ":")
-		if ok && key == "id" {
-			return value
+		if !ok {
+			continue
+		}
+		switch key {
+		case "id":
+			findingID = value
+		case "loc":
+			encodedLocation = value
 		}
 	}
-	return ""
+	if encodedLocation == "" {
+		return findingID, ""
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(encodedLocation)
+	if err != nil {
+		return "", ""
+	}
+	return findingID, string(decoded)
+}
+
+func discussionActionLocation(action DiscussionAction) string {
+	if action.FindingID != "" {
+		if location := strings.TrimSuffix(action.ThreadHash, ":"+action.FindingID); location != action.ThreadHash {
+			return location
+		}
+	}
+	return discussionLocationKey(action.Path, action.Line, "")
 }
 
 func positionKey(path string, line int) string {
@@ -372,9 +421,7 @@ func newClient(tokenMode, token string, reviewCtx Context, client *http.Client) 
 	}
 	options := []gl.ClientOptionFunc{
 		gl.WithBaseURL(gitLabAPIBaseURL(reviewCtx)),
-	}
-	if client != nil {
-		options = append(options, gl.WithHTTPClient(client))
+		gl.WithHTTPClient(platformapi.DefaultClient(client)),
 	}
 	switch tokenMode {
 	case "ci_job_token":

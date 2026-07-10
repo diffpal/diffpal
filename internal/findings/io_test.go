@@ -4,8 +4,44 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+func TestWriteStringBundleReplacesArtifactAtomicallyWithPrivatePermissions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "nested", "artifact.json")
+	if err := WriteStringBundle(path, "first"); err != nil {
+		t.Fatalf("WriteStringBundle(first) error = %v", err)
+	}
+	if err := WriteStringBundle(path, "second"); err != nil {
+		t.Fatalf("WriteStringBundle(second) error = %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(raw) != "second" {
+		t.Fatalf("artifact = %q, want second", raw)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat() error = %v", err)
+		}
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Fatalf("artifact permissions = %o, want 600", got)
+		}
+		dirInfo, err := os.Stat(filepath.Dir(path))
+		if err != nil {
+			t.Fatalf("Stat(directory) error = %v", err)
+		}
+		if got := dirInfo.Mode().Perm(); got != 0o700 {
+			t.Fatalf("directory permissions = %o, want 700", got)
+		}
+	}
+}
 
 func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 	dir := t.TempDir()

@@ -71,7 +71,7 @@ func pullRequestReviewComments(plan CommentPlan, identity ReviewIdentity) []map[
 			continue
 		}
 		body := action.Body
-		if marker := findingMarker(identity, action.FindingID); marker != "" {
+		if marker := findingMarker(identity, action); marker != "" {
 			body += "\n" + marker
 		}
 		out = append(out, map[string]any{

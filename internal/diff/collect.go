@@ -3,11 +3,15 @@ package diff
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+const maxDiffLineBytes = 16 << 20
 
 type ChangeStatus string
 
@@ -46,17 +50,17 @@ type Options struct {
 	WorkDir string
 }
 
-func Collect(opts Options) (DiffResult, error) {
+func Collect(ctx context.Context, opts Options) (DiffResult, error) {
 	workDir := opts.WorkDir
 	if workDir == "" {
 		workDir = "."
 	}
 
-	baseSHA, err := resolveBaseRevision(workDir, opts.BaseSHA)
+	baseSHA, err := resolveBaseRevision(ctx, workDir, opts.BaseSHA)
 	if err != nil {
 		return DiffResult{}, err
 	}
-	headSHA, err := resolveHeadRevision(workDir, opts.HeadSHA)
+	headSHA, err := resolveHeadRevision(ctx, workDir, opts.HeadSHA)
 	if err != nil {
 		return DiffResult{}, err
 	}
@@ -71,12 +75,15 @@ func Collect(opts Options) (DiffResult, error) {
 		args = append(args, headSHA)
 	}
 
-	raw, err := runGit(workDir, args...)
+	raw, err := runGit(ctx, workDir, args...)
 	if err != nil {
 		return DiffResult{}, fmt.Errorf("git diff failed: %w", err)
 	}
 	raw = normalizeDiff(raw)
-	files := normalizeDiffFiles(raw)
+	files, err := normalizeDiffFiles(raw)
+	if err != nil {
+		return DiffResult{}, fmt.Errorf("parse git diff: %w", err)
+	}
 
 	return DiffResult{
 		BaseSHA:      baseSHA,
@@ -87,23 +94,21 @@ func Collect(opts Options) (DiffResult, error) {
 	}, nil
 }
 
-func normalizeDiffFiles(raw string) []FileChange {
+func normalizeDiffFiles(raw string) ([]FileChange, error) {
 	out := []FileChange{}
 	scanner := bufio.NewScanner(strings.NewReader(raw))
+	scanner.Buffer(make([]byte, 64*1024), maxDiffLineBytes)
 	var current *FileChange
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "diff --git a/") {
+		if strings.HasPrefix(line, "diff --git ") {
 			if current != nil {
 				out = append(out, *current)
 			}
-			parts := strings.Split(line, " ")
-			if len(parts) < 4 {
-				current = nil
-				continue
+			left, right, err := parseDiffHeader(line)
+			if err != nil {
+				return nil, err
 			}
-			left := trimPrefix(parts[2], "a/")
-			right := trimPrefix(parts[3], "b/")
 			change := FileChange{
 				FromPath:  filepath.Clean(left),
 				ToPath:    filepath.Clean(right),
@@ -128,12 +133,12 @@ func normalizeDiffFiles(raw string) []FileChange {
 			current.Status = ChangeDeleted
 			continue
 		case strings.HasPrefix(line, "rename from "):
-			current.FromPath = filepath.Clean(strings.TrimPrefix(line, "rename from "))
+			current.FromPath = filepath.Clean(decodeGitPath(strings.TrimPrefix(line, "rename from ")))
 			current.IsRename = true
 			current.Status = ChangeRenamed
 			continue
 		case strings.HasPrefix(line, "rename to "):
-			current.ToPath = filepath.Clean(strings.TrimPrefix(line, "rename to "))
+			current.ToPath = filepath.Clean(decodeGitPath(strings.TrimPrefix(line, "rename to ")))
 			current.IsRename = true
 			current.Status = ChangeRenamed
 			continue
@@ -157,36 +162,82 @@ func normalizeDiffFiles(raw string) []FileChange {
 	if current != nil {
 		out = append(out, *current)
 	}
-	return out
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan diff: %w", err)
+	}
+	return out, nil
 }
 
-func resolveBaseRevision(workDir string, rev string) (string, error) {
+func parseDiffHeader(line string) (string, string, error) {
+	rest := strings.TrimPrefix(line, "diff --git ")
+	left, rest, err := nextGitPath(rest)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid diff header %q: %w", line, err)
+	}
+	right, trailing, err := nextGitPath(rest)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid diff header %q: %w", line, err)
+	}
+	if strings.TrimSpace(trailing) != "" {
+		return "", "", fmt.Errorf("invalid diff header %q: unexpected trailing data", line)
+	}
+	return trimPrefix(left, "a/"), trimPrefix(right, "b/"), nil
+}
+
+func nextGitPath(value string) (string, string, error) {
+	value = strings.TrimLeft(value, " \t")
+	if value == "" {
+		return "", "", fmt.Errorf("missing path")
+	}
+	if value[0] != '"' {
+		pathValue, rest, _ := strings.Cut(value, " ")
+		return pathValue, rest, nil
+	}
+	escaped := false
+	for i := 1; i < len(value); i++ {
+		switch {
+		case escaped:
+			escaped = false
+		case value[i] == '\\':
+			escaped = true
+		case value[i] == '"':
+			decoded, err := strconv.Unquote(value[:i+1])
+			if err != nil {
+				return "", "", err
+			}
+			return decoded, value[i+1:], nil
+		}
+	}
+	return "", "", fmt.Errorf("unterminated quoted path")
+}
+
+func resolveBaseRevision(ctx context.Context, workDir string, rev string) (string, error) {
 	if strings.TrimSpace(rev) == "" {
 		return "", nil
 	}
-	return resolveRevision(workDir, rev)
+	return resolveRevision(ctx, workDir, rev)
 }
 
-func resolveHeadRevision(workDir string, rev string) (string, error) {
+func resolveHeadRevision(ctx context.Context, workDir string, rev string) (string, error) {
 	if strings.TrimSpace(rev) == "" {
-		if !insideWorkTree(workDir) {
+		if !insideWorkTree(ctx, workDir) {
 			return "", nil
 		}
-		return resolveRevision(workDir, "HEAD")
+		return resolveRevision(ctx, workDir, "HEAD")
 	}
-	return resolveRevision(workDir, rev)
+	return resolveRevision(ctx, workDir, rev)
 }
 
-func resolveRevision(workDir string, rev string) (string, error) {
-	resolved, err := runGit(workDir, "rev-parse", "--verify", rev+"^{commit}")
+func resolveRevision(ctx context.Context, workDir string, rev string) (string, error) {
+	resolved, err := runGit(ctx, workDir, "rev-parse", "--verify", rev+"^{commit}")
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", rev, err)
 	}
 	return strings.TrimSpace(resolved), nil
 }
 
-func insideWorkTree(workDir string) bool {
-	out, err := runGit(workDir, "rev-parse", "--is-inside-work-tree")
+func insideWorkTree(ctx context.Context, workDir string) bool {
+	out, err := runGit(ctx, workDir, "rev-parse", "--is-inside-work-tree")
 	if err != nil {
 		return false
 	}
@@ -263,6 +314,7 @@ func trimPrefix(v, prefix string) string {
 }
 
 func normalizePatchPath(v string) string {
+	v = decodeGitPath(v)
 	switch v {
 	case "/dev/null":
 		return v
@@ -271,8 +323,18 @@ func normalizePatchPath(v string) string {
 	}
 }
 
-func runGit(workDir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+func decodeGitPath(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, `"`) {
+		if decoded, err := strconv.Unquote(value); err == nil {
+			return decoded
+		}
+	}
+	return value
+}
+
+func runGit(ctx context.Context, workDir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = workDir
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

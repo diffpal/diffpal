@@ -3,6 +3,7 @@ package github
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,51 +14,52 @@ import (
 	"github.com/diffpal/diffpal/internal/platformapi"
 )
 
-func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, items []findings.Finding, client *http.Client) map[string]string {
-	ids := activeReviewThreadFindingIDs(ctx, token, reviewCtx, identity, client)
-	if len(ids) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(ids))
-	for _, item := range items {
-		if _, ok := ids[item.ID]; !ok {
-			continue
-		}
-		out[commentKey(item.Path, item.StartLine, item.Category, item.ID)] = item.ID
-	}
-	return out
-}
-
-func activeReviewThreadFindingIDs(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, client *http.Client) map[string]struct{} {
+func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Context, identity ReviewIdentity, items []findings.Finding, client *http.Client) (map[string]string, error) {
 	owner, repo, ok := strings.Cut(strings.TrimSpace(reviewCtx.Repo), "/")
 	if !ok || strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" || reviewCtx.PRNumber <= 0 {
-		return nil
+		return nil, fmt.Errorf("invalid GitHub review context for thread reconciliation")
 	}
-	out := map[string]struct{}{}
+	byID := make(map[string]findings.Finding, len(items))
+	byLocation := make(map[string]findings.Finding, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+		byLocation[commentLocationKey(item.Path, item.StartLine, item.Category)] = item
+	}
+	out := map[string]string{}
 	cursor := ""
 	for {
 		page, err := queryReviewThreads(ctx, token, owner, repo, reviewCtx.PRNumber, cursor, client)
 		if err != nil {
-			return out
+			return nil, err
 		}
 		for _, thread := range page.Threads {
 			if thread.ID == "" || thread.IsResolved {
 				continue
 			}
-			findingID := threadFindingID(thread, identity)
+			findingID, location := threadFindingMarker(thread, identity)
 			if findingID == "" {
 				continue
 			}
-			out[findingID] = struct{}{}
+			if item, ok := byID[findingID]; ok {
+				out[commentKey(item.Path, item.StartLine, item.Category, item.ID)] = item.ID
+				continue
+			}
+			if item, ok := byLocation[location]; ok && item.ID == findingID {
+				out[commentKey(item.Path, item.StartLine, item.Category, item.ID)] = item.ID
+				continue
+			}
+			if err := resolveReviewThread(ctx, token, thread.ID, client); err != nil {
+				return nil, err
+			}
 		}
 		if !page.HasNextPage || page.EndCursor == "" {
-			return out
+			return out, nil
 		}
 		cursor = page.EndCursor
 	}
 }
 
-func threadFindingID(thread reviewThread, identity ReviewIdentity) string {
+func threadFindingMarker(thread reviewThread, identity ReviewIdentity) (string, string) {
 	prefix := "<!-- diffpal:finding:" + identity.channel() + " "
 	for _, comment := range thread.Comments {
 		body := strings.TrimSpace(comment.Body)
@@ -70,20 +72,54 @@ func threadFindingID(thread reviewThread, identity ReviewIdentity) string {
 			continue
 		}
 		marker := body[idx : idx+end+3]
-		return findingIDFromMarker(marker)
+		return findingMarkerValues(marker)
 	}
-	return ""
+	return "", ""
 }
 
-func findingIDFromMarker(marker string) string {
+func findingMarkerValues(marker string) (string, string) {
 	inner := strings.TrimSuffix(strings.TrimPrefix(marker, "<!--"), "-->")
+	var findingID, encodedLocation string
 	for _, part := range strings.Fields(inner) {
 		key, value, ok := strings.Cut(part, ":")
-		if ok && key == "id" {
-			return value
+		if !ok {
+			continue
+		}
+		switch key {
+		case "id":
+			findingID = value
+		case "loc":
+			encodedLocation = value
 		}
 	}
-	return ""
+	if encodedLocation == "" {
+		return findingID, ""
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(encodedLocation)
+	if err != nil {
+		return "", ""
+	}
+	return findingID, string(decoded)
+}
+
+func resolveReviewThread(ctx context.Context, token, threadID string, client *http.Client) error {
+	const mutation = `mutation($threadId:ID!) {
+  resolveReviewThread(input:{threadId:$threadId}) {
+    thread { id isResolved }
+  }
+}`
+	var resp struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := doGraphQL(ctx, token, mutation, map[string]any{"threadId": threadID}, &resp, client); err != nil {
+		return err
+	}
+	if len(resp.Errors) > 0 {
+		return fmt.Errorf("github graphql: %s", resp.Errors[0].Message)
+	}
+	return nil
 }
 
 type reviewThreadsPage struct {

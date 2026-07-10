@@ -310,20 +310,95 @@ func TestPublishThreadsDoesNotFetchChangesForFallbackOnlyPlan(t *testing.T) {
 	}
 }
 
+func TestPublishThreadsReconcilesExistingFindingThreads(t *testing.T) {
+	t.Parallel()
+
+	repoID := "repo-1"
+	project := "proj"
+	prID := 19
+	threadID := 41
+	commentID := 7
+	status := azgit.CommentThreadStatusValues.Active
+	current := ThreadAction{
+		Type:      ActionCreate,
+		ThreadID:  "internal/app/service.go:7:correctness:fp-a",
+		FindingID: "fp-a",
+		Status:    ThreadStatusActive,
+		Path:      "internal/app/service.go",
+		Line:      7,
+		EndLine:   7,
+		Body:      "body",
+	}
+	body := strings.TrimSpace(current.Body) + "\n" + azureFindingMarker(current) + "\n"
+	client := &fakeThreadGitClient{threads: []azgit.GitPullRequestCommentThread{{
+		Id:     &threadID,
+		Status: &status,
+		Comments: &[]azgit.Comment{{
+			Id:      &commentID,
+			Content: &body,
+		}},
+	}}}
+	args := gitClientArgs{RepositoryID: &repoID, PullRequestID: &prID, Project: &project}
+
+	if err := publishThreadsWithClient(context.Background(), client, args, ThreadPlan{Actions: []ThreadAction{current}}); err != nil {
+		t.Fatalf("identical publish error = %v", err)
+	}
+	if client.createThreadCalls != 0 || client.updateCommentCalls != 0 || client.updateThreadCalls != 0 {
+		t.Fatalf("identical publish calls = create:%d comment:%d thread:%d, want no changes", client.createThreadCalls, client.updateCommentCalls, client.updateThreadCalls)
+	}
+
+	changed := current
+	changed.FindingID = "fp-b"
+	changed.ThreadID = "internal/app/service.go:7:correctness:fp-b"
+	changed.Body = "changed body"
+	if err := publishThreadsWithClient(context.Background(), client, args, ThreadPlan{Actions: []ThreadAction{changed}}); err != nil {
+		t.Fatalf("changed publish error = %v", err)
+	}
+	if client.createThreadCalls != 0 || client.updateCommentCalls != 1 || client.updateThreadCalls != 1 {
+		t.Fatalf("changed publish calls = create:%d comment:%d thread:%d, want 0/1/1", client.createThreadCalls, client.updateCommentCalls, client.updateThreadCalls)
+	}
+
+	client.updateThreadCalls = 0
+	if err := publishThreadsWithClient(context.Background(), client, args, ThreadPlan{}); err != nil {
+		t.Fatalf("stale publish error = %v", err)
+	}
+	if client.updateThreadCalls != 1 {
+		t.Fatalf("stale UpdateThread calls = %d, want 1", client.updateThreadCalls)
+	}
+}
+
 type fakeThreadGitClient struct {
-	iterations        []azgit.GitPullRequestIteration
-	changes           []pullRequestChangeRef
-	iterationErr      error
-	changeErr         error
-	iterationCalls    int
-	changeCalls       int
-	createThreadCalls int
-	lastThread        *azgit.GitPullRequestCommentThread
+	iterations         []azgit.GitPullRequestIteration
+	changes            []pullRequestChangeRef
+	iterationErr       error
+	changeErr          error
+	iterationCalls     int
+	changeCalls        int
+	createThreadCalls  int
+	lastThread         *azgit.GitPullRequestCommentThread
+	threads            []azgit.GitPullRequestCommentThread
+	updateCommentCalls int
+	updateThreadCalls  int
 }
 
 func (f *fakeThreadGitClient) CreateThread(_ context.Context, args azgit.CreateThreadArgs) (*azgit.GitPullRequestCommentThread, error) {
 	f.createThreadCalls++
 	f.lastThread = args.CommentThread
+	return args.CommentThread, nil
+}
+
+func (f *fakeThreadGitClient) GetThreads(_ context.Context, _ azgit.GetThreadsArgs) (*[]azgit.GitPullRequestCommentThread, error) {
+	items := append([]azgit.GitPullRequestCommentThread(nil), f.threads...)
+	return &items, nil
+}
+
+func (f *fakeThreadGitClient) UpdateComment(_ context.Context, args azgit.UpdateCommentArgs) (*azgit.Comment, error) {
+	f.updateCommentCalls++
+	return args.Comment, nil
+}
+
+func (f *fakeThreadGitClient) UpdateThread(_ context.Context, args azgit.UpdateThreadArgs) (*azgit.GitPullRequestCommentThread, error) {
+	f.updateThreadCalls++
 	return args.CommentThread, nil
 }
 

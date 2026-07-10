@@ -1363,8 +1363,8 @@ func TestReviewADOPublishesSelectedHostArtifacts(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := requests.Load(); got != 6 {
-		t.Fatalf("requests = %d, want 6 SDK discovery/status/summary requests", got)
+	if got := requests.Load(); got != 4 {
+		t.Fatalf("requests = %d, want 4 status/summary requests", got)
 	}
 	select {
 	case err := <-handlerErrs:

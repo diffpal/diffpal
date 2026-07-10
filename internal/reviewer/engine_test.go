@@ -929,6 +929,14 @@ func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	if got[0].Path != "a.go" || got[1].Path != "b.go" {
 		t.Fatalf("sorted paths = %q, %q; want a.go then b.go", got[0].Path, got[1].Path)
 	}
+	for _, item := range got {
+		if item.ID == "" {
+			t.Fatalf("finding for %s has an empty deterministic ID", item.Path)
+		}
+		if want := findings.Fingerprint("repo", "head", item); item.ID != want {
+			t.Fatalf("finding ID = %q, want %q", item.ID, want)
+		}
+	}
 }
 
 func TestNormalizeReviewFindingAllowsNearbySupportingContext(t *testing.T) {
