@@ -2,6 +2,10 @@
 
 Choose the section that matches what you want to do.
 
+[View the live DiffPal demo review](https://github.com/diffpal/demo/pull/3) to
+see a review summary, inline findings, downloadable artifacts, and an
+intentional merge gate in GitHub Actions.
+
 ## Getting Started
 
 Use [Getting Started](getting-started/README.md) for the first successful
