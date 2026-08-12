@@ -14,6 +14,7 @@ GitHub, GitLab, and Azure DevOps.
 
 [Quickstart](docs/getting-started/github-quickstart.md) ·
 [Documentation](docs/README.md) ·
+[Live Demo](https://github.com/diffpal/demo/pull/3) ·
 [Security](docs/security.md) ·
 [GitHub](https://github.com/diffpal/diffpal)
 
