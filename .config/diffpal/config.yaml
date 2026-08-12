@@ -5,6 +5,7 @@ runtime:
     codex-acp:
       type: codex_acp
       codex_acp:
+        model: gpt-5.4-mini
         reasoning_effort: low
 
 diffpal:
@@ -15,7 +16,8 @@ diffpal:
     language: en
     instructions: |
       Prefer actionable findings that are directly supported by the diff.
-      The diffpal-dev workflow intentionally restores Codex auth and runs the
+      The diffpal-dev workflow intentionally authenticates Codex with the
+      repository OPENAI_API_KEY secret and runs the
       same-repository PR-built DiffPal binary for this repository's own review
       dogfooding. Do not report that trust-model choice by itself. Still report
       fork exposure, secret logging, broader credential misuse, or unrelated CI
