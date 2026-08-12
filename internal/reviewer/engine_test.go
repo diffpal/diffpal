@@ -722,6 +722,54 @@ func TestProviderErrorFromRuntimeErrorUsesJSONRPCData(t *testing.T) {
 	}
 }
 
+func TestProviderErrorFromRuntimeErrorUsesDirectProviderError(t *testing.T) {
+	original := &acperror.ProviderError{
+		Kind:    acperror.KindQuotaExceeded,
+		Message: "quota exceeded",
+	}
+
+	got, ok := providerErrorFromRuntimeError(original)
+	if !ok {
+		t.Fatal("providerErrorFromRuntimeError() ok = false, want true")
+	}
+	if got != original {
+		t.Fatalf("providerErrorFromRuntimeError() = %p, want %p", got, original)
+	}
+}
+
+func TestProviderErrorKind(t *testing.T) {
+	t.Parallel()
+
+	retryable := true
+	nonRetryable := false
+	tests := []struct {
+		name string
+		err  *acperror.ProviderError
+		want ErrorKind
+	}{
+		{name: "nil", want: KindInternal},
+		{name: "quota", err: &acperror.ProviderError{Kind: acperror.KindQuotaExceeded}, want: KindInternal},
+		{name: "authentication", err: &acperror.ProviderError{Kind: acperror.KindAuthenticationRequired}, want: KindInternal},
+		{name: "payment", err: &acperror.ProviderError{Kind: acperror.KindPaymentRequired}, want: KindInternal},
+		{name: "rate limited", err: &acperror.ProviderError{Kind: acperror.KindRateLimited}, want: KindTransient},
+		{name: "unavailable", err: &acperror.ProviderError{Kind: acperror.KindUnavailable}, want: KindTransient},
+		{name: "invalid request", err: &acperror.ProviderError{Kind: acperror.KindInvalidRequest}, want: KindInternal},
+		{name: "unknown", err: &acperror.ProviderError{Kind: acperror.KindUnknown}, want: KindInternal},
+		{name: "unrecognized", err: &acperror.ProviderError{Kind: acperror.Kind("future_kind")}, want: KindInternal},
+		{name: "explicit retryable quota", err: &acperror.ProviderError{Kind: acperror.KindQuotaExceeded, Retryable: &retryable}, want: KindTransient},
+		{name: "explicit non-retryable unavailable", err: &acperror.ProviderError{Kind: acperror.KindUnavailable, Retryable: &nonRetryable}, want: KindInternal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := providerErrorKind(tt.err); got != tt.want {
+				t.Fatalf("providerErrorKind() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProviderErrorFromRuntimeErrorUsesAuthCode(t *testing.T) {
 	got, ok := providerErrorFromRuntimeError(&acp.RequestError{
 		Code:    -32000,
