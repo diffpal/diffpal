@@ -32,19 +32,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bubblewrap
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
 
-      - name: Restore Codex auth
+      - name: Authenticate Codex
         run: |
-          mkdir -p "$HOME/.codex"
-          printf '%s' "$CODEX_AUTH_JSON_B64" | base64 --decode > "$HOME/.codex/auth.json"
-          chmod 600 "$HOME/.codex/auth.json"
+          printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
           {
             echo 'sandbox_mode = "workspace-write"'
             echo 'approval_policy = "untrusted"'
           } > "$HOME/.codex/config.toml"
         env:
-          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Review pull request
         uses: diffpal/action@v1
@@ -57,4 +55,5 @@ jobs:
           feedback: review
           gate: true
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
