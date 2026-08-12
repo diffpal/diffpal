@@ -94,7 +94,7 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	for ev, runErr := range events {
 		if runErr != nil {
 			if providerErr, ok := providerErrorFromRuntimeError(runErr); ok {
-				return ReviewOutput{}, usage, wrapError(KindTransient, providerErr)
+				return ReviewOutput{}, usage, wrapError(providerErrorKind(providerErr), providerErr)
 			}
 			if isTransientProviderError(runErr) {
 				return ReviewOutput{}, usage, wrapError(KindTransient, runErr)
@@ -252,6 +252,10 @@ func (a providerErrorDetectingAgent) Run(ctx adkagent.InvocationContext) iter.Se
 				yield(ev, providerErr)
 				return
 			}
+			if eventErr := providerEventError(ev); eventErr != nil {
+				yield(ev, eventErr)
+				return
+			}
 			if !yield(ev, nil) {
 				return
 			}
@@ -294,9 +298,31 @@ func providerErrorFromEvent(ev *session.Event) (*acperror.ProviderError, bool) {
 	return nil, false
 }
 
+func providerEventError(ev *session.Event) error {
+	if ev == nil {
+		return nil
+	}
+	code := strings.TrimSpace(ev.ErrorCode)
+	message := strings.TrimSpace(ev.ErrorMessage)
+	switch {
+	case code != "" && message != "":
+		return fmt.Errorf("provider error %s: %s", code, message)
+	case code != "":
+		return fmt.Errorf("provider error: %s", code)
+	case message != "":
+		return fmt.Errorf("provider error: %s", message)
+	default:
+		return nil
+	}
+}
+
 func providerErrorFromRuntimeError(err error) (*acperror.ProviderError, bool) {
 	if err == nil {
 		return nil, false
+	}
+	var providerErr *acperror.ProviderError
+	if errors.As(err, &providerErr) && providerErr != nil {
+		return providerErr, true
 	}
 	var reqErr *acp.RequestError
 	if errors.As(err, &reqErr) {
@@ -311,4 +337,20 @@ func providerErrorFromRuntimeError(err error) (*acperror.ProviderError, bool) {
 		}
 	}
 	return nil, false
+}
+
+func providerErrorKind(err *acperror.ProviderError) ErrorKind {
+	if err == nil {
+		return KindInternal
+	}
+	if err.Retryable != nil {
+		if *err.Retryable {
+			return KindTransient
+		}
+		return KindInternal
+	}
+	if err.Kind == acperror.KindRateLimited || err.Kind == acperror.KindUnavailable {
+		return KindTransient
+	}
+	return KindInternal
 }
