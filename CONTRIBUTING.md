@@ -31,7 +31,7 @@ of default PR verification because they need local provider auth, network
 access, and available provider quota.
 
 ```bash
-# Codex ACP review path; uses npx -y @normahq/codex-acp-bridge@latest.
+# Codex ACP review path; uses npx -y @normahq/codex-acp-bridge@1.8.4.
 go test -tags='integration,codex' -count=1 ./internal/reviewer \
   -run TestADKRuntimeCodexACPReviewFindsUnsafeHandler -v
 

@@ -81,7 +81,7 @@ jobs:
           node-version: 22
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
 
       - name: Authenticate Codex
         run: printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
