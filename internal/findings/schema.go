@@ -278,6 +278,27 @@ func (f Finding) EvidenceText() string {
 	return strings.Join(parts, " ")
 }
 
+// EvidenceDisplayText returns evidence intended for user-facing output.
+// Evidence.Source is structured provenance for machines, not review prose.
+func (f Finding) EvidenceDisplayText() string {
+	parts := make([]string, 0, 2)
+	appendUnique := func(text string) {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return
+		}
+		for _, part := range parts {
+			if part == text {
+				return
+			}
+		}
+		parts = append(parts, text)
+	}
+	appendUnique(f.Evidence.Anchor)
+	appendUnique(f.Evidence.ReasoningBasis)
+	return strings.Join(parts, " ")
+}
+
 func (f Finding) ImpactText() string {
 	summary := strings.TrimSpace(f.Impact.Summary)
 	scope := strings.TrimSpace(f.Impact.Scope)

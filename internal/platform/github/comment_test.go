@@ -260,7 +260,11 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 		StartLine:  12,
 		EndLine:    17,
 		Message:    "query concatenates untrusted input",
-		Evidence:   findings.NewEvidence("Line 17 builds SQL by concatenating user input."),
+		Evidence: findings.FindingEvidence{
+			Anchor:         "Line 17 builds SQL by concatenating user input.",
+			ReasoningBasis: "The query now accepts untrusted input.",
+			Source:         "changed_line",
+		},
 		Suggestion: "Use a parameterized statement.",
 	}}, CommentOptions{
 		Links: markdown.FindingLinkFunc(func(findings.Finding) (string, bool) {
@@ -275,7 +279,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	for _, want := range []string{
 		"query concatenates untrusted input\n- **Finding**: High security",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
-		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
+		"- **Evidence**: Line 17 builds SQL by concatenating user input. The query now accepts untrusted input.",
 		"- **Suggestion**: Use a parameterized statement.",
 	} {
 		if !strings.Contains(body, want) {
@@ -290,6 +294,9 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	if strings.Contains(body, "**Confidence**") {
 		t.Fatalf("comment body contains confidence:\n%s", body)
+	}
+	if strings.Contains(body, "changed_line") {
+		t.Fatalf("comment body exposes structured evidence source:\n%s", body)
 	}
 }
 

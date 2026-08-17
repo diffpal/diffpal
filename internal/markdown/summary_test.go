@@ -333,6 +333,7 @@ func TestRenderSummaryIncludesFindingCodeSnippet(t *testing.T) {
 	assertContains(t, got, "**Impact:** malicious users can delete sessions for other accounts.")
 	assertContains(t, got, "**Fix:** Use a parameterized statement.")
 	assertContains(t, got, "**Evidence:** Line 17 builds SQL by concatenating user input.")
+	assertNotContains(t, got, "changed_line")
 	assertContains(t, got, "```go\nuser := r.URL.Query().Get(\"user\")\n_, _ = db.Exec(\"DELETE FROM sessions WHERE user = '\" + user + \"'\")\n```")
 	assertNotContains(t, got, "**Confidence:**")
 }
