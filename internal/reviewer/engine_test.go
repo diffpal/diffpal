@@ -15,7 +15,9 @@ import (
 	dpconfig "github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/diff"
 	"github.com/diffpal/diffpal/internal/findings"
+	githubpub "github.com/diffpal/diffpal/internal/platform/github"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
+	"github.com/diffpal/diffpal/internal/sarif"
 	"github.com/normahq/go-adk-acpagent/v2/acperror"
 	"github.com/normahq/runtime/v2/agentconfig"
 	"google.golang.org/adk/v2/model"
@@ -408,6 +410,8 @@ func TestRunWithRuntimeRetainsDeletedOwnershipCheck(t *testing.T) {
 	runGitCmd(t, repo, "add", "orders.go")
 	runGitCmd(t, repo, "commit", "-m", "initial")
 	writeRepoFile(t, filepath.Join(repo, "orders.go"), "package orders\n\nfunc canRead(owner, requester string) bool {\n\treturn true\n}\n")
+	runGitCmd(t, repo, "add", "orders.go")
+	runGitCmd(t, repo, "commit", "-m", "simplify access")
 
 	runtime := &fakeRuntime{outputs: []ReviewOutput{{
 		ChangeSummary: []string{"Simplified order access checks."},
@@ -451,6 +455,8 @@ func TestRunWithRuntimeRetainsDeletedOwnershipCheck(t *testing.T) {
 		WorkingDir: repo,
 		Repo:       "repo-ownership",
 		ReviewID:   "review-ownership",
+		BaseSHA:    "HEAD~1",
+		HeadSHA:    "HEAD",
 		BlockOn:    "high",
 	}, runtime)
 	if err != nil {
@@ -465,6 +471,35 @@ func TestRunWithRuntimeRetainsDeletedOwnershipCheck(t *testing.T) {
 	}
 	if result.Bundle.ReviewResult != runtime.outputs[0].ReviewResult || len(result.Bundle.ChangeSummary) != 1 {
 		t.Fatalf("summary output lost: result=%q summary=%v", result.Bundle.ReviewResult, result.Bundle.ChangeSummary)
+	}
+	if result.Bundle.Version != findings.VersionV4 {
+		t.Fatalf("bundle version = %q, want %q", result.Bundle.Version, findings.VersionV4)
+	}
+	bundleJSON, err := json.Marshal(result.Bundle)
+	if err != nil {
+		t.Fatalf("Marshal(bundle) error = %v", err)
+	}
+	if !strings.Contains(string(bundleJSON), `"side":"LEFT"`) {
+		t.Fatalf("bundle JSON missing LEFT side: %s", bundleJSON)
+	}
+	plan := githubpub.PlanInlineCommentsWithOptions(nil, result.Bundle.Findings, githubpub.CommentOptions{
+		AllFindings: true,
+		Links: githubpub.NewPermanentLinkProvider(githubpub.Context{
+			Repo: "acme/orders", BaseSHA: result.Bundle.BaseSHA, HeadSHA: result.Bundle.HeadSHA,
+		}),
+	})
+	if len(plan.Actions) != 1 || plan.Actions[0].Side != findings.SideLeft {
+		t.Fatalf("GitHub plan = %+v, want one LEFT action", plan)
+	}
+	if !strings.Contains(plan.Actions[0].Body, "/blob/"+result.Bundle.BaseSHA+"/orders.go#L4") {
+		t.Fatalf("LEFT comment body missing base permalink: %s", plan.Actions[0].Body)
+	}
+	if strings.Contains(plan.Actions[0].Body, "changed_line") {
+		t.Fatalf("LEFT comment body exposes evidence source: %s", plan.Actions[0].Body)
+	}
+	report := sarif.ToReport(result.Bundle)
+	if len(report.Runs) != 1 || len(report.Runs[0].Results) != 1 || report.Runs[0].Results[0].Locations[0].PhysicalLocation.Region.StartLine != 4 {
+		t.Fatalf("SARIF report lost deleted-line finding: %+v", report)
 	}
 }
 

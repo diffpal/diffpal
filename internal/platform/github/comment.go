@@ -143,10 +143,6 @@ func commentKey(path string, line int, category string, findingID string) string
 	return commentKeyForSide(path, line, category, findings.SideRight, findingID)
 }
 
-func commentLocationKey(path string, line int, category string) string {
-	return commentLocationKeyForSide(path, line, category, findings.SideRight)
-}
-
 func commentKeyForSide(path string, line int, category string, side findings.LineSide, findingID string) string {
 	return commentLocationKeyForSide(path, line, category, side) + ":" + findingID
 }
