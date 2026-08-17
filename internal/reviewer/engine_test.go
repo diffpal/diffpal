@@ -1232,3 +1232,75 @@ func TestNormalizeReviewFindingRejectsInvalidOrMismatchedSide(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeReviewFindingClipsAdjacentContextFromChangedRange(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string][]changedSpan{
+		"orders.go": {
+			{Start: 39, End: 41, Side: findings.SideRight},
+			{Start: 57, End: 57, Side: findings.SideRight},
+			{Start: 80, End: 83, Side: findings.SideLeft},
+		},
+	}
+	tests := []struct {
+		name      string
+		start     int
+		end       int
+		side      findings.LineSide
+		wantStart int
+		wantEnd   int
+	}{
+		{name: "right trailing context", start: 57, end: 58, side: findings.SideRight, wantStart: 57, wantEnd: 57},
+		{name: "left surrounding context", start: 79, end: 84, side: findings.SideLeft, wantStart: 80, wantEnd: 83},
+		{name: "right exact range", start: 39, end: 40, side: findings.SideRight, wantStart: 39, wantEnd: 40},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item := ReviewFinding{
+				Category:    "correctness",
+				Severity:    "high",
+				Confidence:  0.9,
+				Path:        "orders.go",
+				StartLine:   tt.start,
+				EndLine:     tt.end,
+				ChangedSpan: findings.LineSpan{Path: "orders.go", StartLine: tt.start, EndLine: tt.end, Side: tt.side},
+				Title:       "changed behavior",
+				Message:     "the changed code breaks the contract",
+				Evidence:    findings.NewEvidence("the range overlaps changed code"),
+				Impact:      findings.NewImpact("callers observe incorrect behavior"),
+			}
+			got, ok := normalizeReviewFinding(item, allowed, "provider-a")
+			if !ok {
+				t.Fatal("normalizeReviewFinding() rejected overlapping changed range")
+			}
+			if got.StartLine != tt.wantStart || got.EndLine != tt.wantEnd || got.ChangedSpan.StartLine != tt.wantStart || got.ChangedSpan.EndLine != tt.wantEnd {
+				t.Fatalf("normalized range = %d-%d / %+v, want %d-%d", got.StartLine, got.EndLine, got.ChangedSpan, tt.wantStart, tt.wantEnd)
+			}
+		})
+	}
+}
+
+func TestNormalizeReviewFindingRejectsBroadRangeWithMinorChangedOverlap(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string][]changedSpan{
+		"orders.go": {{Start: 57, End: 57, Side: findings.SideRight}},
+	}
+	item := ReviewFinding{
+		Category:    "correctness",
+		Severity:    "high",
+		Confidence:  0.9,
+		Path:        "orders.go",
+		StartLine:   1,
+		EndLine:     100,
+		ChangedSpan: findings.LineSpan{Path: "orders.go", StartLine: 1, EndLine: 100, Side: findings.SideRight},
+		Title:       "broad finding",
+		Message:     "the location is not specific enough",
+		Evidence:    findings.NewEvidence("only one line in the range changed"),
+		Impact:      findings.NewImpact("the anchor is ambiguous"),
+	}
+	if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); ok {
+		t.Fatal("normalizeReviewFinding() accepted broad range with minor changed overlap")
+	}
+}

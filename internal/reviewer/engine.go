@@ -489,7 +489,8 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 	if startLine <= 0 || endLine <= 0 || startLine > endLine {
 		return findings.Finding{}, false
 	}
-	if !allowedRange(path, startLine, endLine, side, allowed) {
+	startLine, endLine, ok = changedRange(path, startLine, endLine, side, allowed)
+	if !ok {
 		return findings.Finding{}, false
 	}
 
@@ -553,18 +554,32 @@ func allowedSeverity(severity string) bool {
 	}
 }
 
-func allowedRange(path string, startLine, endLine int, side findings.LineSide, allowed map[string][]changedSpan) bool {
+func changedRange(path string, startLine, endLine int, side findings.LineSide, allowed map[string][]changedSpan) (int, int, bool) {
 	spans, ok := allowed[path]
 	if !ok {
-		return false
+		return 0, 0, false
 	}
+	bestStart, bestEnd, bestLength := 0, 0, 0
 	for _, span := range spans {
 		spanSide, ok := normalizeFindingSide(span.Side)
-		if ok && spanSide == side && startLine >= span.Start && endLine <= span.End {
-			return true
+		if !ok || spanSide != side {
+			continue
+		}
+		intersectionStart := max(startLine, span.Start)
+		intersectionEnd := min(endLine, span.End)
+		if intersectionStart > intersectionEnd {
+			continue
+		}
+		length := intersectionEnd - intersectionStart + 1
+		if length > bestLength {
+			bestStart, bestEnd, bestLength = intersectionStart, intersectionEnd, length
 		}
 	}
-	return false
+	claimedLength := endLine - startLine + 1
+	if bestLength == 0 || bestLength*2 < claimedLength {
+		return 0, 0, false
+	}
+	return bestStart, bestEnd, true
 }
 
 func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA string) []findings.Finding {
