@@ -427,6 +427,12 @@ func changedSpansByPath(files []diff.FileChange) map[string][]changedSpan {
 			continue
 		}
 		for _, span := range file.ChangedLineSpans {
+			// The current findings contract uses new-file coordinates only. Keep
+			// LEFT spans available to the next schema revision without accepting
+			// them as RIGHT-side locations in legacy review output.
+			if span.Side == diff.SideLeft {
+				continue
+			}
 			if span.Start <= 0 || span.End <= 0 || span.Start > span.End {
 				continue
 			}
