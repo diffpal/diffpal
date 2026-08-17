@@ -186,8 +186,8 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.5.0" {
-		t.Fatalf("PromptVersion = %q, want v1.5.0", got.PromptVersion)
+	if got.PromptVersion != "v1.5.1" {
+		t.Fatalf("PromptVersion = %q, want v1.5.1", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
@@ -238,6 +238,13 @@ func TestPromptRegistryKeepsPreviousReviewPrompt(t *testing.T) {
 	}
 	if metadata := prompt.ReviewMetadata(); metadata.SchemaVersion != "findings.v3" || prompt.OutputSchema != OutputSchemaJSONV3 {
 		t.Fatalf("v1.4.0 prompt = %+v, want findings.v3 with preserved schema", metadata)
+	}
+	prompt, ok = Lookup(ReviewPromptID, "v1.5.0")
+	if !ok {
+		t.Fatal("Lookup(diffpal.review, v1.5.0) failed")
+	}
+	if metadata := prompt.ReviewMetadata(); metadata.SchemaVersion != "findings.v4" || prompt.OutputSchema != OutputSchemaJSON {
+		t.Fatalf("v1.5.0 prompt = %+v, want findings.v4 with preserved schema", metadata)
 	}
 }
 
@@ -335,6 +342,8 @@ func TestReviewSystemIncludesHighSignalRubric(t *testing.T) {
 		"Do not report vague style preferences, generic best-practice advice, praise, or low-value maintainability nits.",
 		"Return one finding per distinct root cause.",
 		"Continue until all qualifying findings are listed.",
+		"summary fields must not introduce review issues omitted from findings.",
+		"anchor changed_span to the deleted line or lines on LEFT",
 	}
 	for _, phrase := range required {
 		if !strings.Contains(system, phrase) {

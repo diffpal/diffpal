@@ -8,7 +8,7 @@ import (
 
 const (
 	ReviewPromptID      = "diffpal.review"
-	ReviewPromptVersion = "v1.5.0"
+	ReviewPromptVersion = "v1.5.1"
 	ReviewPurpose       = "review_changed_diff"
 	ReviewSchemaVersion = "findings.v4"
 
@@ -91,12 +91,24 @@ var reviewPromptV1_4 = Prompt{
 var reviewPromptV1_5 = Prompt{
 	Metadata: findings.PromptMetadata{
 		PromptID:      ReviewPromptID,
-		PromptVersion: ReviewPromptVersion,
+		PromptVersion: "v1.5.0",
 		Purpose:       ReviewPurpose,
 		SchemaVersion: ReviewSchemaVersion,
 	},
 	OutputSchema: OutputSchemaJSON,
 	renderSystem: renderReviewSystemV1_5,
+	renderTask:   reviewTaskV1_3,
+}
+
+var reviewPromptV1_5_1 = Prompt{
+	Metadata: findings.PromptMetadata{
+		PromptID:      ReviewPromptID,
+		PromptVersion: ReviewPromptVersion,
+		Purpose:       ReviewPurpose,
+		SchemaVersion: ReviewSchemaVersion,
+	},
+	OutputSchema: OutputSchemaJSON,
+	renderSystem: renderReviewSystemV1_5_1,
 	renderTask:   reviewTaskV1_3,
 }
 
@@ -107,7 +119,8 @@ var registry = map[string]map[string]Prompt{
 		"v1.2.2":            reviewPromptV1_2_2,
 		"v1.3.0":            reviewPromptV1_3,
 		"v1.4.0":            reviewPromptV1_4,
-		ReviewPromptVersion: reviewPromptV1_5,
+		"v1.5.0":            reviewPromptV1_5,
+		ReviewPromptVersion: reviewPromptV1_5_1,
 	},
 }
 
@@ -436,6 +449,21 @@ func renderReviewSystemV1_5(opts ReviewOptions) string {
 	return strings.Join(sections, "\n\n")
 }
 
+func renderReviewSystemV1_5_1(opts ReviewOptions) string {
+	sections := []string{
+		diffPalReviewContract(),
+		providerInstructionsV1_4(),
+		reviewPolicyV1_3(),
+		changeSummaryPolicyV1_4(),
+		outputPolicyV1_5_1(),
+		untrustedPayloadPolicy(),
+	}
+	if custom := strings.TrimSpace(opts.Instructions); custom != "" {
+		sections = append(sections, teamInstructions(custom))
+	}
+	return strings.Join(sections, "\n\n")
+}
+
 func diffPalReviewContract() string {
 	return strings.Join([]string{
 		"# DiffPal review contract",
@@ -725,6 +753,13 @@ func outputPolicyV1_5() string {
 		"Suggestions are optional and must be safe, concrete, short, and scoped to the finding.",
 		"review_result is optional. When you can determine it confidently, return one short sentence in the requested language that summarizes the outcome using the findings you return and the block_on threshold from the task snapshot.",
 		"If you are unsure how to phrase review_result, return an empty string.",
+	}, "\n")
+}
+
+func outputPolicyV1_5_1() string {
+	return outputPolicyV1_5() + "\n" + strings.Join([]string{
+		"Every concrete issue stated in change_summary or review_result must have one corresponding entry in findings; summary fields must not introduce review issues omitted from findings.",
+		"When an issue is caused by removed behavior, anchor changed_span to the deleted line or lines on LEFT, even when a nearby RIGHT replacement reflects the consequence.",
 	}, "\n")
 }
 
