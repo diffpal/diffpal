@@ -1,6 +1,9 @@
 package findings
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeInheritsReviewIDAndStableFingerprint(t *testing.T) {
 	t.Parallel()
@@ -292,5 +295,27 @@ func TestFingerprintPreservesPathCase(t *testing.T) {
 	upper.Path = "internal/app/Service.go"
 	if Fingerprint("repo", "head-a", base) == Fingerprint("repo", "head-a", upper) {
 		t.Fatal("Fingerprint() matched paths that differ by case")
+	}
+}
+
+func TestEvidenceDisplayTextOmitsStructuredSource(t *testing.T) {
+	t.Parallel()
+
+	finding := Finding{Evidence: FindingEvidence{
+		Anchor:         "the changed assignment",
+		ReasoningBasis: "the assignment bypasses trusted state",
+		Source:         "changed_line",
+	}}
+
+	if got, want := finding.EvidenceDisplayText(), "the changed assignment the assignment bypasses trusted state"; got != want {
+		t.Fatalf("EvidenceDisplayText() = %q, want %q", got, want)
+	}
+	if got := finding.EvidenceText(); !strings.Contains(got, "changed_line") {
+		t.Fatalf("EvidenceText() = %q, want structured source retained for machine identity", got)
+	}
+
+	finding.Evidence.ReasoningBasis = finding.Evidence.Anchor
+	if got, want := finding.EvidenceDisplayText(), finding.Evidence.Anchor; got != want {
+		t.Fatalf("EvidenceDisplayText() duplicate fields = %q, want %q", got, want)
 	}
 }
