@@ -965,17 +965,18 @@ func runGitCmd(t *testing.T, dir string, args ...string) string {
 
 func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	items := []findings.Finding{
-		{Category: "style", Message: "beta", Evidence: findings.NewEvidence("e2"), Path: "b.go", StartLine: 3, EndLine: 3},
-		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2},
-		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2},
+		{Category: "style", Message: "beta", Evidence: findings.NewEvidence("e2"), Path: "b.go", StartLine: 3, EndLine: 3, ChangedSpan: findings.LineSpan{Side: findings.SideRight}},
+		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2, ChangedSpan: findings.LineSpan{Side: findings.SideRight}},
+		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2, ChangedSpan: findings.LineSpan{Side: findings.SideLeft}},
+		{Category: "style", Message: "alpha", Evidence: findings.NewEvidence("e1"), Path: "a.go", StartLine: 2, EndLine: 2, ChangedSpan: findings.LineSpan{Side: findings.SideRight}},
 	}
 
 	got := dedupeAndSortFindings(items, "repo", "review", "head")
-	if len(got) != 2 {
-		t.Fatalf("len(got) = %d, want 2", len(got))
+	if len(got) != 3 {
+		t.Fatalf("len(got) = %d, want 3", len(got))
 	}
-	if got[0].Path != "a.go" || got[1].Path != "b.go" {
-		t.Fatalf("sorted paths = %q, %q; want a.go then b.go", got[0].Path, got[1].Path)
+	if got[0].Path != "a.go" || got[0].ChangedSpan.Side != findings.SideLeft || got[1].ChangedSpan.Side != findings.SideRight || got[2].Path != "b.go" {
+		t.Fatalf("sorted findings = %+v, want a.go LEFT, a.go RIGHT, b.go RIGHT", got)
 	}
 }
 

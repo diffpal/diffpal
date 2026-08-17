@@ -160,7 +160,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:  findings.VersionV3,
+		Version:  findings.VersionV4,
 		ReviewID: reviewID,
 		BaseSHA:  result.BaseSHA,
 		HeadSHA:  result.HeadSHA,
@@ -474,7 +474,7 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 		Path:           path,
 		StartLine:      startLine,
 		EndLine:        endLine,
-		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine},
+		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine, Side: findings.SideRight},
 		SupportingSpan: item.SupportingSpan,
 		Title:          title,
 		Message:        message,
@@ -551,6 +551,9 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 		}
 		if left.EndLine != right.EndLine {
 			return left.EndLine < right.EndLine
+		}
+		if left.ChangedSpan.Side != right.ChangedSpan.Side {
+			return left.ChangedSpan.Side < right.ChangedSpan.Side
 		}
 		if left.Category != right.Category {
 			return left.Category < right.Category

@@ -11,6 +11,14 @@ const (
 	VersionV1 = "v1"
 	VersionV2 = "v2"
 	VersionV3 = "v3"
+	VersionV4 = "v4"
+)
+
+type LineSide string
+
+const (
+	SideLeft  LineSide = "LEFT"
+	SideRight LineSide = "RIGHT"
 )
 
 var validSeverities = map[string]struct{}{
@@ -75,9 +83,10 @@ type Finding struct {
 }
 
 type LineSpan struct {
-	Path      string `json:"path"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
+	Path      string   `json:"path"`
+	StartLine int      `json:"start_line"`
+	EndLine   int      `json:"end_line"`
+	Side      LineSide `json:"side,omitempty"`
 }
 
 type FindingEvidence struct {
@@ -156,8 +165,8 @@ func (e ValidationError) Error() string {
 
 func Validate(bundle FindingsBundle) error {
 	version := ensureVersion(bundle.Version)
-	if version != VersionV1 && version != VersionV2 && version != VersionV3 {
-		return ValidationError{Field: "version", Msg: "must be v1, v2, or v3"}
+	if version != VersionV1 && version != VersionV2 && version != VersionV3 && version != VersionV4 {
+		return ValidationError{Field: "version", Msg: "must be v1, v2, v3, or v4"}
 	}
 	if bundle.ReviewID == "" {
 		return ValidationError{Field: "review_id", Msg: "review_id is required"}
@@ -186,12 +195,12 @@ func Validate(bundle FindingsBundle) error {
 		if f.Message == "" {
 			return ValidationError{Field: "finding.message", Msg: "message is required"}
 		}
-		if version == VersionV2 || version == VersionV3 {
-			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true); err != nil {
+		if version == VersionV2 || version == VersionV3 || version == VersionV4 {
+			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true, version == VersionV4); err != nil {
 				return err
 			}
 			if f.SupportingSpan != nil {
-				if err := validateLineSpan("finding.supporting_span", *f.SupportingSpan, true); err != nil {
+				if err := validateLineSpan("finding.supporting_span", *f.SupportingSpan, true, false); err != nil {
 					return err
 				}
 			}
@@ -228,7 +237,7 @@ func Validate(bundle FindingsBundle) error {
 	return nil
 }
 
-func validateLineSpan(field string, span LineSpan, requirePath bool) error {
+func validateLineSpan(field string, span LineSpan, requirePath bool, requireSide bool) error {
 	if requirePath && strings.TrimSpace(span.Path) == "" {
 		return ValidationError{Field: field + ".path", Msg: "path is required"}
 	}
@@ -237,6 +246,12 @@ func validateLineSpan(field string, span LineSpan, requirePath bool) error {
 	}
 	if span.StartLine > span.EndLine {
 		return ValidationError{Field: field, Msg: "start_line must be <= end_line"}
+	}
+	if requireSide && span.Side == "" {
+		return ValidationError{Field: field + ".side", Msg: "side is required"}
+	}
+	if span.Side != "" && span.Side != SideLeft && span.Side != SideRight {
+		return ValidationError{Field: field + ".side", Msg: "side must be LEFT or RIGHT"}
 	}
 	return nil
 }
@@ -250,6 +265,9 @@ func Normalize(bundle *FindingsBundle, repo string) {
 		f.Severity = strings.ToLower(strings.TrimSpace(f.Severity))
 		if f.ChangedSpan.Path == "" && f.StartLine > 0 && f.EndLine > 0 {
 			f.ChangedSpan = LineSpan{Path: f.Path, StartLine: f.StartLine, EndLine: f.EndLine}
+		}
+		if bundle.Version == VersionV4 && f.ChangedSpan.Side == "" {
+			f.ChangedSpan.Side = SideRight
 		}
 		if f.StartLine == 0 && f.ChangedSpan.StartLine > 0 {
 			f.StartLine = f.ChangedSpan.StartLine
@@ -327,6 +345,7 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Category    string `json:"category"`
 		MessageNorm string `json:"message_norm"`
 		Evidence    string `json:"evidence"`
+		Side        string `json:"side,omitempty"`
 	}
 	canonical := payload{
 		Platform:    "diffpal",
@@ -339,10 +358,18 @@ func Fingerprint(repo string, headSHA string, f Finding) string {
 		Category:    strings.TrimSpace(strings.ToLower(f.Category)),
 		MessageNorm: normalizeMessage(f.Message),
 		Evidence:    shaText(f.EvidenceText()),
+		Side:        fingerprintSide(f.ChangedSpan.Side),
 	}
 	jsonBytes, _ := json.Marshal(canonical)
 	sum := sha256.Sum256(jsonBytes)
 	return fmt.Sprintf("%x", sum[:])
+}
+
+func fingerprintSide(side LineSide) string {
+	if side == SideLeft {
+		return string(SideLeft)
+	}
+	return ""
 }
 
 func normalizePath(v string) string {
