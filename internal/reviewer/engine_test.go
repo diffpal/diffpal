@@ -356,10 +356,16 @@ func TestRunWithRuntimeReviewsDeleteOnlyDiffWithoutPreloadingFileList(t *testing
 				Path:       "gone.go",
 				StartLine:  1,
 				EndLine:    1,
-				Title:      "deleted file finding",
-				Message:    "deleted file findings cannot be anchored to head lines",
-				Evidence:   findings.NewEvidence("gone.go was deleted"),
-				Impact:     findings.NewImpact("deleted file findings should be ignored"),
+				ChangedSpan: findings.LineSpan{
+					Path:      "gone.go",
+					StartLine: 1,
+					EndLine:   1,
+					Side:      findings.SideLeft,
+				},
+				Title:    "deleted file finding",
+				Message:  "the deletion removes behavior still required by callers",
+				Evidence: findings.NewEvidence("gone.go was deleted"),
+				Impact:   findings.NewImpact("callers lose the removed behavior"),
 			}},
 		}},
 	}
@@ -391,8 +397,74 @@ func TestRunWithRuntimeReviewsDeleteOnlyDiffWithoutPreloadingFileList(t *testing
 	if strings.Join(result.Bundle.ChangeSummary, "\n") != "Removed an obsolete Go entrypoint file." {
 		t.Fatalf("ChangeSummary = %v", result.Bundle.ChangeSummary)
 	}
-	if len(result.Bundle.Findings) != 0 {
-		t.Fatalf("len(Findings) = %d, want deleted-file finding dropped", len(result.Bundle.Findings))
+	if len(result.Bundle.Findings) != 1 || result.Bundle.Findings[0].ChangedSpan.Side != findings.SideLeft {
+		t.Fatalf("Findings = %+v, want one LEFT deleted-file finding", result.Bundle.Findings)
+	}
+}
+
+func TestRunWithRuntimeRetainsDeletedOwnershipCheck(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "orders.go"), "package orders\n\nfunc canRead(owner, requester string) bool {\n\treturn owner == requester\n}\n")
+	runGitCmd(t, repo, "add", "orders.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "orders.go"), "package orders\n\nfunc canRead(owner, requester string) bool {\n\treturn true\n}\n")
+
+	runtime := &fakeRuntime{outputs: []ReviewOutput{{
+		ChangeSummary: []string{"Simplified order access checks."},
+		ReviewResult:  "A high-severity authorization regression blocks the review.",
+		Findings: []ReviewFinding{
+			{
+				Category:   "security",
+				Severity:   "high",
+				Confidence: 0.99,
+				Path:       "orders.go",
+				StartLine:  4,
+				EndLine:    4,
+				ChangedSpan: findings.LineSpan{
+					Path:      "orders.go",
+					StartLine: 4,
+					EndLine:   4,
+					Side:      findings.SideLeft,
+				},
+				Title:    "ownership check removed",
+				Message:  "the deleted comparison allowed reads only for the order owner",
+				Evidence: findings.NewEvidence("the owner-to-requester comparison was deleted"),
+				Impact:   findings.NewImpact("authenticated users can read orders they do not own"),
+			},
+			{
+				Category:    "correctness",
+				Severity:    "medium",
+				Confidence:  0.8,
+				Path:        "orders.go",
+				StartLine:   3,
+				EndLine:     3,
+				ChangedSpan: findings.LineSpan{Path: "orders.go", StartLine: 3, EndLine: 3, Side: findings.SideRight},
+				Title:       "context-only finding",
+				Message:     "this line was not changed",
+				Evidence:    findings.NewEvidence("unchanged function declaration"),
+				Impact:      findings.NewImpact("no changed-line support"),
+			},
+		},
+	}}}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		WorkingDir: repo,
+		Repo:       "repo-ownership",
+		ReviewID:   "review-ownership",
+		BlockOn:    "high",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(result.Bundle.Findings) != 1 {
+		t.Fatalf("Findings = %+v, want ownership finding", result.Bundle.Findings)
+	}
+	got := result.Bundle.Findings[0]
+	if got.ChangedSpan.Side != findings.SideLeft || got.StartLine != 4 || !got.Blocking {
+		t.Fatalf("finding = %+v, want blocking LEFT line 4", got)
+	}
+	if result.Bundle.ReviewResult != runtime.outputs[0].ReviewResult || len(result.Bundle.ChangeSummary) != 1 {
+		t.Fatalf("summary output lost: result=%q summary=%v", result.Bundle.ReviewResult, result.Bundle.ChangeSummary)
 	}
 }
 
@@ -980,6 +1052,26 @@ func TestDedupeAndSortFindingsKeepsStableOrder(t *testing.T) {
 	}
 }
 
+func TestChangedSpansByPathUsesSideSpecificRenamePaths(t *testing.T) {
+	t.Parallel()
+
+	got := changedSpansByPath([]diff.FileChange{{
+		FromPath: "old.go",
+		ToPath:   "new.go",
+		Status:   diff.ChangeRenamed,
+		ChangedLineSpans: []diff.LineSpan{
+			{Start: 8, End: 9, Side: diff.SideLeft},
+			{Start: 10, End: 11, Side: diff.SideRight},
+		},
+	}})
+	if len(got["old.go"]) != 1 || got["old.go"][0].Side != findings.SideLeft {
+		t.Fatalf("old.go spans = %+v, want one LEFT span", got["old.go"])
+	}
+	if len(got["new.go"]) != 1 || got["new.go"][0].Side != findings.SideRight {
+		t.Fatalf("new.go spans = %+v, want one RIGHT span", got["new.go"])
+	}
+}
+
 func TestNormalizeReviewFindingAllowsNearbySupportingContext(t *testing.T) {
 	allowed := map[string][]changedSpan{
 		"app/config.go": {{Start: 22, End: 22}},
@@ -1076,5 +1168,32 @@ func TestNormalizeReviewFindingRejectsUnchangedOnlyAnchor(t *testing.T) {
 
 	if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); ok {
 		t.Fatal("normalizeReviewFinding() accepted finding anchored only to unchanged context")
+	}
+}
+
+func TestNormalizeReviewFindingRejectsInvalidOrMismatchedSide(t *testing.T) {
+	allowed := map[string][]changedSpan{
+		"app/config.go": {{Start: 22, End: 22, Side: findings.SideLeft}},
+	}
+	base := ReviewFinding{
+		Category:    "security",
+		Severity:    "high",
+		Confidence:  0.9,
+		Path:        "app/config.go",
+		StartLine:   22,
+		EndLine:     22,
+		ChangedSpan: findings.LineSpan{Path: "app/config.go", StartLine: 22, EndLine: 22},
+		Title:       "removed guard",
+		Message:     "the deletion removes the guard",
+		Evidence:    findings.NewEvidence("the guard was deleted"),
+		Impact:      findings.NewImpact("requests bypass the guard"),
+	}
+
+	for _, side := range []findings.LineSide{findings.SideRight, "BOTH"} {
+		item := base
+		item.ChangedSpan.Side = side
+		if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); ok {
+			t.Fatalf("normalizeReviewFinding() accepted side %q against LEFT span", side)
+		}
 	}
 }
