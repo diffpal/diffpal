@@ -1281,7 +1281,7 @@ func TestNormalizeReviewFindingClipsAdjacentContextFromChangedRange(t *testing.T
 	}
 }
 
-func TestNormalizeReviewFindingRejectsBroadRangeWithMinorChangedOverlap(t *testing.T) {
+func TestNormalizeReviewFindingClipsBroadRangeToChangedOverlap(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string][]changedSpan{
@@ -1300,7 +1300,11 @@ func TestNormalizeReviewFindingRejectsBroadRangeWithMinorChangedOverlap(t *testi
 		Evidence:    findings.NewEvidence("only one line in the range changed"),
 		Impact:      findings.NewImpact("the anchor is ambiguous"),
 	}
-	if _, ok := normalizeReviewFinding(item, allowed, "provider-a"); ok {
-		t.Fatal("normalizeReviewFinding() accepted broad range with minor changed overlap")
+	got, ok := normalizeReviewFinding(item, allowed, "provider-a")
+	if !ok {
+		t.Fatal("normalizeReviewFinding() rejected broad range overlapping a changed line")
+	}
+	if got.StartLine != 57 || got.EndLine != 57 || got.ChangedSpan.StartLine != 57 || got.ChangedSpan.EndLine != 57 {
+		t.Fatalf("normalized range = %d-%d / %+v, want 57-57", got.StartLine, got.EndLine, got.ChangedSpan)
 	}
 }
