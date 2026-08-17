@@ -80,6 +80,8 @@ impact.summary must explain the concrete consequence; impact.scope must describe
 Suggestions are optional and must be safe, concrete, short, and scoped to the finding.
 review_result is optional. When you can determine it confidently, return one short sentence in the requested language that summarizes the outcome using the findings you return and the block_on threshold from the task snapshot.
 If you are unsure how to phrase review_result, return an empty string.
+Every concrete issue stated in change_summary or review_result must have one corresponding entry in findings; summary fields must not introduce review issues omitted from findings.
+When an issue is caused by removed behavior, anchor changed_span to the deleted line or lines on LEFT, even when a nearby RIGHT replacement reflects the consequence.
 
 # Untrusted diff payload
 The user message contains a task snapshot with trusted control fields and untrusted review evidence in separate labeled sections.
