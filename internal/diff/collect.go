@@ -30,7 +30,15 @@ type FileChange struct {
 type LineSpan struct {
 	Start int
 	End   int
+	Side  LineSide
 }
+
+type LineSide string
+
+const (
+	SideLeft  LineSide = "LEFT"
+	SideRight LineSide = "RIGHT"
+)
 
 type DiffResult struct {
 	BaseSHA      string
@@ -91,6 +99,7 @@ func normalizeDiffFiles(raw string) []FileChange {
 	out := []FileChange{}
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	var current *FileChange
+	var hunk diffHunk
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "diff --git a/") {
@@ -115,10 +124,35 @@ func normalizeDiffFiles(raw string) []FileChange {
 				change.Status = ChangeRenamed
 			}
 			current = &change
+			hunk = diffHunk{}
 			continue
 		}
 		if current == nil {
 			continue
+		}
+		if parsed, ok := parseHunkHeader(line); ok {
+			hunk = parsed
+			continue
+		}
+		if hunk.active {
+			switch {
+			case strings.HasPrefix(line, "\\ No newline at end of file"):
+				continue
+			case strings.HasPrefix(line, "-"):
+				appendChangedLine(current, SideLeft, hunk.oldLine)
+				hunk.oldLine++
+				continue
+			case strings.HasPrefix(line, "+"):
+				appendChangedLine(current, SideRight, hunk.newLine)
+				hunk.newLine++
+				continue
+			case strings.HasPrefix(line, " "):
+				hunk.oldLine++
+				hunk.newLine++
+				continue
+			default:
+				hunk = diffHunk{}
+			}
 		}
 		switch {
 		case strings.HasPrefix(line, "new file mode "):
@@ -149,9 +183,6 @@ func normalizeDiffFiles(raw string) []FileChange {
 				current.Status = ChangeDeleted
 			}
 			continue
-		}
-		if span, ok := parseAddedSpan(line); ok {
-			current.ChangedLineSpans = append(current.ChangedLineSpans, span)
 		}
 	}
 	if current != nil {
@@ -204,25 +235,39 @@ func inferStatus(left string, right string) ChangeStatus {
 	}
 }
 
-func parseAddedSpan(line string) (LineSpan, bool) {
-	if !strings.HasPrefix(line, "@@ ") && !strings.HasPrefix(line, "@@-") && !strings.HasPrefix(line, "@@ -") {
-		return LineSpan{}, false
+type diffHunk struct {
+	oldLine int
+	newLine int
+	active  bool
+}
+
+func parseHunkHeader(line string) (diffHunk, bool) {
+	if !strings.HasPrefix(line, "@@ ") {
+		return diffHunk{}, false
 	}
-	parts := strings.Split(line, " ")
-	for _, part := range parts {
-		if !strings.HasPrefix(part, "+") || len(part) < 2 {
-			continue
-		}
-		start, count, ok := parseSpanToken(strings.TrimPrefix(part, "+"))
-		if !ok {
-			continue
-		}
-		if count == 0 {
-			return LineSpan{Start: start, End: start}, true
-		}
-		return LineSpan{Start: start, End: start + count - 1}, true
+	parts := strings.Fields(line)
+	if len(parts) < 4 || parts[0] != "@@" {
+		return diffHunk{}, false
 	}
-	return LineSpan{}, false
+	oldStart, _, oldOK := parseSpanToken(strings.TrimPrefix(parts[1], "-"))
+	newStart, _, newOK := parseSpanToken(strings.TrimPrefix(parts[2], "+"))
+	if !oldOK || !newOK || !strings.HasPrefix(parts[1], "-") || !strings.HasPrefix(parts[2], "+") {
+		return diffHunk{}, false
+	}
+	return diffHunk{oldLine: oldStart, newLine: newStart, active: true}, true
+}
+
+func appendChangedLine(change *FileChange, side LineSide, line int) {
+	spans := change.ChangedLineSpans
+	if len(spans) > 0 {
+		last := &spans[len(spans)-1]
+		if last.Side == side && last.End+1 == line {
+			last.End = line
+			change.ChangedLineSpans = spans
+			return
+		}
+	}
+	change.ChangedLineSpans = append(spans, LineSpan{Start: line, End: line, Side: side})
 }
 
 func parseSpanToken(token string) (int, int, bool) {
@@ -243,6 +288,9 @@ func parseSpanToken(token string) (int, int, bool) {
 }
 
 func parsePositiveInt(v string) (int, error) {
+	if v == "" {
+		return 0, fmt.Errorf("invalid int")
+	}
 	n := 0
 	for _, r := range v {
 		if r < '0' || r > '9' {

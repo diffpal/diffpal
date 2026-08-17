@@ -2,14 +2,14 @@
 
 The canonical review artifact is
 `.artifacts/diffpal/findings.json`, a JSON serialization of DiffPal's findings
-bundle. New review writes use `version: "v3"` unless a bundle version is
+bundle. New review writes use `version: "v4"` unless a bundle version is
 already set by the caller.
 
 ## Canonical Bundle
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `version` | yes | Bundle version. New writes use `v3`; readers accept `v1`, `v2`, and `v3`. |
+| `version` | yes | Bundle version. New writes use `v4`; readers accept `v1`, `v2`, `v3`, and `v4`. |
 | `review_id` | yes | Stable review identifier. |
 | `base_sha` | yes | Base revision used for the review. |
 | `head_sha` | yes | Head revision used for the review. |
@@ -28,7 +28,7 @@ Prompt metadata fields:
 | `prompt_id` | Prompt identifier, currently `diffpal.review` for review output. |
 | `prompt_version` | Prompt version used for the review. |
 | `purpose` | Prompt purpose. |
-| `schema_version` | Prompt output schema version, currently `findings.v3`. |
+| `schema_version` | Prompt output schema version, currently `findings.v4`. |
 
 Inspection metadata fields:
 
@@ -52,12 +52,12 @@ Inspection metadata fields:
 | `path` | yes | File path for the finding. |
 | `start_line` | yes | Positive start line. |
 | `end_line` | yes | Positive end line, greater than or equal to `start_line`. |
-| `changed_span` | yes for v2/v3 | Changed-line span that anchors the finding. |
+| `changed_span` | yes for v2/v3/v4 | Changed-line span that anchors the finding. |
 | `supporting_span` | no | Additional context span. |
 | `title` | yes | Short finding title. |
 | `message` | yes | Finding explanation. |
-| `evidence` | yes | Structured evidence for v2/v3. |
-| `impact` | yes | Structured impact for v2/v3. |
+| `evidence` | yes | Structured evidence for v2/v3/v4. |
+| `impact` | yes | Structured impact for v2/v3/v4. |
 | `suggestion` | no | Suggested fix. |
 | `blocking` | written by DiffPal | Whether the finding meets the active threshold. |
 | `provider` | no | Provider ID that produced the finding. |
@@ -68,7 +68,8 @@ Line span representation:
 {
   "path": "internal/session.go",
   "start_line": 12,
-  "end_line": 14
+  "end_line": 14,
+  "side": "RIGHT"
 }
 ```
 
@@ -104,15 +105,21 @@ Location is represented twice for compatibility:
 For v2/v3, `changed_span.path`, `changed_span.start_line`, and
 `changed_span.end_line` are required and must be positive.
 
+For v4, `changed_span.side` is also required. `LEFT` uses old-file line
+coordinates for deleted lines; `RIGHT` uses new-file line coordinates for
+added lines.
+
 ## Compatibility
 
 DiffPal readers accept:
 
 - `v1` bundles where `evidence` and `impact` may be legacy strings;
 - `v2` bundles with structured evidence and impact;
-- `v3` bundles with optional `review_result`.
+- `v3` bundles with optional `review_result`;
+- `v4` bundles with a side-aware changed-line anchor.
 
-New writes use `v3`. Consumers should ignore unknown fields and treat
+Legacy v1-v3 anchors default to `RIGHT` when read. New writes use `v4`.
+Consumers should ignore unknown fields and treat
 `findings[]` as the canonical machine-readable issue list.
 
 ## Consumer Example

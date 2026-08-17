@@ -259,8 +259,11 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle() error = %v", err)
 	}
-	if readBack.Version != VersionV3 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
+	if readBack.Version != VersionV4 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	}
+	if readBack.Findings[0].ChangedSpan.Side != SideRight {
+		t.Fatalf("ChangedSpan.Side = %q, want %q", readBack.Findings[0].ChangedSpan.Side, SideRight)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")
@@ -295,6 +298,67 @@ func TestFingerprintPreservesPathCase(t *testing.T) {
 	upper.Path = "internal/app/Service.go"
 	if Fingerprint("repo", "head-a", base) == Fingerprint("repo", "head-a", upper) {
 		t.Fatal("Fingerprint() matched paths that differ by case")
+	}
+}
+
+func TestFingerprintPreservesRightIdentityAndDistinguishesLeft(t *testing.T) {
+	t.Parallel()
+
+	base := Finding{
+		ReviewID:    "review-a",
+		Category:    "correctness",
+		Path:        "internal/app/service.go",
+		StartLine:   12,
+		EndLine:     12,
+		ChangedSpan: LineSpan{Path: "internal/app/service.go", StartLine: 12, EndLine: 12},
+		Message:     "same message",
+		Evidence:    NewEvidence("same evidence"),
+	}
+	right := base
+	right.ChangedSpan.Side = SideRight
+	left := base
+	left.ChangedSpan.Side = SideLeft
+
+	legacyID := Fingerprint("repo", "head-a", base)
+	if got := Fingerprint("repo", "head-a", right); got != legacyID {
+		t.Fatalf("RIGHT fingerprint = %q, want legacy %q", got, legacyID)
+	}
+	if got := Fingerprint("repo", "head-a", left); got == legacyID {
+		t.Fatal("LEFT fingerprint matched legacy RIGHT fingerprint")
+	}
+}
+
+func TestValidateV4RequiresCanonicalChangedSpanSide(t *testing.T) {
+	t.Parallel()
+
+	valid := FindingsBundle{
+		Version:  VersionV4,
+		ReviewID: "review-v4",
+		Findings: []Finding{{
+			Category:    "security",
+			Severity:    "high",
+			Confidence:  0.9,
+			Path:        "app/session.go",
+			StartLine:   12,
+			EndLine:     12,
+			ChangedSpan: LineSpan{Path: "app/session.go", StartLine: 12, EndLine: 12, Side: SideLeft},
+			Title:       "ownership check removed",
+			Message:     "the deletion removes the access-control check",
+			Evidence:    NewEvidence("the ownership comparison was deleted"),
+			Impact:      NewImpact("authenticated users can read another user's order"),
+		}},
+	}
+	if err := Validate(valid); err != nil {
+		t.Fatalf("Validate(valid v4) error = %v", err)
+	}
+
+	for _, side := range []LineSide{"", "left", "BOTH"} {
+		candidate := valid
+		candidate.Findings = append([]Finding(nil), valid.Findings...)
+		candidate.Findings[0].ChangedSpan.Side = side
+		if err := Validate(candidate); err == nil {
+			t.Fatalf("Validate(v4 side %q) error = nil, want validation error", side)
+		}
 	}
 }
 
