@@ -27,6 +27,7 @@ type CommentAction struct {
 	Path      string
 	Line      int
 	EndLine   int
+	Side      findings.LineSide
 }
 
 type CommentState struct {
@@ -66,7 +67,11 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		if f.StartLine <= 0 || f.Confidence < minConfidence {
 			continue
 		}
-		key := commentKey(f.Path, f.StartLine, f.Category, f.ID)
+		side, ok := canonicalCommentSide(f.ChangedSpan.Side)
+		if !ok {
+			continue
+		}
+		key := commentKeyForSide(f.Path, f.StartLine, f.Category, side, f.ID)
 		body := formatBody(f, links)
 		endLine := f.EndLine
 		if endLine < f.StartLine {
@@ -74,22 +79,22 @@ func planInlineComments(existing map[string]string, findings []findings.Finding,
 		}
 		state = append(state, CommentState{Key: key, FindingID: f.ID})
 		if existing == nil {
-			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine, Side: side})
 			continue
 		}
 		prior, ok := existing[key]
 		if !ok {
-			prior, ok = singleExistingForLocation(existing, commentLocationKey(f.Path, f.StartLine, f.Category))
+			prior, ok = singleExistingForLocation(existing, commentLocationKeyForSide(f.Path, f.StartLine, f.Category, side))
 		}
 		if ok && prior == f.ID {
-			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionSkip, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine, Side: side})
 			continue
 		}
 		if ok {
-			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+			out = append(out, CommentAction{Type: ActionUpdate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine, Side: side})
 			continue
 		}
-		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine})
+		out = append(out, CommentAction{Type: ActionCreate, FindingID: f.ID, Body: body, Path: f.Path, Line: f.StartLine, EndLine: endLine, Side: side})
 	}
 	return CommentPlan{
 		Actions: out,
@@ -104,6 +109,9 @@ func ValidateInlineFindings(items []findings.Finding) error {
 		}
 		if item.StartLine <= 0 {
 			return fmt.Errorf("github finding %q cannot be published inline: missing start line", item.ID)
+		}
+		if _, ok := canonicalCommentSide(item.ChangedSpan.Side); !ok {
+			return fmt.Errorf("github finding %q cannot be published inline: side must be LEFT or RIGHT", item.ID)
 		}
 	}
 	return nil
@@ -132,11 +140,34 @@ func LoadExistingState(path string) (map[string]string, error) {
 }
 
 func commentKey(path string, line int, category string, findingID string) string {
-	return commentLocationKey(path, line, category) + ":" + findingID
+	return commentKeyForSide(path, line, category, findings.SideRight, findingID)
 }
 
 func commentLocationKey(path string, line int, category string) string {
-	return fmt.Sprintf("%s:%d:%s", path, line, category)
+	return commentLocationKeyForSide(path, line, category, findings.SideRight)
+}
+
+func commentKeyForSide(path string, line int, category string, side findings.LineSide, findingID string) string {
+	return commentLocationKeyForSide(path, line, category, side) + ":" + findingID
+}
+
+func commentLocationKeyForSide(path string, line int, category string, side findings.LineSide) string {
+	key := fmt.Sprintf("%s:%d:%s", path, line, category)
+	if side == findings.SideLeft {
+		return key + ":LEFT"
+	}
+	return key
+}
+
+func canonicalCommentSide(side findings.LineSide) (findings.LineSide, bool) {
+	switch side {
+	case "", findings.SideRight:
+		return findings.SideRight, true
+	case findings.SideLeft:
+		return findings.SideLeft, true
+	default:
+		return "", false
+	}
 }
 
 func singleExistingForLocation(existing map[string]string, locationKey string) (string, bool) {

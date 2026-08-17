@@ -207,9 +207,15 @@ func TestPublishBundleToFilesGitHubCommentsIncludeAdvisoryFindings(t *testing.T)
 			Path:       "internal/db/query.go",
 			StartLine:  3,
 			EndLine:    3,
-			Title:      "advisory",
-			Message:    "medium advisory",
-			Evidence:   findings.NewEvidence("medium evidence"),
+			ChangedSpan: findings.LineSpan{
+				Path:      "internal/db/query.go",
+				StartLine: 3,
+				EndLine:   3,
+				Side:      findings.SideLeft,
+			},
+			Title:    "advisory",
+			Message:  "medium advisory",
+			Evidence: findings.NewEvidence("medium evidence"),
 		}, {
 			ID:         "fp-high",
 			ReviewID:   "github-pr-1",
@@ -237,7 +243,7 @@ func TestPublishBundleToFilesGitHubCommentsIncludeAdvisoryFindings(t *testing.T)
 		t.Fatalf("ReadFile(github-comments.json) error = %v", err)
 	}
 	text := string(raw)
-	for _, needle := range []string{"fp-medium", "medium advisory", "fp-high", "high finding"} {
+	for _, needle := range []string{"fp-medium", "medium advisory", "fp-high", "high finding", `"Side": "LEFT"`, "blob/base-a/internal/db/query.go#L3"} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("github comments missing %q:\n%s", needle, text)
 		}

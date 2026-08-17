@@ -152,6 +152,20 @@ func TestPublishPullRequestReviewCreatesMultilineInlineComment(t *testing.T) {
 	}
 }
 
+func TestPullRequestReviewCommentsUsesLeftForDeletedRange(t *testing.T) {
+	t.Parallel()
+
+	comments := pullRequestReviewComments(CommentPlan{Actions: []CommentAction{{
+		Type: ActionCreate, Body: "removed guard", Path: "orders.go", Line: 40, EndLine: 42, Side: findings.SideLeft,
+	}}}, ReviewIdentity{})
+	if len(comments) != 1 {
+		t.Fatalf("comments = %d, want 1", len(comments))
+	}
+	if comments[0]["side"] != "LEFT" || comments[0]["start_side"] != "LEFT" || comments[0]["start_line"] != 40 || comments[0]["line"] != 42 {
+		t.Fatalf("comment = %#v, want LEFT lines 40-42", comments[0])
+	}
+}
+
 func TestPublishPullRequestReviewUpdatesExistingHeadReview(t *testing.T) {
 	t.Setenv("DIFFPAL_GITHUB_API_URL", "")
 	var patchedBody string
@@ -285,10 +299,11 @@ func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
 		Repo:     "acme/diffpal",
 		PRNumber: 7,
 	}, ReviewIdentity{Channel: "diffpal-dev"}, []findings.Finding{{
-		ID:        "current-finding",
-		Path:      "internal/app.go",
-		StartLine: 12,
-		Category:  "security",
+		ID:          "current-finding",
+		Path:        "internal/app.go",
+		StartLine:   12,
+		Category:    "security",
+		ChangedSpan: findings.LineSpan{Side: findings.SideLeft},
 	}, {
 		ID:        "resolved-finding",
 		Path:      "internal/app.go",
@@ -300,7 +315,7 @@ func TestActiveReviewThreadStateUsesUnresolvedFindingMarkers(t *testing.T) {
 		t.Fatal(err)
 	default:
 	}
-	wantKey := commentKey("internal/app.go", 12, "security", "current-finding")
+	wantKey := commentKeyForSide("internal/app.go", 12, "security", findings.SideLeft, "current-finding")
 	if len(state) != 1 || state[wantKey] != "current-finding" {
 		t.Fatalf("state = %#v, want only active current finding", state)
 	}
