@@ -575,8 +575,7 @@ func changedRange(path string, startLine, endLine int, side findings.LineSide, a
 			bestStart, bestEnd, bestLength = intersectionStart, intersectionEnd, length
 		}
 	}
-	claimedLength := endLine - startLine + 1
-	if bestLength == 0 || bestLength*2 < claimedLength {
+	if bestLength == 0 {
 		return 0, 0, false
 	}
 	return bestStart, bestEnd, true
