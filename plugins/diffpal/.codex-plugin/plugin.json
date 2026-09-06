@@ -1,0 +1,26 @@
+{
+  "name": "diffpal",
+  "version": "0.1.0",
+  "description": "Configure and run DiffPal reviews locally and in CI.",
+  "author": {
+    "name": "Alexey Samoylov"
+  },
+  "homepage": "https://diffpal.github.io/",
+  "repository": "https://github.com/diffpal/diffpal",
+  "license": "MIT",
+  "keywords": ["diffpal", "code-review", "ci"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DiffPal",
+    "shortDescription": "Configure and run DiffPal reviews.",
+    "longDescription": "Set up local and CI profiles, run safe code reviews, and configure CI integrations with DiffPal.",
+    "developerName": "Alexey Samoylov",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "$diffpal:setup Configure DiffPal with local and CI profiles.",
+      "$diffpal:review Review my current branch with DiffPal.",
+      "$diffpal:ci Add a safe DiffPal CI workflow."
+    ]
+  }
+}
