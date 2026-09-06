@@ -1,0 +1,4 @@
+interface:
+  display_name: "DiffPal Review"
+  short_description: "Review repository changes safely with DiffPal"
+  default_prompt: "Use $diffpal:review to review my current branch with DiffPal."

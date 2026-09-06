@@ -62,6 +62,17 @@ Open a same-repository pull request. After the first successful run, expect a
 For full setup details, provider alternatives, and fork PR guidance, use the
 [GitHub quickstart](docs/getting-started/github-quickstart.md).
 
+## Coding-Agent Plugin
+
+DiffPal includes an instruction-only plugin for Codex, Claude Code, Grok Build,
+GitHub Copilot CLI, Cursor, OpenCode, and Agent Plugins 1.0.0 clients. Its three
+skills configure separate local and CI profiles, run review with explicit
+provider/publishing boundaries, and merge safe CI automation for GitHub,
+GitLab, Azure, or custom runners.
+
+See the [plugin guide](plugins/diffpal/README.md) for host installation and the
+exact setup, review, and CI skill names.
+
 ## Supported Integrations
 
 | Host | Native outputs | Guide |

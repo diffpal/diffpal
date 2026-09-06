@@ -1,0 +1,4 @@
+interface:
+  display_name: "DiffPal Setup"
+  short_description: "Configure safe local and CI review profiles"
+  default_prompt: "Use $diffpal:setup to configure DiffPal with local and CI profiles."

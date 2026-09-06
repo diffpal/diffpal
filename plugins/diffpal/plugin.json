@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "diffpal",
+  "version": "0.1.0",
+  "description": "Configure and run DiffPal reviews locally and in CI.",
+  "author": {
+    "name": "Alexey Samoylov"
+  },
+  "homepage": "https://diffpal.github.io/",
+  "repository": "https://github.com/diffpal/diffpal",
+  "license": "MIT",
+  "keywords": ["diffpal", "code-review", "ci"]
+}
