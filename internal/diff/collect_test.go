@@ -187,6 +187,45 @@ func TestCollectParsesAddedFileRightSpan(t *testing.T) {
 	}
 }
 
+func TestCollectIncludesUntrackedTextOnlyWhenRequested(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	writeFile(t, filepath.Join(repo, ".gitignore"), "ignored.txt\n")
+	writeFile(t, filepath.Join(repo, "tracked.txt"), "tracked\n")
+	runGitCmd(t, repo, "add", ".gitignore", "tracked.txt")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+
+	writeFile(t, filepath.Join(repo, "new.txt"), "first\nsecond")
+	writeFile(t, filepath.Join(repo, "ignored.txt"), "ignored\n")
+	if err := os.WriteFile(filepath.Join(repo, "binary.bin"), []byte{'a', 0, 'b'}, 0o644); err != nil {
+		t.Fatalf("WriteFile(binary.bin) error = %v", err)
+	}
+
+	withoutUntracked, err := Collect(Options{WorkDir: repo})
+	if err != nil {
+		t.Fatalf("Collect() without untracked error = %v", err)
+	}
+	if len(withoutUntracked.Files) != 0 {
+		t.Fatalf("Files without untracked = %+v, want none", withoutUntracked.Files)
+	}
+
+	withUntracked, err := Collect(Options{WorkDir: repo, IncludeUntracked: true})
+	if err != nil {
+		t.Fatalf("Collect() with untracked error = %v", err)
+	}
+	if len(withUntracked.Files) != 1 {
+		t.Fatalf("Files with untracked = %+v, want only new.txt", withUntracked.Files)
+	}
+	file := withUntracked.Files[0]
+	if file.FromPath != "/dev/null" || file.ToPath != "new.txt" || file.Status != ChangeAdded {
+		t.Fatalf("untracked file = %+v, want added /dev/null -> new.txt", file)
+	}
+	if got, want := file.ChangedLineSpans, []LineSpan{{Start: 1, End: 2, Side: SideRight}}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("ChangedLineSpans = %v, want %v", got, want)
+	}
+}
+
 func TestCollectMarksDeletedFiles(t *testing.T) {
 	t.Parallel()
 

@@ -432,3 +432,45 @@ func TestReviewTaskDescribesDiffPalCIReview(t *testing.T) {
 		}
 	}
 }
+
+func TestUncommittedReviewTaskDelegatesWorkspaceInspection(t *testing.T) {
+	t.Parallel()
+
+	got := UncommittedReviewTask()
+	for _, phrase := range []string{
+		"uncommitted changes",
+		"workspace snapshot provided by the backend",
+		"does not include a CLI-generated changed-file list",
+		"available tools",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("UncommittedReviewTask() = %q, want phrase %q", got, phrase)
+		}
+	}
+	for _, forbidden := range []string{"temporary Git repository", "--path", "--untracked"} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("UncommittedReviewTask() = %q, contains %q", got, forbidden)
+		}
+	}
+}
+
+func TestUncommittedReviewSystemDoesNotRequireCommittedRange(t *testing.T) {
+	t.Parallel()
+
+	got := RenderReviewSystem(ReviewOptions{Uncommitted: true})
+	for _, phrase := range []string{
+		"uncommitted changes in the workspace snapshot provided by the backend",
+		"do not expect a CLI-generated changed-file list",
+		"do not limit inspection to a committed base..head range",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("uncommitted system prompt missing %q", phrase)
+		}
+	}
+	if strings.Contains(got, "inspect the requested base..head Git diff") {
+		t.Fatalf("uncommitted system prompt retains committed-range instruction:\n%s", got)
+	}
+	if strings.Contains(got, "pull request review engine") {
+		t.Fatalf("uncommitted system prompt retains pull-request-only contract:\n%s", got)
+	}
+}

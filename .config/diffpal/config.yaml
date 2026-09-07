@@ -31,7 +31,11 @@ diffpal:
     github: {}
 
 profiles:
+  local:
+    diffpal:
+      provider: codex-acp
   ci:
     diffpal:
+      provider: codex-acp
       gate:
         block_on: high

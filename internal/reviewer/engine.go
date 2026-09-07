@@ -20,6 +20,7 @@ import (
 )
 
 type Options struct {
+	Mode          Mode
 	WorkingDir    string
 	Repo          string
 	ReviewID      string
@@ -29,6 +30,24 @@ type Options struct {
 	Language      string
 	ReviewTimeout time.Duration
 	Instructions  string
+}
+
+type Mode string
+
+const (
+	ModeDefault     Mode = ""
+	ModeUncommitted Mode = "uncommitted"
+)
+
+func reviewTaskForMode(mode Mode) (string, error) {
+	switch mode {
+	case ModeDefault:
+		return promptpack.DefaultReviewPrompt().ReviewTask(), nil
+	case ModeUncommitted:
+		return promptpack.UncommittedReviewTask(), nil
+	default:
+		return "", fmt.Errorf("unsupported review mode %q", mode)
+	}
 }
 
 type Result struct {
@@ -86,6 +105,7 @@ type RuntimeUsage struct {
 }
 
 type RuntimeConfig struct {
+	Mode         Mode
 	ProviderID   string
 	Providers    map[string]dpconfig.ProviderConfig
 	MCPServers   map[string]agentconfig.MCPServerConfig
@@ -119,9 +139,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		workingDir = cwd
 	}
 	result, err := diff.Collect(diff.Options{
-		BaseSHA: opts.BaseSHA,
-		HeadSHA: opts.HeadSHA,
-		WorkDir: workingDir,
+		BaseSHA:          opts.BaseSHA,
+		HeadSHA:          opts.HeadSHA,
+		WorkDir:          workingDir,
+		IncludeUntracked: opts.Mode == ModeUncommitted,
 	})
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
@@ -158,6 +179,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
 	}
+	reviewTask, err := reviewTaskForMode(opts.Mode)
+	if err != nil {
+		return Result{}, wrapError(KindConfig, err)
+	}
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
@@ -179,6 +204,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	runtimeCfg := RuntimeConfig{
+		Mode:         opts.Mode,
 		ProviderID:   cfg.ProviderID(),
 		Providers:    providersWithEnv(cfg.Providers),
 		MCPServers:   cfg.MCPServers,
@@ -192,6 +218,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	summaries := make([]string, 0)
 	var inspection *findings.Inspection
 	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, blockOn, language, instructions, commitMessages)
+	input.ReviewTask = reviewTask
 	var output ReviewOutput
 	var usage RuntimeUsage
 	reviewTimeout := opts.ReviewTimeout

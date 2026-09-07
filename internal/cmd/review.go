@@ -42,6 +42,7 @@ func newReviewCommandWithRunner(run reviewRunner) *cobra.Command {
 
 	review.AddCommand(
 		newLocalReviewSubcommand(run),
+		newUncommittedReviewSubcommand(run),
 		newHostReviewSubcommand(run, "github", "github", nil),
 		newHostReviewSubcommand(run, "gitlab", "gitlab", nil),
 		newHostReviewSubcommand(run, "ado", "azure", []string{"azure"}),
@@ -84,8 +85,10 @@ func newHostReviewSubcommand(run reviewRunner, name, platform string, aliases []
 }
 
 func addReviewAnalysisFlags(cmd *cobra.Command, defaultReviewID string) {
-	cmd.Flags().String("base", "", "Base revision")
-	cmd.Flags().String("head", "", "Head revision")
+	if cmd.Name() != "uncommitted" {
+		cmd.Flags().String("base", "", "Base revision")
+		cmd.Flags().String("head", "", "Head revision")
+	}
 	cmd.Flags().String("language", "", "Language for generated review findings")
 	cmd.Flags().String("instructions", "", "Additional review instructions for local prompt tuning")
 	cmd.Flags().String("instructions-file", "", "Path to additional review instructions")
@@ -114,12 +117,16 @@ func addReviewPolicyFlags(cmd *cobra.Command) {
 }
 
 func runReviewOnly(cmd *cobra.Command, defaultReviewID string, run reviewRunner) error {
+	return runReviewOnlyWithMode(cmd, defaultReviewID, run, reviewer.ModeDefault)
+}
+
+func runReviewOnlyWithMode(cmd *cobra.Command, defaultReviewID string, run reviewRunner, mode reviewer.Mode) error {
 	feedback, _ := cmd.Flags().GetString("feedback")
 	profile, err := normalizeFeedback(feedback)
 	if err != nil {
 		return withExitCode(2, err)
 	}
-	execution, err := executeReview(cmd, defaultReviewID, run, false, false)
+	execution, err := executeReview(cmd, defaultReviewID, run, false, false, mode)
 	if err != nil {
 		return err
 	}
@@ -169,7 +176,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 		}
 	}
 
-	execution, err := executeReview(cmd, defaultReviewID, run, true, true)
+	execution, err := executeReview(cmd, defaultReviewID, run, true, true, reviewer.ModeDefault)
 	if err != nil {
 		return err
 	}
@@ -249,7 +256,7 @@ func runHostReview(cmd *cobra.Command, platform, defaultReviewID string, run rev
 	return nil
 }
 
-func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner, emitStatus bool, writeBundle bool) (reviewExecution, error) {
+func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner, emitStatus bool, writeBundle bool, mode reviewer.Mode) (reviewExecution, error) {
 	base, _ := cmd.Flags().GetString("base")
 	head, _ := cmd.Flags().GetString("head")
 	language, _ := cmd.Flags().GetString("language")
@@ -303,6 +310,7 @@ func executeReview(cmd *cobra.Command, defaultReviewID string, run reviewRunner,
 		runCtx = context.Background()
 	}
 	result, err := run(runCtx, cfg, reviewer.Options{
+		Mode:          mode,
 		Repo:          repo,
 		ReviewID:      reviewID,
 		BaseSHA:       base,
