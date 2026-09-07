@@ -44,6 +44,8 @@ Supported runtime provider types:
 | `aistudio` | Supported config type | Hosted API config type; use when explicitly configured. |
 | `gemini_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
 | `claude_code_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
+| `claude_acp` | Compatibility alias | Uses the `claude_code_acp` configuration block. |
+| `grok_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
 | `pool` | Supported runtime type | Ordered provider failover config. |
 
 No provider account is managed by DiffPal. Provider authentication belongs to

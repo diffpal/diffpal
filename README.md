@@ -44,7 +44,7 @@ Generate a GitHub Actions config with the default Codex API-key recipe:
 npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform github
 ```
 
-Add `OPENAI_API_KEY` as a repository secret, then copy the workflow:
+Add `OPENAI_API_KEY` as a repository secret, then download the workflow:
 
 `OPENAI_API_KEY` is a provider credential. DiffPal runs in your CI and sends
 review input to the provider you configure, so keep this secret out of
@@ -52,12 +52,15 @@ untrusted fork PR jobs.
 
 ```bash
 mkdir -p .github/workflows
-cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
+curl -fsSL \
+  https://raw.githubusercontent.com/diffpal/diffpal/main/examples/ci/github-actions/codex-api-key.yml \
+  -o .github/workflows/diffpal.yml
 ```
 
 Open a same-repository pull request. After the first successful run, expect a
 `DiffPal Review Summary`, inline findings when actionable issues exist, and
-`.artifacts/diffpal/findings.json` in the workflow workspace.
+the retained `diffpal-review` artifact containing
+`.artifacts/diffpal/findings.json`.
 
 For full setup details, provider alternatives, and fork PR guidance, use the
 [GitHub quickstart](docs/getting-started/github-quickstart.md).
@@ -107,7 +110,7 @@ Azure users can install the
 | Run the first GitHub review | [GitHub quickstart](docs/getting-started/github-quickstart.md) |
 | Confirm the first run worked | [Verify First Review](docs/getting-started/verify-first-review.md) |
 | Improve a working setup | [Next Steps](docs/getting-started/next-steps.md) |
-| Understand the concepts | [Concepts](docs/concepts/README.md) and [Glossary](docs/concepts/glossary.md) |
+| Understand the concepts | [Concepts](docs/concepts/README.md) and [Glossary](docs/reference/glossary.md) |
 | Choose a provider or ACP agent | [Providers](docs/providers/README.md) |
 | Set up GitLab, Azure, or custom CI | [Integrations](docs/integrations/README.md) |
 | Secure secrets and fork PRs | [Secrets and fork PRs](docs/guides/secrets-and-fork-prs.md) |
