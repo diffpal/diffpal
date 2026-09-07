@@ -40,19 +40,19 @@ profiles:
       provider: ci-agent
 ```
 
-For one shared provider, define one provider entry and point the root, `local`, and `ci` selections to its ID. Preserve unrelated `runtime`, `diffpal`, and `profiles` keys during a merge.
+For one shared provider, define one provider entry and point the root plus each requested profile to its ID. Do not add `local` or `ci` merely to make the example symmetric. Preserve unrelated `runtime`, `diffpal`, and `profiles` keys during a merge.
 
 ## Initialization choices
 
 Supported wizard setup names are `codex-api-key`, `codex-subscription`, `copilot-github-token`, `opencode-acp`, and `generic-acp`. A representative command is:
 
 ```bash
-diffpal init --wizard --setup <setup-name> --platform <platform> --profile ci
+<diffpal-command> init --wizard --setup <setup-name> --platform <platform> --profile <requested-profile>
 ```
 
 The wizard creates one selected profile, not the full two-profile model. For a new repository, preview the wizard command and the post-init YAML merge together. For an existing config, normally skip `init` and patch the parsed YAML directly. Do not use `--force` by default.
 
-When only `npx` is available, the equivalent command begins with `npx -y @diffpal/diffpal@latest`; this can resolve and execute code from the network and needs explicit approval.
+When an approved `npx` invocation is selected, use that same command prefix for init and doctor. Do not fall back to a nonexistent global `diffpal` binary.
 
 ## Provider and credential rules
 
@@ -69,7 +69,7 @@ Before writing, show:
 
 - the target config path and whether it already exists;
 - the preserved and changed YAML keys;
-- local and CI provider IDs and types;
+- provider IDs and types for each requested profile;
 - any install or `npx` command;
 - credential variable names only;
-- the exact `doctor` commands that will validate the result.
+- the exact `doctor` commands, using the selected executable, that will validate the requested profiles.

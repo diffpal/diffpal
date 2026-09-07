@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -49,9 +50,10 @@ type DiffResult struct {
 }
 
 type Options struct {
-	BaseSHA string
-	HeadSHA string
-	WorkDir string
+	BaseSHA          string
+	HeadSHA          string
+	WorkDir          string
+	IncludeUntracked bool
 }
 
 func Collect(opts Options) (DiffResult, error) {
@@ -85,6 +87,13 @@ func Collect(opts Options) (DiffResult, error) {
 	}
 	raw = normalizeDiff(raw)
 	files := normalizeDiffFiles(raw)
+	if opts.IncludeUntracked {
+		untracked, err := collectUntrackedFiles(workDir)
+		if err != nil {
+			return DiffResult{}, err
+		}
+		files = append(files, untracked...)
+	}
 
 	return DiffResult{
 		BaseSHA:      baseSHA,
@@ -93,6 +102,56 @@ func Collect(opts Options) (DiffResult, error) {
 		Files:        files,
 		ChangedFiles: len(files),
 	}, nil
+}
+
+func collectUntrackedFiles(workDir string) ([]FileChange, error) {
+	raw, err := runGit(workDir, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, fmt.Errorf("git list untracked files failed: %w", err)
+	}
+	paths := strings.Split(strings.TrimSuffix(raw, "\x00"), "\x00")
+	if raw == "" {
+		return nil, nil
+	}
+	files := make([]FileChange, 0, len(paths))
+	for _, path := range paths {
+		path = filepath.Clean(path)
+		if path == "." || filepath.IsAbs(path) || path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
+			continue
+		}
+		fullPath := filepath.Join(workDir, path)
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			return nil, fmt.Errorf("inspect untracked file %q: %w", path, err)
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			return nil, fmt.Errorf("read untracked file %q: %w", path, err)
+		}
+		if bytes.IndexByte(content, 0) >= 0 {
+			continue
+		}
+		change := FileChange{FromPath: "/dev/null", ToPath: path, Status: ChangeAdded}
+		if lines := sourceLineCount(content); lines > 0 {
+			change.ChangedLineSpans = []LineSpan{{Start: 1, End: lines, Side: SideRight}}
+		}
+		files = append(files, change)
+	}
+	return files, nil
+}
+
+func sourceLineCount(content []byte) int {
+	if len(content) == 0 {
+		return 0
+	}
+	lines := bytes.Count(content, []byte{'\n'})
+	if content[len(content)-1] != '\n' {
+		lines++
+	}
+	return lines
 }
 
 func normalizeDiffFiles(raw string) []FileChange {

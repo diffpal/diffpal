@@ -110,6 +110,99 @@ func TestRunWithRuntimeAggregatesFindingsAndAppliesBlocking(t *testing.T) {
 	}
 }
 
+func TestRunWithRuntimeSelectsUncommittedBackendTask(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc value() int { return 1 }\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n\nfunc value() int { return 2 }\n")
+
+	runtime := &fakeRuntime{outputs: []ReviewOutput{{ChangeSummary: []string{"Changed value."}}}}
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		Mode:       ModeUncommitted,
+		WorkingDir: repo,
+		Repo:       "repo-uncommitted",
+		ReviewID:   "uncommitted",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if len(runtime.inputs) != 1 {
+		t.Fatalf("runtime inputs = %d, want 1", len(runtime.inputs))
+	}
+	if len(runtime.configs) != 1 || runtime.configs[0].Mode != ModeUncommitted {
+		t.Fatalf("runtime configs = %+v, want uncommitted mode", runtime.configs)
+	}
+	got := runtime.inputs[0].ReviewTask
+	for _, phrase := range []string{"uncommitted changes", "workspace snapshot provided by the backend", "does not include a CLI-generated changed-file list"} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("uncommitted task missing %q: %s", phrase, got)
+		}
+	}
+	if strings.Contains(got, "requested Git diff") {
+		t.Fatalf("uncommitted task retained range-review instruction: %s", got)
+	}
+}
+
+func TestRunWithRuntimeValidatesUntrackedFindingInUncommittedMode(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "tracked.go"), "package sample\n")
+	runGitCmd(t, repo, "add", "tracked.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "new.go"), "package sample\n\nvar value = 1\n")
+
+	runtime := &fakeRuntime{outputs: []ReviewOutput{{
+		Findings: []ReviewFinding{{
+			Category:   "correctness",
+			Severity:   "medium",
+			Confidence: 0.9,
+			Path:       "new.go",
+			StartLine:  3,
+			EndLine:    3,
+			Title:      "untracked finding",
+			Message:    "the new declaration has a correctness issue",
+			Evidence:   findings.NewEvidence("new.go line 3 contains the affected declaration"),
+			Impact:     findings.NewImpact("the new behavior can produce an incorrect result"),
+		}},
+	}}}
+
+	result, err := RunWithRuntime(context.Background(), testConfig(), Options{
+		Mode:       ModeUncommitted,
+		WorkingDir: repo,
+		Repo:       "repo-uncommitted",
+		ReviewID:   "uncommitted",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("RunWithRuntime() error = %v", err)
+	}
+	if result.ChangedFiles != 1 || len(result.Files) != 1 || result.Files[0].ToPath != "new.go" {
+		t.Fatalf("collected files = %+v (count %d), want untracked new.go", result.Files, result.ChangedFiles)
+	}
+	if len(result.Bundle.Files) != 1 || result.Bundle.Files[0].Path != "new.go" {
+		t.Fatalf("Bundle.Files = %+v, want new.go", result.Bundle.Files)
+	}
+	if len(result.Bundle.Findings) != 1 || result.Bundle.Findings[0].Path != "new.go" {
+		t.Fatalf("Bundle.Findings = %+v, want retained new.go finding", result.Bundle.Findings)
+	}
+}
+
+func TestRunWithRuntimeRejectsUnknownReviewMode(t *testing.T) {
+	repo := newGitRepo(t)
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package main\n")
+	runGitCmd(t, repo, "add", "main.go")
+	runGitCmd(t, repo, "commit", "-m", "initial")
+	writeRepoFile(t, filepath.Join(repo, "main.go"), "package changed\n")
+
+	runtime := &fakeRuntime{}
+	_, err := RunWithRuntime(context.Background(), testConfig(), Options{Mode: Mode("unknown"), WorkingDir: repo}, runtime)
+	if err == nil || !strings.Contains(err.Error(), "unsupported review mode") {
+		t.Fatalf("RunWithRuntime() error = %v, want unsupported review mode", err)
+	}
+	if len(runtime.inputs) != 0 {
+		t.Fatalf("runtime inputs = %d, want no provider call", len(runtime.inputs))
+	}
+}
+
 func TestRunWithRuntimeDoesNotInventChangeSummaryFromPaths(t *testing.T) {
 	repo := newGitRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "docs", "getting-started"), 0o755); err != nil {
@@ -974,6 +1067,7 @@ type reviewEvalFinding struct {
 type fakeRuntime struct {
 	outputs []ReviewOutput
 	errs    []error
+	configs []RuntimeConfig
 	inputs  []ReviewInput
 	calls   int
 }
@@ -991,7 +1085,8 @@ func (r *deadlineRuntime) Review(ctx context.Context, _ RuntimeConfig, _ ReviewI
 	return ReviewOutput{}, RuntimeUsage{}, nil
 }
 
-func (f *fakeRuntime) Review(_ context.Context, _ RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {
+func (f *fakeRuntime) Review(_ context.Context, cfg RuntimeConfig, input ReviewInput) (ReviewOutput, RuntimeUsage, error) {
+	f.configs = append(f.configs, cfg)
 	f.inputs = append(f.inputs, input)
 	idx := f.calls
 	f.calls++

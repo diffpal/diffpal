@@ -36,6 +36,10 @@ Host-specific artifacts are derived from the canonical bundle:
 - prints Markdown to stdout;
 - does not automatically create `summary.md`.
 
+`diffpal review uncommitted` uses the same local output paths and canonical
+findings schema. It does not add a CLI snapshot manifest or temporary revision
+identities to the bundle.
+
 Non-dry-run `diffpal review github`:
 
 - writes `findings.json`;

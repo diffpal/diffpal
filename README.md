@@ -62,6 +62,19 @@ Open a same-repository pull request. After the first successful run, expect a
 For full setup details, provider alternatives, and fork PR guidance, use the
 [GitHub quickstart](docs/getting-started/github-quickstart.md).
 
+## Review Before Committing
+
+Run the latest published CLI directly:
+
+```bash
+npx -y @diffpal/diffpal@latest --profile local review uncommitted
+```
+
+The command changes the provider task: the backend inspects the uncommitted
+state in its workspace snapshot with its own tools. DiffPal does not construct a
+second Git snapshot or pass changed files one by one. See the
+[CLI reference](docs/reference/cli.md#diffpal-review-uncommitted).
+
 ## Coding-Agent Plugin
 
 DiffPal includes an instruction-only plugin for Codex, Claude Code, Grok Build,

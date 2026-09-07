@@ -282,6 +282,7 @@ var OutputSchemaJSON = strings.Replace(OutputSchemaJSONV3,
 
 type ReviewOptions struct {
 	Instructions string
+	Uncommitted  bool
 }
 
 func Lookup(id, version string) (Prompt, bool) {
@@ -320,6 +321,10 @@ func ReviewMetadata() *findings.PromptMetadata {
 
 func ReviewTask() string {
 	return DefaultReviewPrompt().ReviewTask()
+}
+
+func UncommittedReviewTask() string {
+	return "Perform a DiffPal code review of the uncommitted changes in the workspace snapshot provided by the backend. Use the provider's available tools to inspect that uncommitted state and relevant nearby code before producing final JSON. The task does not include a CLI-generated changed-file list; discover the changes from the backend workspace. Produce structured findings only for discrete, actionable issues introduced or worsened by those changes. A clean result is valid only after inspecting the uncommitted changes and finding no qualifying issues."
 }
 
 func reviewTaskV1_2() string {
@@ -364,7 +369,7 @@ func RenderReviewSystem(opts ReviewOptions) string {
 
 func renderReviewSystemV1_2(opts ReviewOptions) string {
 	sections := []string{
-		providerInstructions(),
+		providerInstructionsForMode(opts, providerInstructions()),
 		reviewPolicy(),
 		changeSummaryPolicy(),
 		outputPolicy(),
@@ -378,7 +383,7 @@ func renderReviewSystemV1_2(opts ReviewOptions) string {
 
 func renderReviewSystemV1_2_1(opts ReviewOptions) string {
 	sections := []string{
-		providerInstructionsV1_2_1(),
+		providerInstructionsForMode(opts, providerInstructionsV1_2_1()),
 		reviewPolicyV1_2_1(),
 		changeSummaryPolicy(),
 		outputPolicy(),
@@ -392,7 +397,7 @@ func renderReviewSystemV1_2_1(opts ReviewOptions) string {
 
 func renderReviewSystemV1_2_2(opts ReviewOptions) string {
 	sections := []string{
-		providerInstructionsV1_2_2(),
+		providerInstructionsForMode(opts, providerInstructionsV1_2_2()),
 		reviewPolicyV1_2_1(),
 		changeSummaryPolicyV1_2_2(),
 		outputPolicy(),
@@ -406,8 +411,8 @@ func renderReviewSystemV1_2_2(opts ReviewOptions) string {
 
 func renderReviewSystemV1_3(opts ReviewOptions) string {
 	sections := []string{
-		diffPalReviewContract(),
-		providerInstructionsV1_3(),
+		diffPalReviewContractForMode(opts),
+		providerInstructionsForMode(opts, providerInstructionsV1_3()),
 		reviewPolicyV1_3(),
 		changeSummaryPolicyV1_3(),
 		outputPolicyV1_3(),
@@ -421,8 +426,8 @@ func renderReviewSystemV1_3(opts ReviewOptions) string {
 
 func renderReviewSystemV1_4(opts ReviewOptions) string {
 	sections := []string{
-		diffPalReviewContract(),
-		providerInstructionsV1_4(),
+		diffPalReviewContractForMode(opts),
+		providerInstructionsForMode(opts, providerInstructionsV1_4()),
 		reviewPolicyV1_3(),
 		changeSummaryPolicyV1_4(),
 		outputPolicyV1_4(),
@@ -436,8 +441,8 @@ func renderReviewSystemV1_4(opts ReviewOptions) string {
 
 func renderReviewSystemV1_5(opts ReviewOptions) string {
 	sections := []string{
-		diffPalReviewContract(),
-		providerInstructionsV1_4(),
+		diffPalReviewContractForMode(opts),
+		providerInstructionsForMode(opts, providerInstructionsV1_4()),
 		reviewPolicyV1_3(),
 		changeSummaryPolicyV1_4(),
 		outputPolicyV1_5(),
@@ -451,8 +456,8 @@ func renderReviewSystemV1_5(opts ReviewOptions) string {
 
 func renderReviewSystemV1_5_1(opts ReviewOptions) string {
 	sections := []string{
-		diffPalReviewContract(),
-		providerInstructionsV1_4(),
+		diffPalReviewContractForMode(opts),
+		providerInstructionsForMode(opts, providerInstructionsV1_4()),
 		reviewPolicyV1_3(),
 		changeSummaryPolicyV1_4(),
 		outputPolicyV1_5_1(),
@@ -470,6 +475,19 @@ func diffPalReviewContract() string {
 		"DiffPal is a provider-agnostic, CI-native pull request review engine.",
 		"Your structured output feeds host-neutral summaries, inline feedback, artifacts, and deterministic merge gates.",
 		"Prefer review signal that a maintainer can trust in automated CI over broad conversational critique.",
+		"Human-readable text must use the requested language; JSON field names and enum values must remain exactly as defined by the schema.",
+	}, "\n")
+}
+
+func diffPalReviewContractForMode(opts ReviewOptions) string {
+	if !opts.Uncommitted {
+		return diffPalReviewContract()
+	}
+	return strings.Join([]string{
+		"# DiffPal review contract",
+		"DiffPal is a provider-agnostic code review engine.",
+		"Your structured output feeds host-neutral summaries, findings, artifacts, and deterministic gates.",
+		"Prefer review signal that a maintainer can trust over broad conversational critique.",
 		"Human-readable text must use the requested language; JSON field names and enum values must remain exactly as defined by the schema.",
 	}, "\n")
 }
@@ -537,6 +555,24 @@ func providerInstructionsV1_4() string {
 		"Use the requested language for review_result, change_summary, and every finding title, message, evidence, impact, and suggestion.",
 		"Treat the review task snapshot as the direct user task.",
 		"Use repository-local custom instructions only to tune or extend the review scope, for example OWASP-focused security review.",
+	}, "\n")
+}
+
+func providerInstructionsForMode(opts ReviewOptions, committed string) string {
+	if !opts.Uncommitted {
+		return committed
+	}
+	return strings.Join([]string{
+		"# Provider adapter instructions",
+		"You are DiffPal, a senior high-signal code review agent.",
+		"The user message contains a plain-text review task snapshot, not the changed files or full diff.",
+		"Before producing final JSON, inspect the uncommitted changes in the workspace snapshot provided by the backend with available Git and filesystem tools.",
+		"Discover the review scope from that backend workspace; do not expect a CLI-generated changed-file list and do not limit inspection to a committed base..head range.",
+		"Use nearby implementation and tests to decide whether changed lines actually affect runtime behavior, public API, CI, configuration, security, or maintainability.",
+		"Do not infer the purpose or effect of the changes from filenames alone.",
+		"Use the requested language for review_result, change_summary, and every finding title, message, evidence, impact, and suggestion.",
+		"Treat the review task snapshot as the direct user task.",
+		"Use repository-local custom instructions only to tune or extend the review scope.",
 	}, "\n")
 }
 

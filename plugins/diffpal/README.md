@@ -75,18 +75,23 @@ DiffPal repository configuration remains at .config/diffpal/config.yaml. Shared 
 - automated runs use --profile ci;
 - both profiles may select the same provider or different provider IDs.
 
-The setup skill previews a merge and preserves unrelated configuration. DiffPal's wizard initializes one selected profile, so the skill adds the second profile explicitly rather than claiming the wizard creates both.
+The setup skill previews a merge and preserves unrelated configuration. DiffPal's wizard initializes one selected profile; the skill adds another profile only when the user requested it and approved the preview.
 
 ## Effects and security
 
+The review skill routes dirty working-tree requests to native
+`diffpal review uncommitted`. That command changes the task prompt while the
+backend provider owns workspace snapshot inspection; the skill does not pass
+files one by one. Committed ranges continue to use explicit base/head revisions.
+
 - setup can propose installation and repository-config edits, but requires separate approval for network/install actions and writes. It never uses --force implicitly.
-- review performs provider-free preflight checks, then requires approval before repository content is sent to a provider. Host publishing needs distinct approval.
-- ci edits workflow files only after preview. It separates provider credentials from code-host credentials and requires trusted-source or fork protection.
+- review treats an explicit request to run the review as authorization for its provider call. Host publishing still needs distinct approval.
+- ci edits workflow files only after preview. It separates provider credentials from code-host credentials, supports artifact-only and native publishing modes, and does not treat a same-repository or non-fork check as sufficient trust for contributor-controlled configuration.
 - No skill reads, prints, embeds, or sets credential values. Installing tools, changing secrets, pushing, dispatching CI, and publishing are outside ordinary plugin use unless separately authorized.
 
 ## Requirements and validation
 
-Actual review execution requires DiffPal, a configured provider, a resolvable Git base/head, and provider authentication. Native publishing additionally requires the matching code-host context and token.
+Actual review execution requires DiffPal, a configured provider and provider authentication. Committed mode requires a resolvable Git base/head; uncommitted mode requires a backend workspace in which the provider can inspect current changes. Native publishing additionally requires the matching code-host context and token.
 
 The package is statically validated for Codex, Claude Code, Grok Build, Agent Skills frontmatter, Agent Plugins 1.0.0, paths, and metadata. Copilot CLI has no dedicated validate command; Cursor requires a load session for runtime confirmation; OpenCode project-local discovery requires opening a target project. Static validation does not claim that any host installed, loaded, or invoked the plugin.
 
