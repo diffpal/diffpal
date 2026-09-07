@@ -21,7 +21,6 @@ includes the [comparison guide](concepts/comparison.md).
 - [Review lifecycle](concepts/review-lifecycle.md)
 - [Providers and agents](concepts/providers-and-agents.md)
 - [Findings, feedback, and gates](concepts/findings-feedback-and-gates.md)
-- [Glossary](concepts/glossary.md)
 
 ## Integrations
 
@@ -62,6 +61,7 @@ Use [Reference](reference/README.md) for stable contracts:
 - [Exit behavior](reference/exit-behavior.md)
 - [Versioning](reference/versioning.md)
 - [Support matrix](reference/support-matrix.md)
+- [Glossary](reference/glossary.md)
 
 ## Help
 

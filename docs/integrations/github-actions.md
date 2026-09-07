@@ -101,7 +101,19 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retain DiffPal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diffpal-review
+          path: .artifacts/diffpal/
+          if-no-files-found: warn
 ```
+
+For the complete wrapper input contract, including version pinning, output
+paths, review-channel isolation, and instruction overrides, see the
+[GitHub Action input reference](https://github.com/diffpal/action#inputs).
 
 ## Feedback Modes
 
@@ -112,8 +124,9 @@ See [Feedback Modes](README.md#feedback-modes).
 
 ## Merge-Gate Setup
 
-Set `gate: true` on `diffpal/action@v1`. Blocking findings fail the workflow
-when they meet `diffpal.gate.block_on`.
+Set `gate: true` on `diffpal/action@v1`. The action's `block-on` input defaults
+to `high` and overrides `diffpal.gate.block_on`; set it explicitly when your
+repository uses another threshold. Matching findings fail the workflow.
 
 See [Merge Gates](README.md#merge-gates).
 

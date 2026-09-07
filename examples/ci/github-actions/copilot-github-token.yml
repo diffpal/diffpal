@@ -43,3 +43,11 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retain DiffPal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diffpal-review
+          path: .artifacts/diffpal/
+          if-no-files-found: warn

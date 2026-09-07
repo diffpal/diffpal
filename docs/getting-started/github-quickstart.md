@@ -55,17 +55,19 @@ are preserved unless you pass `--force`.
 Commit the generated config:
 
 ```bash
-git add .config/diffpal/config.yaml
+git add .config/diffpal/config.yaml .config/diffpal/templates .diffpalignore
 git commit -m "chore: add diffpal config"
 ```
 
 ## 4. Install Workflow
 
-Copy the GitHub Actions example:
+Download the GitHub Actions example from the DiffPal repository:
 
 ```bash
 mkdir -p .github/workflows
-cp examples/ci/github-actions/codex-api-key.yml .github/workflows/diffpal.yml
+curl -fsSL \
+  https://raw.githubusercontent.com/diffpal/diffpal/main/examples/ci/github-actions/codex-api-key.yml \
+  -o .github/workflows/diffpal.yml
 ```
 
 Commit the workflow:
