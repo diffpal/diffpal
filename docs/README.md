@@ -2,7 +2,7 @@
 
 Choose the section that matches what you want to do.
 
-[View the live DiffPal demo review](https://github.com/diffpal/demo/pull/3) to
+[View the live DiffPal demo review](https://github.com/diffpal/demo/pull/13) to
 see a review summary, inline findings, downloadable artifacts, and an
 intentional merge gate in GitHub Actions.
 
