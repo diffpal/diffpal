@@ -1,0 +1,28 @@
+version: v1
+
+runtime:
+  providers:
+    registry-agent:
+      type: registry_acp
+      registry_acp:
+        registry_id: amp-acp
+        bridge_version: 0.1.6
+
+diffpal:
+  provider: registry-agent
+  gate:
+    block_on: high
+  review:
+    language: en
+    instructions: |
+      Prefer actionable findings that are directly supported by the diff.
+  platforms:
+    github: {}
+    gitlab: {}
+    azure: {}
+
+profiles:
+  ci:
+    diffpal:
+      gate:
+        block_on: high

@@ -229,6 +229,16 @@ func providerBinary(cfg config.ProviderConfig) string {
 		if cfg.GenericACP != nil && len(cfg.GenericACP.Cmd) > 0 {
 			return cfg.GenericACP.Cmd[0]
 		}
+	case "registry_acp":
+		if cfg.RegistryACP == nil {
+			return ""
+		}
+		if len(cfg.RegistryACP.Cmd) > 0 {
+			return cfg.RegistryACP.Cmd[0]
+		}
+		if strings.TrimSpace(cfg.RegistryACP.RegistryID) != "" {
+			return "npx"
+		}
 	}
 	return ""
 }

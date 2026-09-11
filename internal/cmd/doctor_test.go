@@ -39,6 +39,9 @@ func TestProviderBinary(t *testing.T) {
 		{name: "gemini", cfg: config.ProviderConfig{Type: "gemini_acp", GeminiACP: &agentconfig.ACPConfig{}}, want: "gemini"},
 		{name: "claude", cfg: config.ProviderConfig{Type: "claude_code_acp", ClaudeCodeACP: &agentconfig.ACPConfig{}}, want: "claude"},
 		{name: "codex", cfg: config.ProviderConfig{Type: "codex_acp", CodexACP: &agentconfig.ACPConfig{}}, want: "codex"},
+		{name: "registry", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{RegistryID: "amp-acp"}}, want: "npx"},
+		{name: "registry command wins", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{Cmd: []string{"custom-acprun"}}}, want: "custom-acprun"},
+		{name: "invalid registry", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{}}, want: ""},
 		{name: "empty", cfg: config.ProviderConfig{Type: "openai", OpenAI: &agentconfig.LocalAPIConfig{}}, want: ""},
 	}
 	for _, tc := range cases {
