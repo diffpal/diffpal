@@ -4,6 +4,7 @@
 [![diffpal-dev review](https://github.com/diffpal/diffpal/actions/workflows/diffpal-dev-review.yml/badge.svg)](https://github.com/diffpal/diffpal/actions/workflows/diffpal-dev-review.yml)
 [![npm](https://img.shields.io/npm/v/@diffpal/diffpal?label=npm)](https://www.npmjs.com/package/@diffpal/diffpal)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Product Hunt](https://img.shields.io/badge/Product%20Hunt-DA552F?logo=producthunt&logoColor=white)](https://www.producthunt.com/products/diffpal)
 
 **Open-source AI pull request review that runs in your CI.**
 
