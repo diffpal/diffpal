@@ -6,7 +6,127 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/normahq/runtime/v2/agentconfig"
 )
+
+func TestLoadConfigRegistryACP(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
+version: v1
+runtime:
+  providers:
+    registry-agent:
+      type: registry_acp
+      registry_acp:
+        registry_id: amp-acp
+        extra_args: ["--verbose"]
+        model: default
+        model_config_id: provider_model
+        reasoning_effort: medium
+        reasoning_effort_config_id: thought_level
+        mode: code
+        bridge_version: 0.1.6
+    custom-registry-agent:
+      type: registry_acp
+      registry_acp:
+        cmd: ["custom-acprun", "run"]
+diffpal:
+  provider: registry-agent
+  gate:
+    block_on: high
+`)
+
+	cfg, err := LoadConfig(dir, "", "")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	if cfg.ProviderID() != "registry-agent" {
+		t.Fatalf("ProviderID() = %q, want registry-agent", cfg.ProviderID())
+	}
+
+	providerCfg := cfg.Providers["registry-agent"]
+	if providerCfg.Type != agentconfig.AgentTypeRegistryACP {
+		t.Fatalf("provider type = %q, want %q", providerCfg.Type, agentconfig.AgentTypeRegistryACP)
+	}
+	registryCfg := providerCfg.RegistryACP
+	if registryCfg == nil {
+		t.Fatal("RegistryACP = nil")
+	}
+	if registryCfg.RegistryID != "amp-acp" || registryCfg.BridgeVersion != "0.1.6" {
+		t.Fatalf("registry selection = %#v", registryCfg)
+	}
+	if strings.Join(registryCfg.ExtraArgs, ",") != "--verbose" ||
+		registryCfg.Model != "default" || registryCfg.ModelConfigID != "provider_model" ||
+		registryCfg.ReasoningEffort != "medium" || registryCfg.ReasoningEffortConfigID != "thought_level" ||
+		registryCfg.Mode != "code" {
+		t.Fatalf("registry ACP fields = %#v", registryCfg)
+	}
+
+	resolved, err := agentconfig.NormalizeConfig(providerCfg, "")
+	if err != nil {
+		t.Fatalf("NormalizeConfig(registry ID) error = %v", err)
+	}
+	wantCommand := "npx,-y,@baldaworks/acprun@0.1.6,run,amp-acp,--verbose"
+	if got := strings.Join(resolved.Command, ","); got != wantCommand {
+		t.Fatalf("resolved command = %q, want %q", got, wantCommand)
+	}
+
+	customCfg := cfg.Providers["custom-registry-agent"]
+	resolved, err = agentconfig.NormalizeConfig(customCfg, "")
+	if err != nil {
+		t.Fatalf("NormalizeConfig(command override) error = %v", err)
+	}
+	if got := strings.Join(resolved.Command, ","); got != "custom-acprun,run" {
+		t.Fatalf("resolved override command = %q, want custom-acprun,run", got)
+	}
+}
+
+func TestLoadConfigRejectsInvalidRegistryACP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		provider  string
+		wantError string
+	}{
+		{
+			name:      "missing matching block",
+			provider:  "      type: registry_acp\n",
+			wantError: "exactly one type-specific block must be set",
+		},
+		{
+			name:      "missing registry ID and command",
+			provider:  "      type: registry_acp\n      registry_acp:\n        mode: code\n",
+			wantError: "registry_id or cmd is required for type registry_acp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			writeTestFile(t, filepath.Join(dir, ".config", "diffpal", "config.yaml"), `
+version: v1
+runtime:
+  providers:
+    registry-agent:
+`+tt.provider+`diffpal:
+  provider: registry-agent
+  gate:
+    block_on: high
+`)
+
+			_, err := LoadConfig(dir, "", "")
+			if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("LoadConfig() error = %v, want substring %q", err, tt.wantError)
+			}
+		})
+	}
+}
 
 func TestLoadConfigAppliesProfileOverlay(t *testing.T) {
 	t.Parallel()

@@ -71,7 +71,7 @@ profiles:
 | --- | --- | --- | --- |
 | `version` | Optional | `v1` from defaults | empty or `v1` |
 | `runtime.providers` | Required for review | empty | map of provider IDs |
-| `runtime.providers.<id>.type` | Required | none | `generic_acp`, `gemini_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `claude_acp`, `grok_acp`, `openai`, `aistudio`, `pool` |
+| `runtime.providers.<id>.type` | Required | none | `generic_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `claude_acp`, `grok_acp`, `registry_acp`, `agy_acp`, `antigravity_acp`, `openai`, `aistudio`, `pool` |
 | `diffpal.provider` | Required | empty | provider ID present in `runtime.providers` |
 | `diffpal.gate.block_on` | Optional | `high` | `low`, `medium`, `high`, `critical` |
 | `diffpal.review.language` | Optional | `en` | any single-line language value |
@@ -103,7 +103,7 @@ Common provider fields:
 | --- | --- | --- |
 | `mcp_servers` | all providers | IDs from `runtime.mcp_servers` attached to this provider. |
 | `system_instructions` | all providers | Provider-level instructions applied by the runtime. |
-| `generic_acp`, `gemini_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `grok_acp` | ACP providers | ACP runtime block. `claude_acp` is a compatibility alias that also uses `claude_code_acp`. |
+| `generic_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `grok_acp`, `registry_acp`, `agy_acp` | ACP providers | ACP runtime block. `claude_acp` is a compatibility alias for `claude_code_acp`; `antigravity_acp` is a compatibility alias for `agy_acp`. |
 | `openai`, `aistudio` | hosted API providers | Hosted API runtime block. |
 | `pool` | pool provider | Ordered failover member list. |
 
@@ -114,9 +114,19 @@ ACP runtime block fields:
 | `cmd` | Optional | provider alias default, or required for custom `generic_acp` use | string list |
 | `extra_args` | Optional | empty | string list |
 | `model` | Optional | provider-specific | non-blank string |
+| `model_config_id` | Optional | `model` | ACP session option ID used for `model`; set the exact advertised ID when different. |
 | `reasoning_effort` | Optional | provider-specific | `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `reasoning_effort_config_id` | Optional | `reasoning_effort` | ACP session option ID used for `reasoning_effort`; set the exact advertised ID when different. |
 | `mode` | Optional | provider-specific | non-blank string |
-| `bridge_version` | Optional | runtime default | Codex ACP bridge version or npm dist-tag; used only by `codex_acp`. |
+| `bridge_version` | Optional | runtime default | Launcher version or npm dist-tag; Codex bridge for `codex_acp`, `@baldaworks/acprun` for `registry_acp` and Antigravity aliases. |
+| `registry_id` | Required for default `registry_acp` path | none | Official ACP Registry agent ID; may be omitted when `cmd` is set. |
+
+`gemini_acp` is deprecated by the shared runtime and is rejected during
+normalization. Configure Gemini explicitly through `generic_acp` when you have a
+verified ACP command.
+
+For registry-backed setup, trust boundaries, and a complete example, see
+[ACP Registry Agents](../providers/acp-registry.md).
 
 Hosted API block fields:
 
