@@ -229,6 +229,7 @@ func githubLinkProvider(platform string, bundle findings.FindingsBundle, repo st
 	if err != nil {
 		ctx = github.Context{
 			Repo:    strings.TrimSpace(repo),
+			BaseSHA: bundle.BaseSHA,
 			HeadSHA: bundle.HeadSHA,
 		}
 	}
@@ -237,6 +238,9 @@ func githubLinkProvider(platform string, bundle findings.FindingsBundle, repo st
 	}
 	if strings.TrimSpace(ctx.HeadSHA) == "" {
 		ctx.HeadSHA = bundle.HeadSHA
+	}
+	if strings.TrimSpace(ctx.BaseSHA) == "" {
+		ctx.BaseSHA = bundle.BaseSHA
 	}
 	return github.NewPermanentLinkProvider(ctx)
 }
@@ -436,6 +440,11 @@ func publishableInlineFindings(items []findings.Finding) []findings.Finding {
 	out := make([]findings.Finding, 0, len(items))
 	for _, item := range items {
 		if strings.TrimSpace(item.Path) == "" || item.StartLine <= 0 {
+			continue
+		}
+		switch item.ChangedSpan.Side {
+		case "", findings.SideLeft, findings.SideRight:
+		default:
 			continue
 		}
 		out = append(out, item)

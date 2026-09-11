@@ -33,6 +33,7 @@ outputs intended for machines remain on stdout as documented per command.
 | --- | --- |
 | `diffpal init` | Generate starter workspace configuration. |
 | `diffpal review local` | Run provider-backed local review and print Markdown. |
+| `diffpal review uncommitted` | Ask the provider to review the backend snapshot of uncommitted changes. |
 | `diffpal review github` | Run review and publish/emit GitHub outputs. |
 | `diffpal review gitlab` | Run review and publish/emit GitLab outputs. |
 | `diffpal review ado` | Run review and publish/emit Azure DevOps outputs. Alias: `azure`. |
@@ -68,7 +69,7 @@ npx -y @diffpal/diffpal@latest init --wizard --setup codex-api-key --platform gi
 
 ## Review Commands
 
-Shared review flags:
+Shared review flags (`--base` and `--head` apply only to committed/host commands):
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
@@ -100,6 +101,24 @@ diffpal --profile ci review local \
   --feedback summary \
   --out .artifacts/diffpal/findings.json
 ```
+
+### `diffpal review uncommitted`
+
+Review changes before committing. The command uses the normal local-review
+pipeline but selects a task that tells the configured backend provider to
+inspect the uncommitted state in its workspace snapshot. Snapshot acquisition,
+repository tools and sandbox behavior belong to the provider.
+
+```bash
+npx -y @diffpal/diffpal@latest --profile local review uncommitted
+```
+
+Existing `--feedback`, `--gate`, `--block-on`, language and instruction flags
+retain local-review semantics. The command accepts neither `--base`/`--head` nor
+file-selection flags. It does not create a temporary Git repository, mutate the
+index or stash, or send a CLI-generated changed-file list to the provider. The
+existing DiffPal collector continues to anchor and validate structured findings.
+This command never publishes to a host.
 
 ### `diffpal review github`
 

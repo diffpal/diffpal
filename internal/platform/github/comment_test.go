@@ -108,6 +108,40 @@ func TestPlanInlineCommentsKeepsSameLineFindingsDistinct(t *testing.T) {
 	}
 }
 
+func TestPlanInlineCommentsKeepsLeftAndRightLocationsDistinct(t *testing.T) {
+	t.Parallel()
+
+	items := []findings.Finding{
+		{ID: "fp-left", Category: "security", Confidence: 0.95, Path: "main.go", StartLine: 12, Message: "removed guard", ChangedSpan: findings.LineSpan{Side: findings.SideLeft}},
+		{ID: "fp-right", Category: "security", Confidence: 0.95, Path: "main.go", StartLine: 12, Message: "added bypass", ChangedSpan: findings.LineSpan{Side: findings.SideRight}},
+	}
+	plan := PlanInlineComments(nil, items)
+	if len(plan.Actions) != 2 || len(plan.State) != 2 {
+		t.Fatalf("plan = %+v, want two actions and states", plan)
+	}
+	if plan.Actions[0].Side != findings.SideLeft || plan.Actions[1].Side != findings.SideRight {
+		t.Fatalf("action sides = %q, %q; want LEFT, RIGHT", plan.Actions[0].Side, plan.Actions[1].Side)
+	}
+	if plan.State[0].Key == plan.State[1].Key {
+		t.Fatalf("LEFT and RIGHT state keys collide: %q", plan.State[0].Key)
+	}
+	if got, want := commentKeyForSide("main.go", 12, "security", findings.SideRight, "fp-right"), commentKey("main.go", 12, "security", "fp-right"); got != want {
+		t.Fatalf("RIGHT key = %q, want legacy %q", got, want)
+	}
+}
+
+func TestPlanInlineCommentsFiltersInvalidSide(t *testing.T) {
+	t.Parallel()
+
+	plan := PlanInlineComments(nil, []findings.Finding{{
+		ID: "fp-invalid", Category: "security", Confidence: 0.95, Path: "main.go", StartLine: 12,
+		ChangedSpan: findings.LineSpan{Side: "BOTH"},
+	}})
+	if len(plan.Actions) != 0 || len(plan.State) != 0 {
+		t.Fatalf("plan = %+v, want invalid side filtered", plan)
+	}
+}
+
 func TestPlanInlineCommentsUpdatesSinglePriorLocationWhenFindingIDChanges(t *testing.T) {
 	t.Parallel()
 
@@ -246,6 +280,13 @@ func TestValidateInlineFindingsRejectsUnplaceableFindings(t *testing.T) {
 	if !strings.Contains(err.Error(), "missing path") {
 		t.Fatalf("error = %v, want missing path", err)
 	}
+
+	err = ValidateInlineFindings([]findings.Finding{{
+		ID: "fp-bad-side", Path: "main.go", StartLine: 12, ChangedSpan: findings.LineSpan{Side: "BOTH"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "side must be LEFT or RIGHT") {
+		t.Fatalf("error = %v, want invalid side error", err)
+	}
 }
 
 func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
@@ -260,7 +301,11 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 		StartLine:  12,
 		EndLine:    17,
 		Message:    "query concatenates untrusted input",
-		Evidence:   findings.NewEvidence("Line 17 builds SQL by concatenating user input."),
+		Evidence: findings.FindingEvidence{
+			Anchor:         "Line 17 builds SQL by concatenating user input.",
+			ReasoningBasis: "The query now accepts untrusted input.",
+			Source:         "changed_line",
+		},
 		Suggestion: "Use a parameterized statement.",
 	}}, CommentOptions{
 		Links: markdown.FindingLinkFunc(func(findings.Finding) (string, bool) {
@@ -275,7 +320,7 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	for _, want := range []string{
 		"query concatenates untrusted input\n- **Finding**: High security",
 		"https://github.com/acme/diffpal/blob/head-a/internal/db/query.go#L12-L17",
-		"- **Evidence**: Line 17 builds SQL by concatenating user input.",
+		"- **Evidence**: Line 17 builds SQL by concatenating user input. The query now accepts untrusted input.",
 		"- **Suggestion**: Use a parameterized statement.",
 	} {
 		if !strings.Contains(body, want) {
@@ -290,6 +335,9 @@ func TestPlanInlineCommentsCanIncludePermanentLink(t *testing.T) {
 	}
 	if strings.Contains(body, "**Confidence**") {
 		t.Fatalf("comment body contains confidence:\n%s", body)
+	}
+	if strings.Contains(body, "changed_line") {
+		t.Fatalf("comment body exposes structured evidence source:\n%s", body)
 	}
 }
 

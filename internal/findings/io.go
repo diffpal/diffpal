@@ -44,6 +44,7 @@ func ReadBundle(path string) (FindingsBundle, error) {
 	if err := Validate(out); err != nil {
 		return FindingsBundle{}, err
 	}
+	defaultLegacySides(&out)
 	return out, nil
 }
 
@@ -83,7 +84,21 @@ func FormatBundle(bundle FindingsBundle, repo string) ([]byte, error) {
 
 func ensureWriteVersion(v string) string {
 	if v == "" {
-		return VersionV3
+		return VersionV4
 	}
 	return v
+}
+
+func defaultLegacySides(bundle *FindingsBundle) {
+	if bundle.Version == VersionV4 {
+		return
+	}
+	for i := range bundle.Findings {
+		if bundle.Findings[i].ChangedSpan.Side == "" {
+			bundle.Findings[i].ChangedSpan.Side = SideRight
+		}
+		if bundle.Findings[i].SupportingSpan != nil && bundle.Findings[i].SupportingSpan.Side == "" {
+			bundle.Findings[i].SupportingSpan.Side = SideRight
+		}
+	}
 }

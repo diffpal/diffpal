@@ -72,8 +72,8 @@ diffpal:
 		"## Task Snapshot",
 		"DiffPal review task snapshot",
 		"## Mock Bundle",
-		`"version": "v3"`,
-		`"schema_version": "findings.v3"`,
+		`"version": "v4"`,
+		`"schema_version": "findings.v4"`,
 		"Debug harness rendered the review task without contacting a provider.",
 	} {
 		if !strings.Contains(text, needle) {

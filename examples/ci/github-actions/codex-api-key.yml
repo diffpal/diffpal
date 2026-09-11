@@ -28,7 +28,7 @@ jobs:
           node-version: 22
 
       - name: Install Codex provider
-        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+        run: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
 
       - name: Authenticate Codex
         run: |
@@ -53,3 +53,11 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retain DiffPal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diffpal-review
+          path: .artifacts/diffpal/
+          if-no-files-found: warn

@@ -18,6 +18,20 @@ func TestPermanentLinkBuildsLineRange(t *testing.T) {
 	}
 }
 
+func TestPermanentLinkProviderUsesBaseForLeftAndHeadForRight(t *testing.T) {
+	t.Parallel()
+
+	provider := NewPermanentLinkProvider(Context{Repo: "acme/diffpal", BaseSHA: "base-a", HeadSHA: "head-a"})
+	left, ok := provider.Link(findings.Finding{Path: "orders.go", StartLine: 12, ChangedSpan: findings.LineSpan{Side: findings.SideLeft}})
+	if !ok || left != "https://github.com/acme/diffpal/blob/base-a/orders.go#L12" {
+		t.Fatalf("LEFT link = %q, %v; want base SHA", left, ok)
+	}
+	right, ok := provider.Link(findings.Finding{Path: "orders.go", StartLine: 14, ChangedSpan: findings.LineSpan{Side: findings.SideRight}})
+	if !ok || right != "https://github.com/acme/diffpal/blob/head-a/orders.go#L14" {
+		t.Fatalf("RIGHT link = %q, %v; want head SHA", right, ok)
+	}
+}
+
 func TestPermanentLinkEscapesPathSegments(t *testing.T) {
 	got := PermanentLink("acme/diffpal", "head-a", findings.Finding{
 		Path:      "src/user form/app+test.js",

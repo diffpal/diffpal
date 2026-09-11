@@ -233,7 +233,7 @@ func renderSummaryFindingDetail(finding findings.Finding, opts summaryFindingDet
 	if finding.Suggestion != "" {
 		fmt.Fprintf(&out, "**Fix:** %s\n\n", finding.Suggestion)
 	}
-	if evidence := finding.EvidenceText(); evidence != "" {
+	if evidence := finding.EvidenceDisplayText(); evidence != "" {
 		fmt.Fprintf(&out, "**Evidence:** %s\n\n", evidence)
 	}
 	if link := strings.TrimSpace(opts.Link); link != "" {
@@ -258,7 +258,7 @@ func RenderFindingDetail(finding findings.Finding, opts FindingDetailOptions) st
 	hasLink := link != ""
 	fmt.Fprintf(&out, "%s%s\n", prefix, firstNonEmpty(finding.Message, finding.Title))
 	fmt.Fprintf(&out, "%s**Finding**: %s\n", detailPrefix, findingHeading(finding, hasLink))
-	if evidence := finding.EvidenceText(); evidence != "" {
+	if evidence := finding.EvidenceDisplayText(); evidence != "" {
 		fmt.Fprintf(&out, "%s**Evidence**: %s\n", detailPrefix, evidence)
 	}
 	if impact := finding.ImpactText(); impact != "" {

@@ -20,6 +20,7 @@ import (
 )
 
 type Options struct {
+	Mode          Mode
 	WorkingDir    string
 	Repo          string
 	ReviewID      string
@@ -31,6 +32,24 @@ type Options struct {
 	Instructions  string
 }
 
+type Mode string
+
+const (
+	ModeDefault     Mode = ""
+	ModeUncommitted Mode = "uncommitted"
+)
+
+func reviewTaskForMode(mode Mode) (string, error) {
+	switch mode {
+	case ModeDefault:
+		return promptpack.DefaultReviewPrompt().ReviewTask(), nil
+	case ModeUncommitted:
+		return promptpack.UncommittedReviewTask(), nil
+	default:
+		return "", fmt.Errorf("unsupported review mode %q", mode)
+	}
+}
+
 type Result struct {
 	Bundle       findings.FindingsBundle
 	Files        []diff.FileChange
@@ -38,8 +57,9 @@ type Result struct {
 }
 
 type changedSpan struct {
-	Start int `json:"start"`
-	End   int `json:"end"`
+	Start int               `json:"start"`
+	End   int               `json:"end"`
+	Side  findings.LineSide `json:"side"`
 }
 
 type ReviewInput struct {
@@ -85,6 +105,7 @@ type RuntimeUsage struct {
 }
 
 type RuntimeConfig struct {
+	Mode         Mode
 	ProviderID   string
 	Providers    map[string]dpconfig.ProviderConfig
 	MCPServers   map[string]agentconfig.MCPServerConfig
@@ -118,9 +139,10 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 		workingDir = cwd
 	}
 	result, err := diff.Collect(diff.Options{
-		BaseSHA: opts.BaseSHA,
-		HeadSHA: opts.HeadSHA,
-		WorkDir: workingDir,
+		BaseSHA:          opts.BaseSHA,
+		HeadSHA:          opts.HeadSHA,
+		WorkDir:          workingDir,
+		IncludeUntracked: opts.Mode == ModeUncommitted,
 	})
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
@@ -157,10 +179,14 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	if err != nil {
 		return Result{}, wrapError(KindInternal, err)
 	}
+	reviewTask, err := reviewTaskForMode(opts.Mode)
+	if err != nil {
+		return Result{}, wrapError(KindConfig, err)
+	}
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:  findings.VersionV3,
+		Version:  findings.VersionV4,
 		ReviewID: reviewID,
 		BaseSHA:  result.BaseSHA,
 		HeadSHA:  result.HeadSHA,
@@ -178,6 +204,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	}
 
 	runtimeCfg := RuntimeConfig{
+		Mode:         opts.Mode,
 		ProviderID:   cfg.ProviderID(),
 		Providers:    providersWithEnv(cfg.Providers),
 		MCPServers:   cfg.MCPServers,
@@ -191,6 +218,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	summaries := make([]string, 0)
 	var inspection *findings.Inspection
 	input := reviewInputFromChanges(reviewID, repo, result.BaseSHA, result.HeadSHA, blockOn, language, instructions, commitMessages)
+	input.ReviewTask = reviewTask
 	var output ReviewOutput
 	var usage RuntimeUsage
 	reviewTimeout := opts.ReviewTimeout
@@ -422,18 +450,45 @@ func validateReviewFindings(items []ReviewFinding, files []diff.FileChange, prov
 func changedSpansByPath(files []diff.FileChange) map[string][]changedSpan {
 	allowed := make(map[string][]changedSpan, len(files))
 	for _, file := range files {
-		path := reviewFilePath(file)
-		if path == "" {
-			continue
-		}
 		for _, span := range file.ChangedLineSpans {
 			if span.Start <= 0 || span.End <= 0 || span.Start > span.End {
 				continue
 			}
-			allowed[path] = append(allowed[path], changedSpan{Start: span.Start, End: span.End})
+			side, ok := findingSide(span.Side)
+			if !ok {
+				continue
+			}
+			path := changedSpanPath(file, side)
+			if path == "" {
+				continue
+			}
+			allowed[path] = append(allowed[path], changedSpan{Start: span.Start, End: span.End, Side: side})
 		}
 	}
 	return allowed
+}
+
+func changedSpanPath(file diff.FileChange, side findings.LineSide) string {
+	path := file.ToPath
+	if side == findings.SideLeft {
+		path = file.FromPath
+	}
+	path = strings.TrimSpace(path)
+	if path == "" || path == "/dev/null" {
+		return ""
+	}
+	return path
+}
+
+func findingSide(side diff.LineSide) (findings.LineSide, bool) {
+	switch side {
+	case "", diff.SideRight:
+		return findings.SideRight, true
+	case diff.SideLeft:
+		return findings.SideLeft, true
+	default:
+		return "", false
+	}
 }
 
 func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan, providerID string) (findings.Finding, bool) {
@@ -444,6 +499,10 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 	message := strings.TrimSpace(item.Message)
 	suggestion := strings.TrimSpace(item.Suggestion)
 	path, startLine, endLine := normalizeFindingLocation(path, item.StartLine, item.EndLine, item.ChangedSpan)
+	side, ok := normalizeFindingSide(item.ChangedSpan.Side)
+	if !ok {
+		return findings.Finding{}, false
+	}
 
 	if !allowedCategory(category) || !allowedSeverity(severity) {
 		return findings.Finding{}, false
@@ -457,7 +516,8 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 	if startLine <= 0 || endLine <= 0 || startLine > endLine {
 		return findings.Finding{}, false
 	}
-	if !allowedRange(path, startLine, endLine, allowed) {
+	startLine, endLine, ok = changedRange(path, startLine, endLine, side, allowed)
+	if !ok {
 		return findings.Finding{}, false
 	}
 
@@ -468,7 +528,7 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 		Path:           path,
 		StartLine:      startLine,
 		EndLine:        endLine,
-		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine},
+		ChangedSpan:    findings.LineSpan{Path: path, StartLine: startLine, EndLine: endLine, Side: side},
 		SupportingSpan: item.SupportingSpan,
 		Title:          title,
 		Message:        message,
@@ -477,6 +537,17 @@ func normalizeReviewFinding(item ReviewFinding, allowed map[string][]changedSpan
 		Suggestion:     suggestion,
 		Provider:       providerID,
 	}, true
+}
+
+func normalizeFindingSide(side findings.LineSide) (findings.LineSide, bool) {
+	switch side {
+	case "", findings.SideRight:
+		return findings.SideRight, true
+	case findings.SideLeft:
+		return findings.SideLeft, true
+	default:
+		return "", false
+	}
 }
 
 func normalizeFindingLocation(path string, startLine, endLine int, span findings.LineSpan) (string, int, int) {
@@ -510,17 +581,31 @@ func allowedSeverity(severity string) bool {
 	}
 }
 
-func allowedRange(path string, startLine, endLine int, allowed map[string][]changedSpan) bool {
+func changedRange(path string, startLine, endLine int, side findings.LineSide, allowed map[string][]changedSpan) (int, int, bool) {
 	spans, ok := allowed[path]
 	if !ok {
-		return false
+		return 0, 0, false
 	}
+	bestStart, bestEnd, bestLength := 0, 0, 0
 	for _, span := range spans {
-		if startLine >= span.Start && endLine <= span.End {
-			return true
+		spanSide, ok := normalizeFindingSide(span.Side)
+		if !ok || spanSide != side {
+			continue
+		}
+		intersectionStart := max(startLine, span.Start)
+		intersectionEnd := min(endLine, span.End)
+		if intersectionStart > intersectionEnd {
+			continue
+		}
+		length := intersectionEnd - intersectionStart + 1
+		if length > bestLength {
+			bestStart, bestEnd, bestLength = intersectionStart, intersectionEnd, length
 		}
 	}
-	return false
+	if bestLength == 0 {
+		return 0, 0, false
+	}
+	return bestStart, bestEnd, true
 }
 
 func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA string) []findings.Finding {
@@ -545,6 +630,9 @@ func dedupeAndSortFindings(items []findings.Finding, repo, reviewID, headSHA str
 		}
 		if left.EndLine != right.EndLine {
 			return left.EndLine < right.EndLine
+		}
+		if left.ChangedSpan.Side != right.ChangedSpan.Side {
+			return left.ChangedSpan.Side < right.ChangedSpan.Side
 		}
 		if left.Category != right.Category {
 			return left.Category < right.Category

@@ -62,11 +62,11 @@ func TestOutputSchemaIsValidJSON(t *testing.T) {
 	}
 }
 
-func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T) {
+func TestOutputSchemaRequiresFindingsV4ShapeAndRejectsUnknownFields(t *testing.T) {
 	t.Parallel()
 
 	schema := gojsonschema.NewStringLoader(OutputSchemaJSON)
-	valid := gojsonschema.NewGoLoader(map[string]any{
+	validPayload := map[string]any{
 		"change_summary": []any{"Added session deletion logic."},
 		"review_result":  "Найдено 1 замечание, оно блокирует слияние.",
 		"findings": []any{
@@ -81,6 +81,7 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 					"path":       "app/session.go",
 					"start_line": 12,
 					"end_line":   13,
+					"side":       "LEFT",
 				},
 				"title":   "unsafe session deletion",
 				"message": "query input reaches a session deletion statement",
@@ -95,7 +96,8 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 				},
 			},
 		},
-	})
+	}
+	valid := gojsonschema.NewGoLoader(validPayload)
 	result, err := gojsonschema.Validate(schema, valid)
 	if err != nil {
 		t.Fatalf("Validate(valid schema payload) error = %v", err)
@@ -103,6 +105,17 @@ func TestOutputSchemaRequiresFindingsV2ShapeAndRejectsUnknownFields(t *testing.T
 	if !result.Valid() {
 		t.Fatalf("valid schema payload rejected: %v", result.Errors())
 	}
+
+	changedSpan := validPayload["findings"].([]any)[0].(map[string]any)["changed_span"].(map[string]any)
+	delete(changedSpan, "side")
+	result, err = gojsonschema.Validate(schema, gojsonschema.NewGoLoader(validPayload))
+	if err != nil {
+		t.Fatalf("Validate(payload without changed_span.side) error = %v", err)
+	}
+	if result.Valid() {
+		t.Fatal("payload without changed_span.side accepted, want rejection")
+	}
+	changedSpan["side"] = "LEFT"
 
 	invalid := gojsonschema.NewGoLoader(map[string]any{
 		"change_summary":      []any{"Added session deletion logic."},
@@ -173,14 +186,14 @@ func TestReviewMetadataIsStable(t *testing.T) {
 	if got.PromptID != "diffpal.review" {
 		t.Fatalf("PromptID = %q, want diffpal.review", got.PromptID)
 	}
-	if got.PromptVersion != "v1.4.0" {
-		t.Fatalf("PromptVersion = %q, want v1.4.0", got.PromptVersion)
+	if got.PromptVersion != "v1.5.1" {
+		t.Fatalf("PromptVersion = %q, want v1.5.1", got.PromptVersion)
 	}
 	if got.Purpose != "review_changed_diff" {
 		t.Fatalf("Purpose = %q, want review_changed_diff", got.Purpose)
 	}
-	if got.SchemaVersion != "findings.v3" {
-		t.Fatalf("SchemaVersion = %q, want findings.v3", got.SchemaVersion)
+	if got.SchemaVersion != "findings.v4" {
+		t.Fatalf("SchemaVersion = %q, want findings.v4", got.SchemaVersion)
 	}
 }
 
@@ -218,6 +231,20 @@ func TestPromptRegistryKeepsPreviousReviewPrompt(t *testing.T) {
 		if metadata.PromptVersion != version || metadata.SchemaVersion != "findings.v2" {
 			t.Fatalf("previous prompt metadata = %+v, want %s/findings.v2", metadata, version)
 		}
+	}
+	prompt, ok := Lookup(ReviewPromptID, "v1.4.0")
+	if !ok {
+		t.Fatal("Lookup(diffpal.review, v1.4.0) failed")
+	}
+	if metadata := prompt.ReviewMetadata(); metadata.SchemaVersion != "findings.v3" || prompt.OutputSchema != OutputSchemaJSONV3 {
+		t.Fatalf("v1.4.0 prompt = %+v, want findings.v3 with preserved schema", metadata)
+	}
+	prompt, ok = Lookup(ReviewPromptID, "v1.5.0")
+	if !ok {
+		t.Fatal("Lookup(diffpal.review, v1.5.0) failed")
+	}
+	if metadata := prompt.ReviewMetadata(); metadata.SchemaVersion != "findings.v4" || prompt.OutputSchema != OutputSchemaJSON {
+		t.Fatalf("v1.5.0 prompt = %+v, want findings.v4 with preserved schema", metadata)
 	}
 }
 
@@ -315,6 +342,8 @@ func TestReviewSystemIncludesHighSignalRubric(t *testing.T) {
 		"Do not report vague style preferences, generic best-practice advice, praise, or low-value maintainability nits.",
 		"Return one finding per distinct root cause.",
 		"Continue until all qualifying findings are listed.",
+		"summary fields must not introduce review issues omitted from findings.",
+		"anchor changed_span to the deleted line or lines on LEFT",
 	}
 	for _, phrase := range required {
 		if !strings.Contains(system, phrase) {
@@ -401,5 +430,47 @@ func TestReviewTaskDescribesDiffPalCIReview(t *testing.T) {
 		if !strings.Contains(got, phrase) {
 			t.Fatalf("ReviewTask() = %q, want phrase %q", got, phrase)
 		}
+	}
+}
+
+func TestUncommittedReviewTaskDelegatesWorkspaceInspection(t *testing.T) {
+	t.Parallel()
+
+	got := UncommittedReviewTask()
+	for _, phrase := range []string{
+		"uncommitted changes",
+		"workspace snapshot provided by the backend",
+		"does not include a CLI-generated changed-file list",
+		"available tools",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("UncommittedReviewTask() = %q, want phrase %q", got, phrase)
+		}
+	}
+	for _, forbidden := range []string{"temporary Git repository", "--path", "--untracked"} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("UncommittedReviewTask() = %q, contains %q", got, forbidden)
+		}
+	}
+}
+
+func TestUncommittedReviewSystemDoesNotRequireCommittedRange(t *testing.T) {
+	t.Parallel()
+
+	got := RenderReviewSystem(ReviewOptions{Uncommitted: true})
+	for _, phrase := range []string{
+		"uncommitted changes in the workspace snapshot provided by the backend",
+		"do not expect a CLI-generated changed-file list",
+		"do not limit inspection to a committed base..head range",
+	} {
+		if !strings.Contains(got, phrase) {
+			t.Fatalf("uncommitted system prompt missing %q", phrase)
+		}
+	}
+	if strings.Contains(got, "inspect the requested base..head Git diff") {
+		t.Fatalf("uncommitted system prompt retains committed-range instruction:\n%s", got)
+	}
+	if strings.Contains(got, "pull request review engine") {
+		t.Fatalf("uncommitted system prompt retains pull-request-only contract:\n%s", got)
 	}
 }

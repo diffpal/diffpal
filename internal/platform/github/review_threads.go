@@ -23,7 +23,11 @@ func ActiveReviewThreadState(ctx context.Context, token string, reviewCtx Contex
 		if _, ok := ids[item.ID]; !ok {
 			continue
 		}
-		out[commentKey(item.Path, item.StartLine, item.Category, item.ID)] = item.ID
+		side, ok := canonicalCommentSide(item.ChangedSpan.Side)
+		if !ok {
+			continue
+		}
+		out[commentKeyForSide(item.Path, item.StartLine, item.Category, side, item.ID)] = item.ID
 	}
 	return out
 }

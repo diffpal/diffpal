@@ -13,7 +13,7 @@ Before you start, have:
 - a pull request or merge request you can use for a trusted first test.
 
 If the terms are new, read [How DiffPal works](../concepts/how-diffpal-works.md)
-and the [Glossary](../concepts/glossary.md) first.
+and the [Glossary](../reference/glossary.md) first.
 Before adding provider secrets, read
 [Secrets and fork PRs](../guides/secrets-and-fork-prs.md).
 

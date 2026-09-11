@@ -70,6 +70,10 @@ func pullRequestReviewComments(plan CommentPlan, identity ReviewIdentity) []map[
 		if action.Type == ActionSkip || strings.TrimSpace(action.Body) == "" || strings.TrimSpace(action.Path) == "" || action.Line <= 0 {
 			continue
 		}
+		side, ok := canonicalCommentSide(action.Side)
+		if !ok {
+			continue
+		}
 		body := action.Body
 		if marker := findingMarker(identity, action.FindingID); marker != "" {
 			body += "\n" + marker
@@ -77,12 +81,12 @@ func pullRequestReviewComments(plan CommentPlan, identity ReviewIdentity) []map[
 		out = append(out, map[string]any{
 			"path": action.Path,
 			"line": action.Line,
-			"side": "RIGHT",
+			"side": string(side),
 			"body": body,
 		})
 		if action.EndLine > action.Line {
 			out[len(out)-1]["start_line"] = action.Line
-			out[len(out)-1]["start_side"] = "RIGHT"
+			out[len(out)-1]["start_side"] = string(side)
 			out[len(out)-1]["line"] = action.EndLine
 		}
 	}

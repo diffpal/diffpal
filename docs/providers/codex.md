@@ -17,7 +17,7 @@ API-key setup, or trusted CI that restores an existing Codex auth file.
 Install the Codex CLI and ACP bridge in CI:
 
 ```bash
-npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
 ```
 
 ## Authentication In CI

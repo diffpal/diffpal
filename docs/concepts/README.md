@@ -11,7 +11,5 @@ Use this section to understand DiffPal's product model before configuring CI.
   agent distinction and who owns authentication.
 - [Findings, feedback, and gates](findings-feedback-and-gates.md) explains the
   concepts behind summaries, inline feedback, artifacts, and merge blocking.
-- [Glossary](glossary.md) defines the short terms used across guides and
-  reference pages.
 - [Comparison guide](comparison.md) explains how DiffPal differs from hosted AI
   reviewers, lint publishers, and CI convention bots.

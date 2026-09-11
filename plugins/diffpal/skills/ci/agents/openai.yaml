@@ -1,0 +1,4 @@
+interface:
+  display_name: "DiffPal CI"
+  short_description: "Configure secure DiffPal review automation"
+  default_prompt: "Use $diffpal:ci to add a safe DiffPal review workflow to this repository."

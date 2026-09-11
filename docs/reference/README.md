@@ -15,3 +15,5 @@ Use this section for stable user-facing contracts.
 - [Versioning](versioning.md): CLI/package, config, and artifact compatibility.
 - [Support matrix](support-matrix.md): supported hosts, publishers, feedback
   surfaces, provider types, and stability.
+- [Glossary](glossary.md): concise definitions of terms used across the
+  documentation.

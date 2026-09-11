@@ -51,8 +51,8 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle(default path) error = %v", err)
 	}
-	if readBack.Version != VersionV3 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
+	if readBack.Version != VersionV4 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
 	}
 	if got := readBack.Findings[0].Severity; got != "medium" {
 		t.Fatalf("Severity = %q, want medium", got)
@@ -64,13 +64,34 @@ func TestReadBundleRejectsUnsupportedVersion(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "findings.json")
-	raw := []byte(`{"version":"v4","review_id":"review","findings":[]}`)
+	raw := []byte(`{"version":"v5","review_id":"review","findings":[]}`)
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
 	if _, err := ReadBundle(path); err == nil {
 		t.Fatal("ReadBundle() error = nil, want version validation failure")
+	}
+}
+
+func TestReadBundleDefaultsLegacyChangedSpansToRight(t *testing.T) {
+	t.Parallel()
+
+	for _, version := range []string{VersionV1, VersionV2, VersionV3} {
+		t.Run(version, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "findings.json")
+			raw := []byte(`{"version":"` + version + `","review_id":"review","findings":[{"category":"correctness","severity":"medium","confidence":0.8,"path":"app.go","start_line":4,"end_line":4,"changed_span":{"path":"app.go","start_line":4,"end_line":4},"title":"wrong result","message":"the changed line returns the wrong value","evidence":{"anchor":"L4","reasoning_basis":"the return value changed","source":"changed_line"},"impact":{"summary":"callers receive the wrong value","scope":"API callers"},"blocking":false,"provider":"test"}]}`)
+			if err := os.WriteFile(path, raw, 0o644); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+			bundle, err := ReadBundle(path)
+			if err != nil {
+				t.Fatalf("ReadBundle(%s) error = %v", version, err)
+			}
+			if got := bundle.Findings[0].ChangedSpan.Side; got != SideRight {
+				t.Fatalf("ChangedSpan.Side = %q, want %q", got, SideRight)
+			}
+		})
 	}
 }
 
@@ -103,8 +124,8 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &readBack); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
-	if readBack.Version != VersionV3 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV3)
+	if readBack.Version != VersionV4 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")

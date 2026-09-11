@@ -13,7 +13,7 @@ steps:
     inputs:
       version: "22.x"
 
-  - script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+  - script: npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
     displayName: Install Codex provider
 
   - script: |

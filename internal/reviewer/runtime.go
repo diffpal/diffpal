@@ -59,7 +59,10 @@ func (ADKRuntime) Review(ctx context.Context, cfg RuntimeConfig, input ReviewInp
 	wrapped, err := structuredagent.NewAgent(providerErrorDetectingAgent{Agent: agentRuntime},
 		structuredagent.WithoutInputSchema(),
 		structuredagent.WithOutputSchema(prompt.OutputSchema),
-		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{Instructions: cfg.Instructions})),
+		structuredagent.WithSystemInstruction(prompt.RenderReviewSystem(promptpack.ReviewOptions{
+			Instructions: cfg.Instructions,
+			Uncommitted:  cfg.Mode == ModeUncommitted,
+		})),
 		structuredagent.WithOutputValidationRetries(3),
 	)
 	if err != nil {

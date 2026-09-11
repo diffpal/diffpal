@@ -79,7 +79,7 @@ git fetch --tags --prune
 git rev-parse --verify "$DIFFPAL_BASE_REV^{commit}"
 git rev-parse --verify "$DIFFPAL_HEAD_REV^{commit}"
 
-npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.6.3
+npm install --global @openai/codex@0.139.0 @normahq/codex-acp-bridge@1.8.4
 printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
 npm install --global @diffpal/diffpal@latest
 mkdir -p .artifacts/diffpal

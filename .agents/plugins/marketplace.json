@@ -1,0 +1,20 @@
+{
+  "name": "diffpal",
+  "interface": {
+    "displayName": "DiffPal"
+  },
+  "plugins": [
+    {
+      "name": "diffpal",
+      "source": {
+        "source": "local",
+        "path": "./plugins/diffpal"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
