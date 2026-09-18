@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	acp "github.com/coder/acp-go-sdk"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
+	acpagent "github.com/normahq/go-adk-acpagent/v2"
 	"github.com/normahq/runtime/v2/structuredagent"
 	adkagent "google.golang.org/adk/v2/agent"
 	adkrunner "google.golang.org/adk/v2/runner"
@@ -125,50 +125,50 @@ func TestProviderEventErrorIgnoresNormalOutput(t *testing.T) {
 func TestReviewPermissionHandlerSelectsAllowOnce(t *testing.T) {
 	t.Parallel()
 
-	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
-		Options: []acp.PermissionOption{
-			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
-			{Kind: acp.PermissionOptionKindAllowOnce, OptionId: "allow"},
+	resp, err := reviewPermissionHandler(context.Background(), acpagent.PermissionRequest{
+		Options: []acpagent.PermissionOption{
+			{Kind: acpagent.PermissionOptionKindRejectOnce, ID: "reject"},
+			{Kind: acpagent.PermissionOptionKindAllowOnce, ID: "allow"},
 		},
 	})
 	if err != nil {
 		t.Fatalf("reviewPermissionHandler() error = %v", err)
 	}
-	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow" {
-		t.Fatalf("selected option = %+v, want allow", got)
+	if resp.Canceled || resp.OptionID != "allow" {
+		t.Fatalf("permission decision = %+v, want allow", resp)
 	}
 }
 
 func TestReviewPermissionHandlerSelectsAllowAlwaysWhenOnlyAllowAlways(t *testing.T) {
 	t.Parallel()
 
-	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
-		Options: []acp.PermissionOption{
-			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
-			{Kind: acp.PermissionOptionKindAllowAlways, OptionId: "allow-always"},
+	resp, err := reviewPermissionHandler(context.Background(), acpagent.PermissionRequest{
+		Options: []acpagent.PermissionOption{
+			{Kind: acpagent.PermissionOptionKindRejectOnce, ID: "reject"},
+			{Kind: acpagent.PermissionOptionKindAllowAlways, ID: "allow-always"},
 		},
 	})
 	if err != nil {
 		t.Fatalf("reviewPermissionHandler() error = %v", err)
 	}
-	if got := resp.Outcome.Selected; got == nil || got.OptionId != "allow-always" {
-		t.Fatalf("selected option = %+v, want allow-always", got)
+	if resp.Canceled || resp.OptionID != "allow-always" {
+		t.Fatalf("permission decision = %+v, want allow-always", resp)
 	}
 }
 
 func TestReviewPermissionHandlerCancelsWithoutAllowOption(t *testing.T) {
 	t.Parallel()
 
-	resp, err := reviewPermissionHandler(context.Background(), acp.RequestPermissionRequest{
-		Options: []acp.PermissionOption{
-			{Kind: acp.PermissionOptionKindRejectOnce, OptionId: "reject"},
+	resp, err := reviewPermissionHandler(context.Background(), acpagent.PermissionRequest{
+		Options: []acpagent.PermissionOption{
+			{Kind: acpagent.PermissionOptionKindRejectOnce, ID: "reject"},
 		},
 	})
 	if err != nil {
 		t.Fatalf("reviewPermissionHandler() error = %v", err)
 	}
-	if resp.Outcome.Cancelled == nil {
-		t.Fatalf("outcome = %+v, want cancelled", resp.Outcome)
+	if !resp.Canceled || resp.OptionID != "" {
+		t.Fatalf("permission decision = %+v, want cancelled", resp)
 	}
 }
 

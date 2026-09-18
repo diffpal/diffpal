@@ -26,12 +26,14 @@ Before enabling any secret-backed example, read
 
 | Setup | Config | CI secret |
 | --- | --- | --- |
+| ACP Registry agent | [`configs/acp-registry/config.yaml`](configs/acp-registry/config.yaml) | selected-agent-specific |
 | Generic ACP CLI | [`configs/generic-acp/config.yaml`](configs/generic-acp/config.yaml) | provider-specific |
 | OpenCode ACP | [`configs/opencode-acp/config.yaml`](configs/opencode-acp/config.yaml) | OpenCode-specific |
 
-Copy the selected config to `.config/diffpal/config.yaml`. To use another ACP
-CLI, start from the generic ACP config and replace `generic_acp.cmd` with the
-command that starts your provider's ACP stdio server.
+Copy the selected config to `.config/diffpal/config.yaml`. For an official
+registry entry, replace `registry_acp.registry_id` with the agent you evaluated.
+For another ACP CLI, start from the generic ACP config and replace
+`generic_acp.cmd` with the command that starts its ACP stdio server.
 
 ## Govern Review Quality
 

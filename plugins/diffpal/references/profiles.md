@@ -56,7 +56,7 @@ When an approved `npx` invocation is selected, use that same command prefix for 
 
 ## Provider and credential rules
 
-- Use only documented provider types: `generic_acp`, `gemini_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `openai`, `aistudio`, or `pool`.
+- Use only documented provider types: `generic_acp`, `codex_acp`, `opencode_acp`, `copilot_acp`, `claude_code_acp`, `claude_acp`, `grok_acp`, `registry_acp`, `agy_acp`, `antigravity_acp`, `openai`, `aistudio`, or `pool`. The shared runtime rejects deprecated `gemini_acp`; use an explicitly verified `generic_acp` command instead.
 - The effective `diffpal.provider` must match an effective `runtime.providers` key.
 - Prefer environment variables or CI secret references over credential values in YAML.
 - Never reveal or transfer credentials between the provider and the code host.

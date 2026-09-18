@@ -13,6 +13,7 @@ import (
 	"github.com/diffpal/diffpal/internal/logging"
 	"github.com/diffpal/diffpal/internal/reliability"
 	"github.com/diffpal/diffpal/internal/reviewer/promptpack"
+	acpagent "github.com/normahq/go-adk-acpagent/v2"
 	"github.com/normahq/go-adk-acpagent/v2/acperror"
 	"github.com/normahq/runtime/v2/agentfactory"
 	"github.com/normahq/runtime/v2/mcpregistry"
@@ -140,18 +141,18 @@ func nonEmptyChangeSummary(items []string) []string {
 	return out
 }
 
-func reviewPermissionHandler(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+func reviewPermissionHandler(_ context.Context, req acpagent.PermissionRequest) (acpagent.PermissionDecision, error) {
 	// Agent security is delegated to the provider configuration. DiffPal does not
 	// layer a second tool policy on top of ACP; it selects provider-offered allow
 	// options so provider-specific sandbox and approval settings remain the source
 	// of truth.
-	if option, ok := firstPermissionOption(req.Options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
-		return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeSelected(option.OptionId)}, nil
+	if option, ok := firstPermissionOption(req.Options, acpagent.PermissionOptionKindAllowOnce, acpagent.PermissionOptionKindAllowAlways); ok {
+		return acpagent.PermissionDecision{OptionID: option.ID}, nil
 	}
-	return acp.RequestPermissionResponse{Outcome: acp.NewRequestPermissionOutcomeCancelled()}, nil
+	return acpagent.PermissionDecision{Canceled: true}, nil
 }
 
-func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.PermissionOptionKind) (acp.PermissionOption, bool) {
+func firstPermissionOption(options []acpagent.PermissionOption, kinds ...acpagent.PermissionOptionKind) (acpagent.PermissionOption, bool) {
 	for _, kind := range kinds {
 		for _, option := range options {
 			if option.Kind == kind {
@@ -159,7 +160,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 			}
 		}
 	}
-	return acp.PermissionOption{}, false
+	return acpagent.PermissionOption{}, false
 }
 
 func reviewSystemInstruction(instructions string) string {

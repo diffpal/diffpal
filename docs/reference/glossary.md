@@ -14,6 +14,12 @@ The configured runtime entry selected by `diffpal.provider` from
 
 Agent Client Protocol. DiffPal can run ACP-compatible CLIs as review agents.
 
+## ACP Registry
+
+The official catalog of ACP-compatible agents and their distributions. A
+`registry_acp` provider selects an entry by `registry_id`; the selected software
+and its authentication remain third-party trust boundaries.
+
 ## Finding
 
 A structured review issue with severity, category, impact, message, and
