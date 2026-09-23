@@ -16,8 +16,9 @@ The CLI version is built into release binaries with Omnidist ldflags:
 diffpal <version>+<git-commit> (<build-date>)
 ```
 
-The npm package `@diffpal/diffpal` is the public CLI package. Omnidist also
-builds platform-specific packages and release binaries from the same version.
+The npm packages `diffpal` and `@diffpal/diffpal` are equivalent public CLI
+packages. Omnidist publishes both at the same version using one set of
+`@diffpal` platform packages, and builds release binaries from that version.
 Consumers should pin exact versions in credentialed CI jobs when repeatability
 matters.
 

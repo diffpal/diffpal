@@ -5,8 +5,8 @@ This page keeps non-sensitive maintainer checks out of the public user docs.
 ## Versioning Model
 
 - CLI and Go module releases use SemVer tags such as `v1.2.3`.
-- The CLI is distributed through omnidist, including the npm package
-  `@diffpal/diffpal`.
+- The CLI is distributed through Omnidist as both `diffpal` and
+  `@diffpal/diffpal`, with shared `@diffpal` platform packages.
 - Consumers should install the CLI with a pinned SemVer version when they need
   reproducible CI.
 

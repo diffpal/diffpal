@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const npmRoot = path.join(process.cwd(), '.omnidist', 'default', 'npm', '@diffpal');
-const metaPackage = '@diffpal/diffpal';
+const metaPackages = ['diffpal', '@diffpal/diffpal'];
 const binName = 'diffpal';
 const platformSuffix = /-(darwin|linux|win32)-/;
 
@@ -24,20 +24,24 @@ const packages = fs.readdirSync(npmRoot, { withFileTypes: true })
   .map((entry) => path.join(npmRoot, entry.name, 'package.json'))
   .filter((file) => fs.existsSync(file));
 
-const metaFile = packages.find((file) => readJSON(file).name === metaPackage);
-if (!metaFile) {
-  throw new Error(`missing staged meta package ${metaPackage}`);
-}
+for (const metaPackage of metaPackages) {
+  const metaFile = metaPackage.startsWith('@')
+    ? packages.find((file) => readJSON(file).name === metaPackage)
+    : path.join(process.cwd(), '.omnidist', 'default', 'npm', metaPackage, 'package.json');
+  if (!metaFile || !fs.existsSync(metaFile)) {
+    throw new Error(`missing staged meta package ${metaPackage}`);
+  }
 
-const meta = readJSON(metaFile);
-if (!meta.bin || meta.bin[binName] !== 'diffpal.js') {
-  throw new Error(`${metaPackage} must expose bin.${binName}=diffpal.js`);
+  const meta = readJSON(metaFile);
+  if (meta.name !== metaPackage || !meta.bin || meta.bin[binName] !== 'diffpal.js') {
+    throw new Error(`${metaPackage} must expose bin.${binName}=diffpal.js`);
+  }
 }
 
 let changed = 0;
 for (const file of packages) {
   const pkg = readJSON(file);
-  if (pkg.name === metaPackage) {
+  if (metaPackages.includes(pkg.name)) {
     continue;
   }
   if (!pkg.name || !pkg.name.startsWith('@diffpal/diffpal-') || !platformSuffix.test(pkg.name)) {
@@ -51,8 +55,4 @@ for (const file of packages) {
   changed++;
 }
 
-if (changed === 0) {
-  throw new Error('no platform package bin fields were removed');
-}
-
-console.log(`normalized npm bin ownership: ${metaPackage} owns ${binName}; removed platform bin fields from ${changed} package(s)`);
+console.log(`normalized npm bin ownership: ${metaPackages.join(' and ')} own ${binName}; removed platform bin fields from ${changed} package(s)`);

@@ -10,11 +10,14 @@ Verified distribution paths in this repository:
 | --- | --- | --- |
 | npm one-shot | `npx -y @diffpal/diffpal@latest <command>` | Used by the quickstart. |
 | npm global | `npm install --global @diffpal/diffpal@latest` | Provides the `diffpal` executable. |
+| npm one-shot (unscoped) | `npx -y diffpal@latest <command>` | Same CLI and platform binaries. |
+| npm global (unscoped) | `npm install --global diffpal@latest` | Provides the `diffpal` executable. |
 | GitHub Action | `diffpal/action@v1` | Wraps DiffPal for GitHub Actions. See [GitHub Actions](../integrations/github-actions.md). |
 | Azure extension | `DiffPalReview@1` | Wraps DiffPal for Azure Pipelines. See [Azure Pipelines](../integrations/azure-pipelines.md). |
 
 Release builds are produced by Omnidist for npm packages and platform binaries.
-The npm meta-package is `@diffpal/diffpal`.
+The `diffpal` and `@diffpal/diffpal` npm meta-packages share the same
+`@diffpal` platform packages and version.
 
 ## Global Flags
 
