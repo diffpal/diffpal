@@ -26,7 +26,10 @@ profiles:
             cgo: false
         distributions:
             npm:
-                package: '@diffpal/diffpal'
+                package: diffpal
+                aliases:
+                    - '@diffpal/diffpal'
+                platform-package: '@diffpal/diffpal'
                 registry: https://registry.npmjs.org
                 access: public
                 publish-auth: trusted
