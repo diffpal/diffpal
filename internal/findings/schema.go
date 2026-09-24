@@ -12,6 +12,7 @@ const (
 	VersionV2 = "v2"
 	VersionV3 = "v3"
 	VersionV4 = "v4"
+	VersionV5 = "v5"
 )
 
 type LineSide string
@@ -33,6 +34,7 @@ type FindingsBundle struct {
 	ReviewID      string          `json:"review_id"`
 	BaseSHA       string          `json:"base_sha"`
 	HeadSHA       string          `json:"head_sha"`
+	MergeBaseSHA  string          `json:"merge_base_sha,omitempty"`
 	Language      string          `json:"language,omitempty"`
 	Prompt        *PromptMetadata `json:"prompt,omitempty"`
 	Inspection    *Inspection     `json:"inspection,omitempty"`
@@ -40,6 +42,8 @@ type FindingsBundle struct {
 	ReviewResult  string          `json:"review_result,omitempty"`
 	Files         []ReviewedFile  `json:"files,omitempty"`
 	Findings      []Finding       `json:"findings"`
+	Skips         json.RawMessage `json:"skips,omitempty"`
+	Stats         json.RawMessage `json:"stats,omitempty"`
 }
 
 type PromptMetadata struct {
@@ -63,23 +67,26 @@ type ReviewedFile struct {
 }
 
 type Finding struct {
-	ID             string          `json:"id"`
-	ReviewID       string          `json:"review_id"`
-	Category       string          `json:"category"`
-	Severity       string          `json:"severity"`
-	Confidence     float64         `json:"confidence"`
-	Path           string          `json:"path"`
-	StartLine      int             `json:"start_line"`
-	EndLine        int             `json:"end_line"`
-	ChangedSpan    LineSpan        `json:"changed_span"`
-	SupportingSpan *LineSpan       `json:"supporting_span,omitempty"`
-	Title          string          `json:"title"`
-	Message        string          `json:"message"`
-	Evidence       FindingEvidence `json:"evidence"`
-	Impact         FindingImpact   `json:"impact"`
-	Suggestion     string          `json:"suggestion,omitempty"`
-	Blocking       bool            `json:"blocking"`
-	Provider       string          `json:"provider"`
+	ID             string           `json:"id"`
+	ReviewID       string           `json:"review_id"`
+	Category       string           `json:"category"`
+	Severity       string           `json:"severity"`
+	Confidence     float64          `json:"confidence"`
+	Path           string           `json:"path"`
+	StartLine      int              `json:"start_line"`
+	EndLine        int              `json:"end_line"`
+	ChangedSpan    LineSpan         `json:"changed_span"`
+	SupportingSpan *LineSpan        `json:"supporting_span,omitempty"`
+	Title          string           `json:"title"`
+	Message        string           `json:"message"`
+	Evidence       FindingEvidence  `json:"evidence"`
+	Impact         FindingImpact    `json:"impact"`
+	Decision       *FindingDecision `json:"decision,omitempty"`
+	Model          string           `json:"model,omitempty"`
+	WorkItemID     string           `json:"work_item_id,omitempty"`
+	Suggestion     string           `json:"suggestion,omitempty"`
+	Blocking       bool             `json:"blocking"`
+	Provider       string           `json:"provider"`
 }
 
 type LineSpan struct {
@@ -90,9 +97,16 @@ type LineSpan struct {
 }
 
 type FindingEvidence struct {
-	Anchor         string `json:"anchor"`
-	ReasoningBasis string `json:"reasoning_basis"`
-	Source         string `json:"source"`
+	Kind           string `json:"kind,omitempty"`
+	RuleID         string `json:"rule_id,omitempty"`
+	Anchor         string `json:"anchor,omitempty"`
+	ReasoningBasis string `json:"reasoning_basis,omitempty"`
+	Source         string `json:"source,omitempty"`
+}
+
+type FindingDecision struct {
+	Kind  string  `json:"kind"`
+	Value float64 `json:"value"`
 }
 
 func NewEvidence(text string) FindingEvidence {
@@ -165,17 +179,21 @@ func (e ValidationError) Error() string {
 
 func Validate(bundle FindingsBundle) error {
 	version := ensureVersion(bundle.Version)
-	if version != VersionV1 && version != VersionV2 && version != VersionV3 && version != VersionV4 {
-		return ValidationError{Field: "version", Msg: "must be v1, v2, v3, or v4"}
+	if version != VersionV1 && version != VersionV2 && version != VersionV3 && version != VersionV4 && version != VersionV5 {
+		return ValidationError{Field: "version", Msg: "must be v1, v2, v3, v4, or v5"}
 	}
 	if bundle.ReviewID == "" {
 		return ValidationError{Field: "review_id", Msg: "review_id is required"}
+	}
+	if version == VersionV5 && (strings.TrimSpace(bundle.BaseSHA) == "" || strings.TrimSpace(bundle.HeadSHA) == "" || bundle.Findings == nil) {
+		return ValidationError{Field: "bundle", Msg: "base_sha, head_sha, and findings are required"}
 	}
 	for _, file := range bundle.Files {
 		if strings.TrimSpace(file.Path) == "" {
 			return ValidationError{Field: "file.path", Msg: "path is required"}
 		}
 	}
+	seenIDs := make(map[string]bool, len(bundle.Findings))
 	for _, f := range bundle.Findings {
 		if strings.TrimSpace(f.Path) == "" {
 			return ValidationError{Field: "finding.path", Msg: "path is required"}
@@ -195,7 +213,24 @@ func Validate(bundle FindingsBundle) error {
 		if f.Message == "" {
 			return ValidationError{Field: "finding.message", Msg: "message is required"}
 		}
-		if version == VersionV2 || version == VersionV3 || version == VersionV4 {
+		if version == VersionV5 {
+			if strings.TrimSpace(f.Provider) == "" {
+				return ValidationError{Field: "finding.provider", Msg: "provider is required"}
+			}
+			if f.ID == "" || seenIDs[f.ID] || f.ReviewID != bundle.ReviewID {
+				return ValidationError{Field: "finding.id", Msg: "unique id and matching review_id are required"}
+			}
+			seenIDs[f.ID] = true
+			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true, true); err != nil {
+				return err
+			}
+			if f.ChangedSpan.Path != f.Path || f.ChangedSpan.StartLine != f.StartLine || f.ChangedSpan.EndLine != f.EndLine {
+				return ValidationError{Field: "finding.changed_span", Msg: "must match finding location"}
+			}
+			if err := validateV5Evidence(f); err != nil {
+				return err
+			}
+		} else if version == VersionV2 || version == VersionV3 || version == VersionV4 {
 			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true, version == VersionV4); err != nil {
 				return err
 			}
@@ -256,6 +291,28 @@ func validateLineSpan(field string, span LineSpan, requirePath bool, requireSide
 	return nil
 }
 
+func validateV5Evidence(f Finding) error {
+	switch f.Evidence.Kind {
+	case "code":
+		if f.Evidence.RuleID != "" || f.Decision != nil || strings.TrimSpace(f.Evidence.Anchor) == "" ||
+			strings.TrimSpace(f.Evidence.ReasoningBasis) == "" || strings.TrimSpace(f.Evidence.Source) == "" ||
+			strings.TrimSpace(f.Impact.Summary) == "" || strings.TrimSpace(f.Impact.Scope) == "" {
+			return ValidationError{Field: "finding.evidence", Msg: "code evidence and impact are required"}
+		}
+	case "rule":
+		if f.Category != "rule_violation" || !strings.HasSuffix(f.Evidence.RuleID, ".md") ||
+			f.Evidence.Anchor != "" || f.Evidence.ReasoningBasis != "" || f.Evidence.Source != "" ||
+			f.Decision == nil || f.Decision.Kind != "noul_probability" ||
+			f.Decision.Value < 0 || f.Decision.Value > 1 ||
+			f.Impact.Summary != "" || f.Impact.Scope != "" {
+			return ValidationError{Field: "finding.evidence", Msg: "rule evidence and decision are required"}
+		}
+	default:
+		return ValidationError{Field: "finding.evidence.kind", Msg: "must be code or rule"}
+	}
+	return nil
+}
+
 func Normalize(bundle *FindingsBundle, repo string) {
 	for i := range bundle.Findings {
 		f := &bundle.Findings[i]
@@ -263,10 +320,13 @@ func Normalize(bundle *FindingsBundle, repo string) {
 			f.ReviewID = bundle.ReviewID
 		}
 		f.Severity = strings.ToLower(strings.TrimSpace(f.Severity))
+		if bundle.Version == VersionV5 && f.Evidence.Kind == "" {
+			f.Evidence.Kind = "code"
+		}
 		if f.ChangedSpan.Path == "" && f.StartLine > 0 && f.EndLine > 0 {
 			f.ChangedSpan = LineSpan{Path: f.Path, StartLine: f.StartLine, EndLine: f.EndLine}
 		}
-		if bundle.Version == VersionV4 && f.ChangedSpan.Side == "" {
+		if (bundle.Version == VersionV4 || bundle.Version == VersionV5 && f.Evidence.Kind == "code") && f.ChangedSpan.Side == "" {
 			f.ChangedSpan.Side = SideRight
 		}
 		if f.StartLine == 0 && f.ChangedSpan.StartLine > 0 {
@@ -278,11 +338,16 @@ func Normalize(bundle *FindingsBundle, repo string) {
 		if f.Path == "" && f.ChangedSpan.Path != "" {
 			f.Path = f.ChangedSpan.Path
 		}
-		f.ID = Fingerprint(repo, bundle.HeadSHA, *f)
+		if f.Evidence.Kind != "rule" || f.ID == "" {
+			f.ID = Fingerprint(repo, bundle.HeadSHA, *f)
+		}
 	}
 }
 
 func (f Finding) EvidenceText() string {
+	if f.Evidence.Kind == "rule" {
+		return f.Evidence.RuleID
+	}
 	parts := make([]string, 0, 3)
 	if text := strings.TrimSpace(f.Evidence.Anchor); text != "" {
 		parts = append(parts, text)
@@ -299,6 +364,9 @@ func (f Finding) EvidenceText() string {
 // EvidenceDisplayText returns evidence intended for user-facing output.
 // Evidence.Source is structured provenance for machines, not review prose.
 func (f Finding) EvidenceDisplayText() string {
+	if f.Evidence.Kind == "rule" {
+		return "Rule: " + f.Evidence.RuleID
+	}
 	parts := make([]string, 0, 2)
 	appendUnique := func(text string) {
 		text = strings.TrimSpace(text)

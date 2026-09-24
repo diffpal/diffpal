@@ -1,0 +1,25 @@
+{
+  "version": "v5",
+  "review_id": "diffpal-example",
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "findings": [
+    {
+      "id": "diffpal-finding-example",
+      "review_id": "diffpal-example",
+      "category": "correctness",
+      "severity": "high",
+      "confidence": 0.91,
+      "path": "internal/example.go",
+      "start_line": 8,
+      "end_line": 8,
+      "changed_span": {"path": "internal/example.go", "start_line": 8, "end_line": 8, "side": "LEFT"},
+      "title": "Removed validation",
+      "message": "The deleted check allowed an invalid input.",
+      "evidence": {"kind": "code", "anchor": "deleted validation branch", "reasoning_basis": "the branch rejected invalid input", "source": "changed_line"},
+      "impact": {"summary": "invalid input reaches callers", "scope": "request handling"},
+      "blocking": true,
+      "provider": "codex"
+    }
+  ]
+}

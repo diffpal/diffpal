@@ -231,6 +231,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	path := dir + "/findings.json"
 	bundle := FindingsBundle{
 		ReviewID: "review-a",
+		BaseSHA:  "base-a",
 		HeadSHA:  "head-a",
 		Prompt: &PromptMetadata{
 			PromptID:      "diffpal.review",
@@ -250,6 +251,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			Message:    "unsafe HTML sink",
 			Evidence:   NewEvidence("innerHTML receives tainted input"),
 			Impact:     NewImpact("attackers can execute script in another user's browser"),
+			Provider:   "test",
 		}},
 	}
 	if err := WriteBundle(path, bundle, "repo-a"); err != nil {
@@ -259,8 +261,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle() error = %v", err)
 	}
-	if readBack.Version != VersionV4 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	if readBack.Version != VersionV5 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV5)
 	}
 	if readBack.Findings[0].ChangedSpan.Side != SideRight {
 		t.Fatalf("ChangedSpan.Side = %q, want %q", readBack.Findings[0].ChangedSpan.Side, SideRight)

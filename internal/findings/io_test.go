@@ -24,6 +24,7 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 
 	bundle := FindingsBundle{
 		ReviewID: "review-default",
+		BaseSHA:  "base-default",
 		HeadSHA:  "head-default",
 		Findings: []Finding{{
 			Category:   "maintainability",
@@ -36,6 +37,7 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 			Message:    "conditional can never be true",
 			Evidence:   NewEvidence("constant comparison folds to false"),
 			Impact:     NewImpact("maintainers may spend time on unreachable logic"),
+			Provider:   "test",
 		}},
 	}
 
@@ -51,8 +53,8 @@ func TestWriteAndReadBundleDefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle(default path) error = %v", err)
 	}
-	if readBack.Version != VersionV4 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	if readBack.Version != VersionV5 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV5)
 	}
 	if got := readBack.Findings[0].Severity; got != "medium" {
 		t.Fatalf("Severity = %q, want medium", got)
@@ -100,6 +102,7 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 
 	bundle := FindingsBundle{
 		ReviewID: "review-format",
+		BaseSHA:  "base-format",
 		HeadSHA:  "head-format",
 		Findings: []Finding{{
 			Category:   "security",
@@ -112,6 +115,7 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 			Message:    "query concatenates untrusted input",
 			Evidence:   NewEvidence("user input is appended into SQL text"),
 			Impact:     NewImpact("attackers can run unintended queries"),
+			Provider:   "test",
 		}},
 	}
 
@@ -124,8 +128,9 @@ func TestFormatBundleProducesCanonicalJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &readBack); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
-	if readBack.Version != VersionV4 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	validateV5Schema(t, raw)
+	if readBack.Version != VersionV5 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV5)
 	}
 	if readBack.Findings[0].ID == "" {
 		t.Fatal("ID = empty, want fingerprint")
