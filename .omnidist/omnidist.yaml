@@ -27,6 +27,7 @@ profiles:
         distributions:
             npm:
                 package: diffpal
+                description: Open-source AI pull request review CLI for GitHub, GitLab, and Azure DevOps, running in your CI.
                 aliases:
                     - '@diffpal/diffpal'
                 platform-package: '@diffpal/diffpal'
