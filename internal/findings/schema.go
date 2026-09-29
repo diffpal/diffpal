@@ -213,7 +213,8 @@ func Validate(bundle FindingsBundle) error {
 		if f.Message == "" {
 			return ValidationError{Field: "finding.message", Msg: "message is required"}
 		}
-		if version == VersionV5 {
+		switch version {
+		case VersionV5:
 			if strings.TrimSpace(f.Provider) == "" {
 				return ValidationError{Field: "finding.provider", Msg: "provider is required"}
 			}
@@ -230,7 +231,7 @@ func Validate(bundle FindingsBundle) error {
 			if err := validateV5Evidence(f); err != nil {
 				return err
 			}
-		} else if version == VersionV2 || version == VersionV3 || version == VersionV4 {
+		case VersionV2, VersionV3, VersionV4:
 			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true, version == VersionV4); err != nil {
 				return err
 			}
@@ -254,7 +255,7 @@ func Validate(bundle FindingsBundle) error {
 			if strings.TrimSpace(f.Impact.Scope) == "" {
 				return ValidationError{Field: "finding.impact.scope", Msg: "scope is required"}
 			}
-		} else {
+		default:
 			if strings.TrimSpace(f.EvidenceText()) == "" {
 				return ValidationError{Field: "finding.evidence", Msg: "evidence is required"}
 			}

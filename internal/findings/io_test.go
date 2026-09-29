@@ -76,6 +76,27 @@ func TestReadBundleRejectsUnsupportedVersion(t *testing.T) {
 	}
 }
 
+func TestWriteBundlePreservesExplicitV4(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "findings.json")
+	bundle := FindingsBundle{
+		Version:  VersionV4,
+		ReviewID: "review-v4",
+		Findings: []Finding{},
+	}
+	if err := WriteBundle(path, bundle, "repo-v4"); err != nil {
+		t.Fatalf("WriteBundle() error = %v", err)
+	}
+	readBack, err := ReadBundle(path)
+	if err != nil {
+		t.Fatalf("ReadBundle() error = %v", err)
+	}
+	if readBack.Version != VersionV4 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	}
+}
+
 func TestReadBundleDefaultsLegacyChangedSpansToRight(t *testing.T) {
 	t.Parallel()
 
