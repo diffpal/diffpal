@@ -15,8 +15,7 @@ GitHub, GitLab, and Azure DevOps.
 
 DiffPal is the broad AI review CLI in the DiffPal family.
 [LintPal](https://github.com/diffpal/lintpal) is a separate CLI for checking
-explicit repository-owned Markdown rules against committed changes. They have
-separate report versions: DiffPal currently writes v4 and LintPal writes v5.
+explicit repository-owned Markdown rules against committed changes.
 For the rule workflow, see the
 [LintPal documentation](https://github.com/diffpal/lintpal/blob/main/docs/index.md).
 
