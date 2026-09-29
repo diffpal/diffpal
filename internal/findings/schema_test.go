@@ -231,6 +231,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	path := dir + "/findings.json"
 	bundle := FindingsBundle{
 		ReviewID: "review-a",
+		BaseSHA:  "base-a",
 		HeadSHA:  "head-a",
 		Prompt: &PromptMetadata{
 			PromptID:      "diffpal.review",
@@ -250,6 +251,7 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 			Message:    "unsafe HTML sink",
 			Evidence:   NewEvidence("innerHTML receives tainted input"),
 			Impact:     NewImpact("attackers can execute script in another user's browser"),
+			Provider:   "test",
 		}},
 	}
 	if err := WriteBundle(path, bundle, "repo-a"); err != nil {
@@ -259,8 +261,8 @@ func TestWriteBundleNormalizesAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBundle() error = %v", err)
 	}
-	if readBack.Version != VersionV4 {
-		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV4)
+	if readBack.Version != VersionV5 {
+		t.Fatalf("Version = %q, want %q", readBack.Version, VersionV5)
 	}
 	if readBack.Findings[0].ChangedSpan.Side != SideRight {
 		t.Fatalf("ChangedSpan.Side = %q, want %q", readBack.Findings[0].ChangedSpan.Side, SideRight)
@@ -359,6 +361,41 @@ func TestValidateV4RequiresCanonicalChangedSpanSide(t *testing.T) {
 		if err := Validate(candidate); err == nil {
 			t.Fatalf("Validate(v4 side %q) error = nil, want validation error", side)
 		}
+	}
+}
+
+func TestValidateV5RejectsInvalidSupportingSpan(t *testing.T) {
+	t.Parallel()
+
+	bundle := FindingsBundle{
+		Version:  VersionV5,
+		ReviewID: "review-v5",
+		BaseSHA:  "base",
+		HeadSHA:  "head",
+		Findings: []Finding{{
+			ID:             "finding-v5",
+			ReviewID:       "review-v5",
+			Category:       "correctness",
+			Severity:       "high",
+			Confidence:     0.9,
+			Path:           "app/session.go",
+			StartLine:      12,
+			EndLine:        12,
+			ChangedSpan:    LineSpan{Path: "app/session.go", StartLine: 12, EndLine: 12, Side: SideRight},
+			SupportingSpan: &LineSpan{Path: "app/session.go", StartLine: 9, EndLine: 9},
+			Title:          "Missing check",
+			Message:        "The changed line skips validation",
+			Evidence:       FindingEvidence{Kind: "code", Anchor: "changed line", ReasoningBasis: "validation is skipped", Source: "changed_line"},
+			Impact:         NewImpact("Invalid requests are accepted"),
+			Provider:       "test",
+		}},
+	}
+	if err := Validate(bundle); err != nil {
+		t.Fatalf("Validate(valid v5) error = %v", err)
+	}
+	bundle.Findings[0].SupportingSpan.EndLine = 0
+	if err := Validate(bundle); err == nil {
+		t.Fatal("Validate(invalid supporting span) error = nil")
 	}
 }
 

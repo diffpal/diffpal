@@ -84,13 +84,13 @@ func FormatBundle(bundle FindingsBundle, repo string) ([]byte, error) {
 
 func ensureWriteVersion(v string) string {
 	if v == "" {
-		return VersionV4
+		return VersionV5
 	}
 	return v
 }
 
 func defaultLegacySides(bundle *FindingsBundle) {
-	if bundle.Version == VersionV4 {
+	if bundle.Version == VersionV4 || bundle.Version == VersionV5 {
 		return
 	}
 	for i := range bundle.Findings {
