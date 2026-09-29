@@ -225,6 +225,11 @@ func Validate(bundle FindingsBundle) error {
 			if err := validateLineSpan("finding.changed_span", f.ChangedSpan, true, true); err != nil {
 				return err
 			}
+			if f.SupportingSpan != nil {
+				if err := validateLineSpan("finding.supporting_span", *f.SupportingSpan, true, false); err != nil {
+					return err
+				}
+			}
 			if f.ChangedSpan.Path != f.Path || f.ChangedSpan.StartLine != f.StartLine || f.ChangedSpan.EndLine != f.EndLine {
 				return ValidationError{Field: "finding.changed_span", Msg: "must match finding location"}
 			}

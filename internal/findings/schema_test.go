@@ -364,6 +364,41 @@ func TestValidateV4RequiresCanonicalChangedSpanSide(t *testing.T) {
 	}
 }
 
+func TestValidateV5RejectsInvalidSupportingSpan(t *testing.T) {
+	t.Parallel()
+
+	bundle := FindingsBundle{
+		Version:  VersionV5,
+		ReviewID: "review-v5",
+		BaseSHA:  "base",
+		HeadSHA:  "head",
+		Findings: []Finding{{
+			ID:             "finding-v5",
+			ReviewID:       "review-v5",
+			Category:       "correctness",
+			Severity:       "high",
+			Confidence:     0.9,
+			Path:           "app/session.go",
+			StartLine:      12,
+			EndLine:        12,
+			ChangedSpan:    LineSpan{Path: "app/session.go", StartLine: 12, EndLine: 12, Side: SideRight},
+			SupportingSpan: &LineSpan{Path: "app/session.go", StartLine: 9, EndLine: 9},
+			Title:          "Missing check",
+			Message:        "The changed line skips validation",
+			Evidence:       FindingEvidence{Kind: "code", Anchor: "changed line", ReasoningBasis: "validation is skipped", Source: "changed_line"},
+			Impact:         NewImpact("Invalid requests are accepted"),
+			Provider:       "test",
+		}},
+	}
+	if err := Validate(bundle); err != nil {
+		t.Fatalf("Validate(valid v5) error = %v", err)
+	}
+	bundle.Findings[0].SupportingSpan.EndLine = 0
+	if err := Validate(bundle); err == nil {
+		t.Fatal("Validate(invalid supporting span) error = nil")
+	}
+}
+
 func TestEvidenceDisplayTextOmitsStructuredSource(t *testing.T) {
 	t.Parallel()
 
