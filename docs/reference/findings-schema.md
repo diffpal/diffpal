@@ -35,6 +35,9 @@ Prompt metadata fields:
 | `purpose` | Prompt purpose. |
 | `schema_version` | Prompt output schema version, currently `findings.v4`. |
 
+The prompt schema version identifies provider output. It is independent of the
+stored findings bundle version.
+
 Inspection metadata fields:
 
 | Field | Meaning |
@@ -49,8 +52,8 @@ Inspection metadata fields:
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `id` | written by DiffPal | Deterministic fingerprint. |
-| `review_id` | written by DiffPal when missing | Review identifier copied from the bundle. |
+| `id` | yes for v5; written by DiffPal | Deterministic fingerprint. |
+| `review_id` | yes for v5; written by DiffPal when missing | Review identifier copied from the bundle. |
 | `category` | yes | Finding category. |
 | `severity` | yes | `low`, `medium`, `high`, or `critical`. |
 | `confidence` | for code evidence | Number from `0` to `1`. |
@@ -65,8 +68,8 @@ Inspection metadata fields:
 | `impact` | for code evidence | Structured impact. |
 | `decision` | for rule evidence | `kind: "noul_probability"` and numeric `value` from `0` to `1`. |
 | `suggestion` | no | Suggested fix. |
-| `blocking` | written by DiffPal | Whether the finding meets the active threshold. |
-| `provider` | no | Provider ID that produced the finding. |
+| `blocking` | yes for v5; written by DiffPal | Whether the finding meets the active threshold. |
+| `provider` | yes for v5 | Provider ID that produced the finding. |
 | `model` | no | Provider model when recorded. |
 | `work_item_id` | no | LintPal work item identifier when recorded. |
 

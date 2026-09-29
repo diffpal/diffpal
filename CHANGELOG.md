@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New reviews write shared findings v5 bundles. Consumers that validate v4 JSON
+  must adopt the v5 schema; DiffPal still reads existing v1-v4 bundles.
 - Added the DiffPal CLI command set and findings bundle runtime.
 - Added GitHub, GitLab, and Azure adapter contracts and platform-specific task wrappers.
 - Added the composite GitHub Action wrapper for `diffpal review github`.

@@ -18,8 +18,10 @@ DiffPal writes artifacts under `.artifacts/diffpal/` by default.
 
 ## Canonical Versus Host-Specific
 
-`findings.json` is the canonical DiffPal artifact. It contains validated
-structured findings and metadata independent of a code host.
+`findings.json` is the canonical DiffPal artifact. New reviews write the
+[shared findings v5 format](findings-schema.md), with validated structured
+findings and metadata independent of a code host. Existing v1-v4 artifacts
+remain readable.
 
 Host-specific artifacts are derived from the canonical bundle:
 
