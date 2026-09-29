@@ -11,8 +11,8 @@ intentional merge gate in GitHub Actions.
 [LintPal](https://github.com/diffpal/lintpal) is the rule-focused member of
 the DiffPal family. It checks committed changes against repository-owned
 Markdown requirements. DiffPal provides broader AI pull-request review across
-supported code hosts. The tools have separate CLIs and share the findings v5
-report format. Start with the
+supported code hosts. The tools have separate CLIs and report versions:
+DiffPal currently writes v4, while LintPal writes v5. Start with the
 [LintPal documentation](https://github.com/diffpal/lintpal/blob/main/docs/index.md)
 for its setup and rule workflow.
 
