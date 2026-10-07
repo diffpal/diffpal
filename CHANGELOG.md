@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Added `registry_acp` provider support for launching agents from the official
+  ACP Registry, with an explicit command override, configuration examples, and
+  provider guidance.
+- Added `agy_acp` and its `antigravity_acp` compatibility alias, including
+  launcher-aware `doctor` checks.
+- Added configurable ACP session option IDs through `model_config_id` and
+  `reasoning_effort_config_id`.
+- Changed provider validation to normalize the selected runtime provider up
+  front; deprecated `gemini_acp` configurations are rejected and should use a
+  verified `generic_acp` command instead.
+- Updated Norma Runtime from v2.0.9 to v2.0.11 and the ACP agent library from
+  v2.2.1 to v2.2.5, adapting permission handling while preserving the existing
+  allow-once, allow-always, and cancellation behavior.
 - New reviews write shared findings v5 bundles; existing v1-v4 bundles remain readable.
 - Added the DiffPal CLI command set and findings bundle runtime.
 - Added GitHub, GitLab, and Azure adapter contracts and platform-specific task wrappers.
