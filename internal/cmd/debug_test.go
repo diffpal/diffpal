@@ -72,7 +72,7 @@ diffpal:
 		"## Task Snapshot",
 		"DiffPal review task snapshot",
 		"## Mock Bundle",
-		`"version": "v4"`,
+		`"version": "v5"`,
 		`"schema_version": "findings.v4"`,
 		"Debug harness rendered the review task without contacting a provider.",
 	} {

@@ -81,6 +81,38 @@ func TestReviewLocalSubcommandUsesLocalBehavior(t *testing.T) {
 	}
 }
 
+func TestReviewLocalWritesV5Bundle(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeTestConfig(t, dir)
+
+	cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, _ reviewer.Options) (reviewer.Result, error) {
+		result := testReviewResult("local")
+		result.Bundle.Version = findings.VersionV5
+		result.Bundle.Findings[0].Impact = findings.NewImpact("example impact")
+		return result, nil
+	})
+	path := filepath.Join(dir, "findings.json")
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"local", "--out", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	bundle, err := findings.ReadBundle(path)
+	if err != nil {
+		t.Fatalf("ReadBundle() error = %v", err)
+	}
+	if bundle.Version != findings.VersionV5 {
+		t.Fatalf("bundle version = %q, want v5", bundle.Version)
+	}
+	if len(bundle.Findings) != 1 || bundle.Findings[0].Evidence.Kind != "code" ||
+		bundle.Findings[0].ChangedSpan.Side != findings.SideRight {
+		t.Fatalf("unexpected v5 finding: %+v", bundle.Findings)
+	}
+}
+
 func TestReviewLocalFeedbackSummaryOmitsDetailedComments(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

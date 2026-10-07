@@ -13,8 +13,15 @@ hosted review service. Bring Codex, Copilot, OpenCode, another supported
 provider, or any ACP-compatible agent, and keep one review workflow across
 GitHub, GitLab, and Azure DevOps.
 
+DiffPal is the broad AI review CLI in the DiffPal family.
+[LintPal](https://github.com/diffpal/lintpal) is a separate CLI for checking
+explicit repository-owned Markdown rules against committed changes.
+For the rule workflow, see the
+[LintPal documentation](https://github.com/diffpal/lintpal/blob/main/docs/index.md).
+
 [Quickstart](docs/getting-started/github-quickstart.md) ·
 [Documentation](docs/README.md) ·
+[Live Demo](https://github.com/diffpal/demo/pull/13) ·
 [Security](docs/security.md) ·
 [GitHub](https://github.com/diffpal/diffpal)
 

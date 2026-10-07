@@ -1,0 +1,23 @@
+{
+  "version": "v5",
+  "review_id": "lintpal-example",
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "findings": [
+    {
+      "id": "lintpal-finding-example",
+      "review_id": "lintpal-example",
+      "category": "rule_violation",
+      "severity": "medium",
+      "path": "internal/example.go",
+      "start_line": 12,
+      "end_line": 12,
+      "changed_span": {"path": "internal/example.go", "start_line": 12, "end_line": 12, "side": "RIGHT"},
+      "title": "Possible rule violation",
+      "message": "Changed code may violate go/errors.md.",
+      "evidence": {"kind": "rule", "rule_id": "go/errors.md"},
+      "blocking": false,
+      "provider": "systemone"
+    }
+  ]
+}

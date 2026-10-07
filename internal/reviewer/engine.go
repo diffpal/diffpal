@@ -186,7 +186,7 @@ func RunWithRuntime(ctx context.Context, cfg dpconfig.Config, opts Options, runt
 	reviewed := reviewedFiles(filtered)
 	prompt := promptpack.DefaultReviewPrompt()
 	bundle := findings.FindingsBundle{
-		Version:  findings.VersionV4,
+		Version:  findings.VersionV5,
 		ReviewID: reviewID,
 		BaseSHA:  result.BaseSHA,
 		HeadSHA:  result.HeadSHA,

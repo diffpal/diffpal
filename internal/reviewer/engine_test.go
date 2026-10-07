@@ -565,8 +565,8 @@ func TestRunWithRuntimeRetainsDeletedOwnershipCheck(t *testing.T) {
 	if result.Bundle.ReviewResult != runtime.outputs[0].ReviewResult || len(result.Bundle.ChangeSummary) != 1 {
 		t.Fatalf("summary output lost: result=%q summary=%v", result.Bundle.ReviewResult, result.Bundle.ChangeSummary)
 	}
-	if result.Bundle.Version != findings.VersionV4 {
-		t.Fatalf("bundle version = %q, want %q", result.Bundle.Version, findings.VersionV4)
+	if result.Bundle.Version != findings.VersionV5 {
+		t.Fatalf("bundle version = %q, want %q", result.Bundle.Version, findings.VersionV5)
 	}
 	bundleJSON, err := json.Marshal(result.Bundle)
 	if err != nil {

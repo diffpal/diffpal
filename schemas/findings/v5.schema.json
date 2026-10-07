@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/diffpal/diffpal/blob/main/schemas/findings/v5.schema.json",
+  "title": "DiffPal and LintPal findings bundle v5",
+  "type": "object",
+  "required": ["version", "review_id", "base_sha", "head_sha", "findings"],
+  "properties": {
+    "version": {"const": "v5"},
+    "review_id": {"$ref": "#/$defs/nonempty"},
+    "base_sha": {"$ref": "#/$defs/nonempty"},
+    "head_sha": {"$ref": "#/$defs/nonempty"},
+    "merge_base_sha": {"$ref": "#/$defs/nonempty"},
+    "language": {"type": "string"},
+    "prompt": {"type": "object"},
+    "inspection": {"type": "object"},
+    "change_summary": {"type": "array", "items": {"type": "string"}},
+    "review_result": {"type": "string"},
+    "files": {"type": "array", "items": {"type": "object", "required": ["path"], "properties": {"path": {"$ref": "#/$defs/nonempty"}, "status": {"type": "string"}}}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "skips": {"type": "array", "items": {"type": "object", "required": ["reason"], "properties": {"old_path": {"type": "string"}, "new_path": {"type": "string"}, "reason": {"enum": ["binary", "non_regular", "no_changed_lines"]}}}},
+    "stats": {"type": "object", "properties": {"work_items": {"$ref": "#/$defs/count"}, "skipped": {"$ref": "#/$defs/count"}, "groups": {"$ref": "#/$defs/count"}, "batches": {"$ref": "#/$defs/count"}, "questions": {"$ref": "#/$defs/count"}, "diagnostics": {"$ref": "#/$defs/count"}, "input_tokens": {"$ref": "#/$defs/count"}, "output_tokens": {"$ref": "#/$defs/count"}}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonempty": {"type": "string", "minLength": 1},
+    "count": {"type": "integer", "minimum": 0},
+    "span": {
+      "type": "object",
+      "required": ["path", "start_line", "end_line", "side"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonempty"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "side": {"enum": ["LEFT", "RIGHT"]}
+      },
+      "additionalProperties": false
+    },
+    "supporting_span": {
+      "type": "object",
+      "required": ["path", "start_line", "end_line"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonempty"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "side": {"enum": ["LEFT", "RIGHT"]}
+      },
+      "additionalProperties": false
+    },
+    "code_evidence": {
+      "type": "object",
+      "required": ["kind", "anchor", "reasoning_basis", "source"],
+      "properties": {
+        "kind": {"const": "code"},
+        "anchor": {"$ref": "#/$defs/nonempty"},
+        "reasoning_basis": {"$ref": "#/$defs/nonempty"},
+        "source": {"$ref": "#/$defs/nonempty"}
+      },
+      "additionalProperties": false
+    },
+    "rule_evidence": {
+      "type": "object",
+      "required": ["kind", "rule_id"],
+      "properties": {
+        "kind": {"const": "rule"},
+        "rule_id": {"type": "string", "minLength": 4, "pattern": "\\.md$"}
+      },
+      "additionalProperties": false
+    },
+    "impact": {
+      "type": "object",
+      "required": ["summary", "scope"],
+      "properties": {"summary": {"$ref": "#/$defs/nonempty"}, "scope": {"$ref": "#/$defs/nonempty"}},
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {"kind": {"const": "noul_probability"}, "value": {"type": "number", "minimum": 0, "maximum": 1}},
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "review_id", "category", "severity", "path", "start_line", "end_line", "changed_span", "title", "message", "evidence", "blocking", "provider"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonempty"},
+        "review_id": {"$ref": "#/$defs/nonempty"},
+        "category": {"$ref": "#/$defs/nonempty"},
+        "severity": {"enum": ["low", "medium", "high", "critical"]},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "path": {"$ref": "#/$defs/nonempty"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "changed_span": {"$ref": "#/$defs/span"},
+        "supporting_span": {"$ref": "#/$defs/supporting_span"},
+        "title": {"$ref": "#/$defs/nonempty"},
+        "message": {"$ref": "#/$defs/nonempty"},
+        "evidence": {"oneOf": [{"$ref": "#/$defs/code_evidence"}, {"$ref": "#/$defs/rule_evidence"}]},
+        "impact": {"$ref": "#/$defs/impact"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "suggestion": {"type": "string"},
+        "blocking": {"type": "boolean"},
+        "provider": {"$ref": "#/$defs/nonempty"},
+        "model": {"type": "string"},
+        "work_item_id": {"type": "string"}
+      },
+      "allOf": [
+        {"if": {"properties": {"evidence": {"$ref": "#/$defs/code_evidence"}}}, "then": {"required": ["confidence", "impact"], "not": {"required": ["decision"]}}},
+        {"if": {"properties": {"evidence": {"$ref": "#/$defs/rule_evidence"}}}, "then": {"required": ["decision"], "properties": {"category": {"const": "rule_violation"}}, "not": {"anyOf": [{"required": ["confidence"]}, {"required": ["impact"]}]}}}
+      ],
+      "additionalProperties": false
+    }
+  }
+}

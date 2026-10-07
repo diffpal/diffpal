@@ -2,6 +2,19 @@
 
 Choose the section that matches what you want to do.
 
+[View the live DiffPal demo review](https://github.com/diffpal/demo/pull/13) to
+see a review summary, inline findings, downloadable artifacts, and an
+intentional merge gate in GitHub Actions.
+
+## Related project: LintPal
+
+[LintPal](https://github.com/diffpal/lintpal) is the rule-focused member of
+the DiffPal family. It checks committed changes against repository-owned
+Markdown requirements. DiffPal provides broader AI pull-request review across
+supported code hosts. Start with the
+[LintPal documentation](https://github.com/diffpal/lintpal/blob/main/docs/index.md)
+for its setup and rule workflow.
+
 ## Getting Started
 
 Use [Getting Started](getting-started/README.md) for the first successful
