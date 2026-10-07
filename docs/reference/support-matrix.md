@@ -39,13 +39,16 @@ Supported runtime provider types:
 | `codex_acp` | Stable public setup | Default onboarding provider type. |
 | `copilot_acp` | Stable public setup | Documented provider page and examples. |
 | `opencode_acp` | Stable public setup | Documented provider page and config example. |
+| `registry_acp` | Stable public config | Runs a selected official ACP Registry entry through the runtime launcher; individual agents are not certified by DiffPal. |
 | `generic_acp` | Stable public setup | Bring your own ACP-compatible CLI. |
 | `openai` | Supported config type | Hosted API config type; use when explicitly configured. |
 | `aistudio` | Supported config type | Hosted API config type; use when explicitly configured. |
-| `gemini_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
+| `gemini_acp` | Deprecated / rejected | Configure a verified Gemini ACP command through `generic_acp` instead. |
 | `claude_code_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
 | `claude_acp` | Compatibility alias | Uses the `claude_code_acp` configuration block. |
 | `grok_acp` | Supported runtime type | No dedicated public setup page in this docs set. |
+| `agy_acp` | Supported runtime type | Antigravity ACP provider resolved through the runtime launcher. |
+| `antigravity_acp` | Compatibility alias | Alias for `agy_acp`. |
 | `pool` | Supported runtime type | Ordered provider failover config. |
 
 No provider account is managed by DiffPal. Provider authentication belongs to

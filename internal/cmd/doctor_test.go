@@ -39,6 +39,13 @@ func TestProviderBinary(t *testing.T) {
 		{name: "gemini", cfg: config.ProviderConfig{Type: "gemini_acp", GeminiACP: &agentconfig.ACPConfig{}}, want: "gemini"},
 		{name: "claude", cfg: config.ProviderConfig{Type: "claude_code_acp", ClaudeCodeACP: &agentconfig.ACPConfig{}}, want: "claude"},
 		{name: "codex", cfg: config.ProviderConfig{Type: "codex_acp", CodexACP: &agentconfig.ACPConfig{}}, want: "codex"},
+		{name: "registry", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{RegistryID: "amp-acp"}}, want: "npx"},
+		{name: "registry command wins", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{Cmd: []string{"custom-acprun"}}}, want: "custom-acprun"},
+		{name: "invalid registry", cfg: config.ProviderConfig{Type: "registry_acp", RegistryACP: &agentconfig.ACPConfig{}}, want: ""},
+		{name: "agy", cfg: config.ProviderConfig{Type: "agy_acp", AgyACP: &agentconfig.ACPConfig{}}, want: "npx"},
+		{name: "antigravity", cfg: config.ProviderConfig{Type: "antigravity_acp", AntigravityACP: &agentconfig.ACPConfig{}}, want: "npx"},
+		{name: "agy command wins", cfg: config.ProviderConfig{Type: "agy_acp", AgyACP: &agentconfig.ACPConfig{Cmd: []string{"custom-agy"}}}, want: "custom-agy"},
+		{name: "antigravity command wins", cfg: config.ProviderConfig{Type: "antigravity_acp", AntigravityACP: &agentconfig.ACPConfig{Cmd: []string{"custom-antigravity"}}}, want: "custom-antigravity"},
 		{name: "empty", cfg: config.ProviderConfig{Type: "openai", OpenAI: &agentconfig.LocalAPIConfig{}}, want: ""},
 	}
 	for _, tc := range cases {

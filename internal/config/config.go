@@ -193,8 +193,12 @@ func (cfg Config) Validate() error {
 	if providerID == "" {
 		return fmt.Errorf("diffpal.provider is required")
 	}
-	if _, ok := cfg.Providers[providerID]; !ok {
+	providerCfg, ok := cfg.Providers[providerID]
+	if !ok {
 		return fmt.Errorf("unknown diffpal.provider %q", providerID)
+	}
+	if _, err := agentconfig.NormalizeConfig(providerCfg, ""); err != nil {
+		return fmt.Errorf("normalize diffpal.provider %q: %w", providerID, err)
 	}
 	blockOn := cfg.BlockOn()
 	if _, ok := validSeverityThresholds[blockOn]; !ok {

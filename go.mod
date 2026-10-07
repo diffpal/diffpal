@@ -13,8 +13,8 @@ require (
 	github.com/coder/acp-go-sdk v0.13.5
 	github.com/google/uuid v1.6.0
 	github.com/microsoft/azure-devops-go-api/azuredevops/v7 v7.1.0
-	github.com/normahq/go-adk-acpagent/v2 v2.2.1
-	github.com/normahq/runtime/v2 v2.0.9
+	github.com/normahq/go-adk-acpagent/v2 v2.2.5
+	github.com/normahq/runtime/v2 v2.0.11
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	gitlab.com/gitlab-org/api/client-go v1.46.0

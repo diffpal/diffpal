@@ -12,6 +12,7 @@ import (
 	"github.com/diffpal/diffpal/internal/config"
 	"github.com/diffpal/diffpal/internal/platformauth"
 	"github.com/diffpal/diffpal/internal/provider"
+	"github.com/normahq/runtime/v2/agentconfig"
 	"github.com/normahq/runtime/v2/agentfactory"
 	"github.com/normahq/runtime/v2/mcpregistry"
 	"github.com/spf13/cobra"
@@ -228,6 +229,21 @@ func providerBinary(cfg config.ProviderConfig) string {
 	case "generic_acp":
 		if cfg.GenericACP != nil && len(cfg.GenericACP.Cmd) > 0 {
 			return cfg.GenericACP.Cmd[0]
+		}
+	case "registry_acp":
+		if cfg.RegistryACP == nil {
+			return ""
+		}
+		if len(cfg.RegistryACP.Cmd) > 0 {
+			return cfg.RegistryACP.Cmd[0]
+		}
+		if strings.TrimSpace(cfg.RegistryACP.RegistryID) != "" {
+			return "npx"
+		}
+	case "agy_acp", "antigravity_acp":
+		resolved, err := agentconfig.NormalizeConfig(cfg, "")
+		if err == nil && len(resolved.Command) > 0 {
+			return resolved.Command[0]
 		}
 	}
 	return ""
