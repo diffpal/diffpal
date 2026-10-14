@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -429,7 +430,7 @@ func normalizeBundleBlocking(bundle findings.FindingsBundle, blockOn string) (fi
 	}
 	decisions := policy.ApplyPolicy(policy.Policy{BlockOn: sev}, items)
 	out := bundle
-	out.Findings = append([]findings.Finding(nil), bundle.Findings...)
+	out.Findings = slices.Clone(bundle.Findings)
 	for i := range out.Findings {
 		out.Findings[i].Blocking = decisions[i].Action == "block"
 	}

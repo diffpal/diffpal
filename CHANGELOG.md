@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.2.1
+
+- Fixed reviews with no findings failing to save their report. Local and
+  uncommitted reviews now preserve `findings: []` and finish successfully.
+
+## 0.2.0
+
 - Added `registry_acp` provider support for launching agents from the official
   ACP Registry, with an explicit command override, configuration examples, and
   provider guidance.
