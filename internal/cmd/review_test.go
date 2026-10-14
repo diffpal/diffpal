@@ -113,6 +113,45 @@ func TestReviewLocalWritesV5Bundle(t *testing.T) {
 	}
 }
 
+func TestReviewWithoutFindingsWritesEmptyArray(t *testing.T) {
+	for _, mode := range []string{"local", "uncommitted"} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			writeTestConfig(t, dir)
+
+			outPath := filepath.Join(dir, "findings.json")
+			cmd := newReviewCommandWithRunner(func(_ context.Context, _ dpconfig.Config, opts reviewer.Options) (reviewer.Result, error) {
+				return reviewer.Result{Bundle: findings.FindingsBundle{
+					Version:  findings.VersionV5,
+					ReviewID: opts.ReviewID,
+					BaseSHA:  "base-a",
+					HeadSHA:  "head-a",
+					Findings: []findings.Finding{},
+				}}, nil
+			})
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			cmd.SetErr(&out)
+			cmd.SetArgs([]string{mode, "--gate", "--out", outPath})
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			bundle, err := findings.ReadBundle(outPath)
+			if err != nil {
+				t.Fatalf("ReadBundle() error = %v", err)
+			}
+			if bundle.Findings == nil || len(bundle.Findings) != 0 {
+				t.Fatalf("persisted findings = %#v, want initialized empty slice", bundle.Findings)
+			}
+			if bundle.BaseSHA != "base-a" || bundle.HeadSHA != "head-a" {
+				t.Fatalf("persisted SHAs = %q, %q, want base-a, head-a", bundle.BaseSHA, bundle.HeadSHA)
+			}
+		})
+	}
+}
+
 func TestReviewLocalFeedbackSummaryOmitsDetailedComments(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
