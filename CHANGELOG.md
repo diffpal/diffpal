@@ -6,6 +6,8 @@
 
 - Fixed reviews with no findings failing to save their report. Local and
   uncommitted reviews now preserve `findings: []` and finish successfully.
+- Updated Go to 1.26.9 and `golang.org/x/net` to v0.60.0, including required
+  transitive dependency updates, to address reported network vulnerabilities.
 
 ## 0.2.0
 
